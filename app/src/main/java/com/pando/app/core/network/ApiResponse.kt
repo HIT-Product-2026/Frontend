@@ -1,4 +1,4 @@
-package com.jollibee.frontend.core.network
+package com.pando.app.core.network
 
 data class ApiResponse<T>(
     val code: Int,

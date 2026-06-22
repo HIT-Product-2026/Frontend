@@ -1,4 +1,4 @@
-package com.jollibee.frontend.core.utils
+package com.pando.app.core.utils
 
 sealed class DataResult<out T> {
     data class Success<out T>(val data: T, val message: String? = null) : DataResult<T>()

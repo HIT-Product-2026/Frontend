@@ -1,10 +1,12 @@
 plugins {
     alias(libs.plugins.android.application)
     id("com.google.devtools.ksp")
+    id("androidx.navigation.safeargs.kotlin")
+    id("com.google.dagger.hilt.android")
 }
 
 android {
-    namespace = "com.jollibee.frontend"
+    namespace = "com.pando.app"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -13,7 +15,7 @@ android {
 
     defaultConfig {
         applicationId = "com.jollibee.frontend"
-        minSdk = 23
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -40,6 +42,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.activity.ktx)
+    implementation(libs.androidx.annotation)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.core.ktx)
@@ -49,7 +52,6 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
 
     val lifecycle_version = "2.8.7"
-
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle_version")
@@ -67,4 +69,15 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    val nav_version = "2.7.7"
+    implementation("androidx.navigation:navigation-fragment-ktx:$nav_version")
+    implementation("androidx.navigation:navigation-ui-ktx:$nav_version")
+
+    implementation("com.intuit.sdp:sdp-android:1.1.1")
+
+    val hilt_version = "2.59.2"
+    implementation("com.google.dagger:hilt-android:$hilt_version")
+    ksp("com.google.dagger:hilt-android-compiler:$hilt_version")
+
 }

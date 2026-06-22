@@ -1,4 +1,4 @@
-package com.jollibee.frontend.core.ui
+package com.pando.app.core.ui
 
 sealed class UiState<out T> {
     object Idle : UiState<Nothing>()

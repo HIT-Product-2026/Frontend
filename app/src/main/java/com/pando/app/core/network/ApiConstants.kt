@@ -1,4 +1,4 @@
-package com.jollibee.frontend.core.network
+package com.pando.app.core.network
 
 object ApiConstants {
     const val BASE_URL = ""

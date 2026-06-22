@@ -1,4 +1,4 @@
-package com.jollibee.frontend.core.network
+package com.pando.app.core.network
 
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor

@@ -1,17 +1,17 @@
-package com.jollibee.frontend.core.base
+package com.pando.app.core.base
 
-import com.jollibee.frontend.core.network.ApiResponse
-import com.jollibee.frontend.core.utils.DataResult
+import com.pando.app.core.network.ApiResponse
+import com.pando.app.core.utils.DataResult
 import retrofit2.Response
 
 open class BaseRepository {
-    protected suspend fun <T> safeApiCall( call: suspend () -> Response<ApiResponse<T>> ): DataResult<ApiResponse<T>> {
+    protected suspend fun <T> safeApiCall( call: suspend () -> Response<ApiResponse<T>> ): DataResult<T> {
         return try {
             val response = call()
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    DataResult.Success(body)
+                    DataResult.Success(body.data)
                 } else {
                     DataResult.Error("Response body is null", response.code())
                 }
