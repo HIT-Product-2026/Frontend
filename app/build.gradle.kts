@@ -70,14 +70,18 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-    val nav_version = "2.7.7"
+    val nav_version = "2.9.8"
     implementation("androidx.navigation:navigation-fragment-ktx:$nav_version")
     implementation("androidx.navigation:navigation-ui-ktx:$nav_version")
+    implementation("androidx.navigation:navigation-dynamic-features-fragment:${nav_version}")
+    androidTestImplementation("androidx.navigation:navigation-testing:$nav_version")
 
     implementation("com.intuit.sdp:sdp-android:1.1.1")
 
     val hilt_version = "2.59.2"
     implementation("com.google.dagger:hilt-android:$hilt_version")
     ksp("com.google.dagger:hilt-android-compiler:$hilt_version")
+
+    implementation("io.github.chaosleung:pinview:1.4.4")
 
 }
