@@ -94,12 +94,13 @@
         </com.google.android.material.textfield.TextInputLayout>
 
         <TextView
+            android:id="@+id/registerButton"
             android:layout_width="match_parent"
             android:layout_height="@dimen/_40sdp"
             android:layout_marginTop="@dimen/_20sdp"
             android:background="@drawable/green_bg"
             android:gravity="center"
-            android:text="Đăng nhập"
+            android:text="Đăng ký"
             android:textColor="@color/white"
             android:textSize="@dimen/_13sdp"
             android:textStyle="bold" />
@@ -120,6 +121,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/loginButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="@dimen/_5sdp"
