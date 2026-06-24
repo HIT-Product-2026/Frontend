@@ -12,6 +12,15 @@ class StartFragment : BaseFragment<FragmentStartBinding>(FragmentStartBinding::i
     }
 
     override fun initView() {
+        findNavController().currentBackStackEntry?.savedStateHandle?.getLiveData<Boolean>("is_verified")
+            ?.observe(viewLifecycleOwner) { isVerified ->
+                if (isVerified == true) {
+
+                    findNavController().currentBackStackEntry?.savedStateHandle?.remove<Boolean>("is_verified")
+
+                    findNavController().navigate(R.id.action_startFragment_to_loginFragment)
+                }
+            }
     }
 
     override fun initActionView() {

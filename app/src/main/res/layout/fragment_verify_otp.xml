@@ -86,8 +86,7 @@
                 app:itemRadius="@dimen/_13sdp"
                 app:viewType="rectangle"
                 app:lineColor="@color/green1"
-                android:itemBackground="@drawable/green1_bg"
-                app:itemBackgroundColor="@color/green1" />
+                android:itemBackground="@drawable/green1_bg" />
 
             <RelativeLayout
                 android:layout_width="match_parent"
@@ -107,6 +106,7 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/verifyOtpBtn"
             android:layout_width="@dimen/_250sdp"
             android:layout_height="@dimen/_40sdp"
             android:layout_marginTop="@dimen/_20sdp"
