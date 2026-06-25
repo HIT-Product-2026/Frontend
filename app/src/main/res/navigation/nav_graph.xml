@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/startFragment">
+
+    <fragment
+        android:id="@+id/startFragment"
+        android:name="com.pando.app.features.auth.ui.start.StartFragment"
+        android:label="fragment_start"
+        tools:layout="@layout/fragment_start">
+
+        <action
+            android:id="@+id/action_startFragment_to_loginFragment"
+            app:destination="@+id/loginBottomSheet" />
+
+        <action
+            android:id="@+id/action_startFragment_to_registerFragment"
+            app:destination="@+id/registerBottomSheet" />
+
+    </fragment>
+
+    <dialog
+        android:id="@+id/loginBottomSheet"
+        android:name="com.pando.app.features.auth.ui.login.LoginFragment"
+        tools:layout="@layout/fragment_login">
+        <action
+            android:id="@+id/action_loginBottomSheet_to_forgotPasswordFragment"
+            app:destination="@id/forgotPasswordFragment" />
+        <action
+            android:id="@+id/action_loginBottomSheet_to_registerBottomSheet"
+            app:destination="@id/registerBottomSheet"
+            app:popUpTo="@id/startFragment" />
+    </dialog>
+
+    <dialog
+        android:id="@+id/registerBottomSheet"
+        android:name="com.pando.app.features.auth.ui.register.RegisterFragment"
+        tools:layout="@layout/fragment_register">
+        <action
+            android:id="@+id/action_registerBottomSheet_to_verifyOtpFragment"
+            app:destination="@id/verifyOtpFragment" />
+        <action
+            android:id="@+id/action_registerBottomSheet_to_loginBottomSheet"
+            app:destination="@id/loginBottomSheet"
+            app:popUpTo="@id/startFragment" />
+    </dialog>
+
+    <fragment
+        android:id="@+id/forgotPasswordFragment"
+        android:name="com.pando.app.features.auth.ui.forgotpassword.ForgotPasswordFragment"
+        android:label="fragment_forgot_password"
+        tools:layout="@layout/fragment_forgot_password">
+        <action
+            android:id="@+id/action_forgotPasswordFragment_to_verifyOtpFragment"
+            app:destination="@id/verifyOtpFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/verifyOtpFragment"
+        android:name="com.pando.app.features.auth.ui.verifyotp.VerifyOtpFragment"
+        android:label="fragment_verify_otp"
+        tools:layout="@layout/fragment_verify_otp">
+        <action
+            android:id="@+id/action_verifyOtpFragment_to_resetPasswordFragment"
+            app:destination="@id/resetPasswordFragment" />
+        <argument
+            android:name="isRegister"
+            android:defaultValue=""
+            app:argType="string" />
+        <argument
+            android:name="receiveEmail"
+            android:defaultValue=""
+            app:argType="string" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/resetPasswordFragment"
+        android:name="com.pando.app.features.auth.ui.resetpassword.ResetPasswordFragment"
+        android:label="fragment_reset_password"
+        tools:layout="@layout/fragment_reset_password" >
+        <argument
+            android:name="receiveEmail"
+            android:defaultValue=""
+            app:argType="string" />
+    </fragment>
+
+</navigation>

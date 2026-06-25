@@ -16,22 +16,10 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
-    private lateinit var bottomSheetBehavior: BottomSheetBehavior<FragmentContainerView>
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        if (savedInstanceState == null) {
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.FragmentContainer, StartFragment())
-                .commit()
-        }
-    }
-
-    fun setBottomSheetState(state: Int) {
-        bottomSheetBehavior.state = state
     }
 }

@@ -5,13 +5,13 @@ import com.pando.app.core.utils.DataResult
 import retrofit2.Response
 
 open class BaseRepository {
-    protected suspend fun <T> safeApiCall( call: suspend () -> Response<ApiResponse<T>> ): DataResult<T> {
+    protected suspend fun <T> safeApiCall( call: suspend () -> Response<ApiResponse<T>> ): DataResult<ApiResponse<T>> {
         return try {
             val response = call()
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    DataResult.Success(body.data)
+                    DataResult.Success(body)
                 } else {
                     DataResult.Error("Response body is null", response.code())
                 }

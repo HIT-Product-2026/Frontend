@@ -1,4 +1,4 @@
-package com.jollibee.frontend
+package com.pando.app
 
 import org.junit.Test
 
