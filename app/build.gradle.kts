@@ -3,6 +3,7 @@ plugins {
     id("com.google.devtools.ksp")
     id("androidx.navigation.safeargs.kotlin")
     id("com.google.dagger.hilt.android")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -83,5 +84,9 @@ dependencies {
     ksp("com.google.dagger:hilt-android-compiler:$hilt_version")
 
     implementation("io.github.chaosleung:pinview:1.4.4")
+
+    implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
+    implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.firebase:firebase-analytics")
 
 }
