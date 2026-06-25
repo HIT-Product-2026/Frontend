@@ -32,6 +32,7 @@
             app:hintEnabled="false">
 
             <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/emailET"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Email"
@@ -59,6 +60,7 @@
             app:hintEnabled="false">
 
             <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/passwordET"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Mật khẩu"
@@ -86,6 +88,7 @@
             app:hintEnabled="false">
 
             <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/confirmPasswordET"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Mật khẩu"

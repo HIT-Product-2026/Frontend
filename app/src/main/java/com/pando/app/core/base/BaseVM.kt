@@ -13,10 +13,10 @@ abstract class BaseVM<T> : ViewModel() {
     private val _uiState = MutableStateFlow<UiState<T>>(UiState.Idle)
     val uiState: StateFlow<UiState<T>> = _uiState.asStateFlow()
 
-    protected fun executeApi(apiCall: suspend () -> DataResult<T>) {
+    protected fun getData(dataCall: suspend () -> DataResult<T>) {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
-            when (val result = apiCall()) {
+            when (val result = dataCall()) {
                 is DataResult.Success -> _uiState.value = UiState.Success(result.data)
                 is DataResult.Error -> _uiState.value = UiState.Error(result.message)
             }

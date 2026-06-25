@@ -53,17 +53,19 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/_10sdp"
+                    android:layout_marginBottom="@dimen/_2sdp"
                     android:text="Chúng tôi đã gửi mã OTP đến email "
                     android:textAlignment="center"
                     android:textColor="#C4C4C4"
                     android:textSize="@dimen/_14sdp" />
 
                 <TextView
+                    android:id="@+id/emailTV"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="@dimen/_10sdp"
                     android:text=""
+                    android:textStyle="bold"
                     android:textAlignment="center"
                     android:textColor="#C4C4C4"
                     android:textSize="@dimen/_14sdp" />
@@ -80,6 +82,8 @@
                 android:textColor="@color/green1"
                 android:textSize="@dimen/_18sdp"
                 android:textStyle="bold"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
                 app:itemCount="6"
                 app:itemWidth="@dimen/_40sdp"
                 app:itemHeight="@dimen/_40sdp"
@@ -92,6 +96,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
                 <TextView
+                    android:id="@+id/sendEmailAgain"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"

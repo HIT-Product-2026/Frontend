@@ -5,12 +5,6 @@
     android:id="@+id/nav_graph"
     app:startDestination="@id/startFragment">
 
-    <activity
-        android:id="@+id/mainActivity"
-        android:name="com.pando.app.MainActivity"
-        android:label="activity_main"
-        tools:layout="@layout/activity_main" />
-
     <fragment
         android:id="@+id/startFragment"
         android:name="com.pando.app.features.auth.ui.start.StartFragment"
@@ -34,6 +28,10 @@
         <action
             android:id="@+id/action_loginBottomSheet_to_forgotPasswordFragment"
             app:destination="@id/forgotPasswordFragment" />
+        <action
+            android:id="@+id/action_loginBottomSheet_to_registerBottomSheet"
+            app:destination="@id/registerBottomSheet"
+            app:popUpTo="@id/startFragment" />
     </dialog>
 
     <dialog
@@ -43,7 +41,12 @@
         <action
             android:id="@+id/action_registerBottomSheet_to_verifyOtpFragment"
             app:destination="@id/verifyOtpFragment" />
+        <action
+            android:id="@+id/action_registerBottomSheet_to_loginBottomSheet"
+            app:destination="@id/loginBottomSheet"
+            app:popUpTo="@id/startFragment" />
     </dialog>
+
     <fragment
         android:id="@+id/forgotPasswordFragment"
         android:name="com.pando.app.features.auth.ui.forgotpassword.ForgotPasswordFragment"
@@ -53,6 +56,7 @@
             android:id="@+id/action_forgotPasswordFragment_to_verifyOtpFragment"
             app:destination="@id/verifyOtpFragment" />
     </fragment>
+
     <fragment
         android:id="@+id/verifyOtpFragment"
         android:name="com.pando.app.features.auth.ui.verifyotp.VerifyOtpFragment"
@@ -61,11 +65,25 @@
         <action
             android:id="@+id/action_verifyOtpFragment_to_resetPasswordFragment"
             app:destination="@id/resetPasswordFragment" />
+        <argument
+            android:name="isRegister"
+            android:defaultValue=""
+            app:argType="string" />
+        <argument
+            android:name="receiveEmail"
+            android:defaultValue=""
+            app:argType="string" />
     </fragment>
+
     <fragment
         android:id="@+id/resetPasswordFragment"
         android:name="com.pando.app.features.auth.ui.resetpassword.ResetPasswordFragment"
         android:label="fragment_reset_password"
-        tools:layout="@layout/fragment_reset_password">
+        tools:layout="@layout/fragment_reset_password" >
+        <argument
+            android:name="receiveEmail"
+            android:defaultValue=""
+            app:argType="string" />
     </fragment>
+
 </navigation>
