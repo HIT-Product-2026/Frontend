@@ -24,11 +24,15 @@
             android:textSize="@dimen/_17sdp" />
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/emailLayout"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginBottom="@dimen/_10sdp"
             app:boxStrokeColor="@color/black1"
             app:boxStrokeErrorColor="@android:color/holo_red_dark"
+            app:errorEnabled="true"
+            app:errorTextColor="@android:color/holo_red_dark"
             app:hintEnabled="false">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -36,6 +40,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Email"
+                android:inputType="textEmailAddress"
+                android:textColor="@color/black"
                 android:textColorHint="@color/black1" />
 
         </com.google.android.material.textfield.TextInputLayout>
@@ -50,12 +56,16 @@
             android:textSize="@dimen/_17sdp" />
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/passwordLayout"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             app:boxStrokeColor="@color/black1"
             app:boxStrokeErrorColor="@android:color/holo_red_dark"
+            app:errorTextColor="@android:color/holo_red_dark"
             app:endIconMode="password_toggle"
             app:endIconTint="@color/black1"
+            app:errorEnabled="true"
             app:hintEnabled="false">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -63,6 +73,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Mật khẩu"
+                android:inputType="textPassword"
+                android:textColor="@color/black"
                 android:textColorHint="@color/black1" />
 
         </com.google.android.material.textfield.TextInputLayout>
@@ -83,17 +95,34 @@
                 android:textSize="@dimen/_12sdp" />
         </RelativeLayout>
 
-        <TextView
+        <FrameLayout
             android:id="@+id/loginButton"
             android:layout_width="match_parent"
             android:layout_height="@dimen/_40sdp"
             android:layout_marginTop="@dimen/_20sdp"
             android:background="@drawable/green_bg"
-            android:gravity="center"
-            android:text="Đăng nhập"
-            android:textColor="@color/white"
-            android:textSize="@dimen/_13sdp"
-            android:textStyle="bold" />
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:id="@+id/loginText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="Đăng nhập"
+                android:textColor="@color/white"
+                android:textSize="@dimen/_13sdp"
+                android:textStyle="bold" />
+
+            <ProgressBar
+                android:id="@+id/loginProgressBar"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:indeterminateTint="@color/white"
+                android:visibility="gone" />
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="match_parent"

@@ -4,14 +4,13 @@ import com.pando.app.core.base.BaseVM
 import com.pando.app.core.network.ApiResponse
 import com.pando.app.core.ui.UiState
 import com.pando.app.core.utils.DataResult
-import com.pando.app.features.auth.data.model.response.RegisterResponse
 import com.pando.app.features.auth.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
 
 sealed interface VerifyOtpResult {
-    data class RegisterSuccess(val response: ApiResponse<RegisterResponse>) : VerifyOtpResult
-    data class ForgotPasswordSuccess(val response: ApiResponse<Void>) : VerifyOtpResult
+    data class RegisterSuccess(val response: ApiResponse<Void>) : VerifyOtpResult
+    data class ForgotPasswordSuccess(val response: ApiResponse<java.lang.Void>) : VerifyOtpResult
 }
 
 @HiltViewModel

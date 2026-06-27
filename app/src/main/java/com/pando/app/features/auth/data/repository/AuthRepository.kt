@@ -11,7 +11,6 @@ import com.pando.app.features.auth.data.model.request.LoginRequest
 import com.pando.app.features.auth.data.model.request.RegisterSendOtpRequest
 import com.pando.app.features.auth.data.model.request.RegisterVerifyOtpRequest
 import com.pando.app.features.auth.data.model.response.LoginResponse
-import com.pando.app.features.auth.data.model.response.RegisterResponse
 import jakarta.inject.Inject
 
 class AuthRepository @Inject constructor(
@@ -29,7 +28,7 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    suspend fun registerVerifyOtp(email: String, otp: String): DataResult<ApiResponse<RegisterResponse>> {
+    suspend fun registerVerifyOtp(email: String, otp: String): DataResult<ApiResponse<Void>> {
         return safeApiCall {
             authApi.registerVerifyOtp(RegisterVerifyOtpRequest(email, otp))
         }

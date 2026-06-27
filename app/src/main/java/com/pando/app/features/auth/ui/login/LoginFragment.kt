@@ -1,8 +1,12 @@
 package com.pando.app.features.auth.ui.login
 
+import android.text.InputType
+import android.view.View
+import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.snackbar.Snackbar
 import com.pando.app.R
 import com.pando.app.core.base.BaseBottomSheet
 import com.pando.app.core.ui.UiState
@@ -32,6 +36,16 @@ class LoginFragment : BaseBottomSheet<FragmentLoginBinding>(FragmentLoginBinding
             findNavController().navigate(R.id.action_loginBottomSheet_to_forgotPasswordFragment)
         }
 
+        binding.emailET.doOnTextChanged { _, _, _, _ ->
+            binding.emailLayout.error = null
+            viewModel.clearResult()
+        }
+
+        binding.passwordET.doOnTextChanged { _, _, _, _ ->
+            binding.passwordLayout.error = null
+            viewModel.clearResult()
+        }
+
         lifecycleScope.launch {
             viewModel.uiState.collect { state ->
                 when (state) {
@@ -39,13 +53,41 @@ class LoginFragment : BaseBottomSheet<FragmentLoginBinding>(FragmentLoginBinding
 
                     }
                     is UiState.Loading -> {
-
+                        binding.loginButton.isEnabled = false
+                        binding.loginText.visibility = View.GONE
+                        binding.loginProgressBar.visibility = View.VISIBLE
                     }
                     is UiState.Success -> {
-                        binding.loginButton.text = "Done"
+                        binding.loginText.text = "Done"
+                        binding.loginText.visibility = View.VISIBLE
+                        binding.loginProgressBar.visibility = View.GONE
+
+                        Snackbar.make(binding.root, "Đăng nhập thành công!", Snackbar.LENGTH_SHORT).show()
                     }
                     is UiState.Error -> {
+                        binding.loginButton.isEnabled = true
+                        binding.loginText.visibility = View.VISIBLE
+                        binding.loginProgressBar.visibility = View.GONE
 
+                        binding.emailLayout.error = null
+                        binding.passwordLayout.error = null
+
+                        val emailText = binding.emailET.text.toString()
+                        val passwordText = binding.passwordET.text.toString()
+
+                        if (emailText.isEmpty()) {
+                            binding.emailLayout.error = "Vui lòng nhập email"
+                        }
+                        if (binding.emailET.inputType != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS && emailText.isNotEmpty()) {
+                            binding.emailLayout.error = "Vui lòng nhập đúng định dạng email"
+                        }
+                        if (passwordText.isEmpty()) {
+                            binding.passwordLayout.error = "Vui lòng nhập mật khẩu"
+                        }
+                        if (emailText.isNotEmpty() && passwordText.isNotEmpty()) {
+                            binding.emailLayout.error = ""
+                            binding.passwordLayout.error = state.message
+                        }
                     }
                 }
             }

@@ -65,10 +65,10 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="@dimen/_10sdp"
                     android:text=""
-                    android:textStyle="bold"
                     android:textAlignment="center"
                     android:textColor="#C4C4C4"
-                    android:textSize="@dimen/_14sdp" />
+                    android:textSize="@dimen/_14sdp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <com.chaos.view.PinView
@@ -76,54 +76,72 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="@dimen/_10sdp"
+                android:cursorVisible="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
                 android:gravity="center"
                 android:inputType="number"
-                android:cursorVisible="true"
+                android:itemBackground="@drawable/green1_bg"
                 android:textColor="@color/green1"
                 android:textSize="@dimen/_18sdp"
                 android:textStyle="bold"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
                 app:itemCount="6"
-                app:itemWidth="@dimen/_40sdp"
                 app:itemHeight="@dimen/_40sdp"
                 app:itemRadius="@dimen/_13sdp"
-                app:viewType="rectangle"
+                app:itemWidth="@dimen/_40sdp"
                 app:lineColor="@color/green1"
-                android:itemBackground="@drawable/green1_bg" />
+                app:viewType="rectangle" />
 
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
+
                 <TextView
                     android:id="@+id/sendEmailAgain"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
+                    android:layout_marginRight="@dimen/_35sdp"
                     android:layout_marginBottom="@dimen/_10sdp"
                     android:text="Gửi lại mã"
                     android:textAlignment="center"
                     android:textColor="#89FF5A"
-                    android:layout_marginRight="@dimen/_35sdp"
                     android:textSize="@dimen/_13sdp"
                     android:textStyle="bold" />
             </RelativeLayout>
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/verifyOtpBtn"
+        <FrameLayout
+            android:id="@+id/verifyOtpButton"
             android:layout_width="@dimen/_250sdp"
             android:layout_height="@dimen/_40sdp"
             android:layout_marginTop="@dimen/_20sdp"
             android:layout_marginBottom="@dimen/_50sdp"
             android:background="@drawable/green_bg"
-            android:gravity="center"
-            android:text="@string/xac_nhan"
-            android:textColor="@color/white"
-            android:textSize="@dimen/_13sdp"
-            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent" />
+            app:layout_constraintStart_toStartOf="parent">
+
+            <TextView
+                android:id="@+id/verifyOtpText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="Xác nhận"
+                android:textColor="@color/white"
+                android:textSize="@dimen/_13sdp"
+                android:textStyle="bold" />
+
+            <ProgressBar
+                android:id="@+id/verifyOtpProgressBar"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:indeterminateTint="@color/white"
+                android:visibility="gone" />
+        </FrameLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 </FrameLayout>
