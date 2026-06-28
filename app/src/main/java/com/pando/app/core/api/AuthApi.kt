@@ -1,4 +1,4 @@
-package com.pando.app.features.auth.data.api
+package com.pando.app.core.api
 
 import com.pando.app.core.network.ApiConstants
 import com.pando.app.core.network.ApiResponse
@@ -12,6 +12,8 @@ import com.pando.app.features.auth.data.model.response.LoginResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Query
 
 interface AuthApi {
     @POST(ApiConstants.Auth.LOGIN)
