@@ -61,4 +61,10 @@ class AuthRepository @Inject constructor(
             authApi.resetPassword(FPResetPasswordRequest(email, password))
         }
     }
+
+    suspend fun sendFcmToken(fcmToken :String) : DataResult<ApiResponse<Void>> {
+        return safeApiCall {
+            authApi.sendFcmToken(fcmToken)
+        }
+    }
 }
