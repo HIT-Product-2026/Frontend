@@ -1,6 +1,7 @@
 package com.pando.app.features.auth.data.repository
 
 import com.pando.app.core.api.AuthApi
+import com.pando.app.core.api.UserApi
 import com.pando.app.core.base.BaseRepository
 import com.pando.app.core.network.ApiResponse
 import com.pando.app.core.network.TokenManager
@@ -16,7 +17,8 @@ import jakarta.inject.Inject
 
 class AuthRepository @Inject constructor(
     private val authApi: AuthApi,
-    private val tokenManager: TokenManager
+    private val tokenManager: TokenManager,
+    private val userApi: UserApi
 ) : BaseRepository() {
     suspend fun login(email: String, password: String): DataResult<ApiResponse<LoginResponse>> {
         val result = safeApiCall {
@@ -64,7 +66,7 @@ class AuthRepository @Inject constructor(
 
     suspend fun sendFcmToken(fcmToken :String) : DataResult<ApiResponse<Void>> {
         return safeApiCall {
-            authApi.sendFcmToken(fcmToken)
+            userApi.sendFcmToken(fcmToken)
         }
     }
 }
