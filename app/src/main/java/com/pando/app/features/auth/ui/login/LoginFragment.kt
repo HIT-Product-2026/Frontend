@@ -27,13 +27,23 @@ class LoginFragment : BaseBottomSheet<FragmentLoginBinding>(FragmentLoginBinding
         }
 
         binding.loginButton.setOnClickListener {
-            val email = binding.emailET.text.toString()
-            val password = binding.passwordET.text.toString()
-            viewModel.login(email, password)
+            login()
         }
 
         binding.forgotPasswordBtn.setOnClickListener {
             findNavController().navigate(R.id.action_loginBottomSheet_to_forgotPasswordFragment)
+        }
+
+        binding.passwordET.setOnEditorActionListener { _, i, _ ->
+            if (i == android.view.inputmethod.EditorInfo.IME_ACTION_NEXT ||
+                i == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+
+                login()
+
+                true
+            } else {
+                false
+            }
         }
 
         binding.emailET.doOnTextChanged { _, _, _, _ ->
@@ -62,6 +72,8 @@ class LoginFragment : BaseBottomSheet<FragmentLoginBinding>(FragmentLoginBinding
                         binding.loginText.visibility = View.VISIBLE
                         binding.loginProgressBar.visibility = View.GONE
 
+                        findNavController().navigate(R.id.action_loginBottomSheet_to_cameraFragment)
+
                         Snackbar.make(binding.root, "Đăng nhập thành công!", Snackbar.LENGTH_SHORT).show()
                     }
                     is UiState.Error -> {
@@ -74,23 +86,31 @@ class LoginFragment : BaseBottomSheet<FragmentLoginBinding>(FragmentLoginBinding
 
                         val emailText = binding.emailET.text.toString()
                         val passwordText = binding.passwordET.text.toString()
+                        val isEmailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(emailText).matches()
 
                         if (emailText.isEmpty()) {
                             binding.emailLayout.error = "Vui lòng nhập email"
-                        }
-                        if (binding.emailET.inputType != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS && emailText.isNotEmpty()) {
+                        } else if (!isEmailValid) {
                             binding.emailLayout.error = "Vui lòng nhập đúng định dạng email"
                         }
+
                         if (passwordText.isEmpty()) {
                             binding.passwordLayout.error = "Vui lòng nhập mật khẩu"
                         }
-                        if (emailText.isNotEmpty() && passwordText.isNotEmpty()) {
-                            binding.emailLayout.error = ""
+
+                        if (isEmailValid && passwordText.isNotEmpty()) {
+                            binding.emailLayout.error = null
                             binding.passwordLayout.error = state.message
                         }
                     }
                 }
             }
         }
+    }
+
+    private fun login() {
+        val email = binding.emailET.text.toString()
+        val password = binding.passwordET.text.toString()
+        viewModel.login(email, password)
     }
 }

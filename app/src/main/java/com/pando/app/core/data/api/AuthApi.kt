@@ -1,4 +1,4 @@
-package com.pando.app.core.api
+package com.pando.app.core.data.api
 
 import com.pando.app.core.network.ApiConstants
 import com.pando.app.core.network.ApiResponse

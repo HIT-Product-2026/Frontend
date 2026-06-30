@@ -32,6 +32,9 @@
             android:id="@+id/action_loginBottomSheet_to_registerBottomSheet"
             app:destination="@id/registerBottomSheet"
             app:popUpTo="@id/startFragment" />
+        <action
+            android:id="@+id/action_loginBottomSheet_to_cameraFragment"
+            app:destination="@id/cameraFragment" />
     </dialog>
 
     <dialog
@@ -85,5 +88,10 @@
             android:defaultValue=""
             app:argType="string" />
     </fragment>
+    <fragment
+        android:id="@+id/cameraFragment"
+        android:name="com.pando.app.features.home.ui.camera.CameraFragment"
+        android:label="fragment_camera"
+        tools:layout="@layout/fragment_camera" />
 
 </navigation>

@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 @AndroidEntryPoint
 class RegisterFragment : BaseBottomSheet<FragmentRegisterBinding>(FragmentRegisterBinding::inflate) {
     private val viewModel : RegisterViewModel by viewModels()
+    private lateinit var email : String
+
     override fun initView() {
     }
 
@@ -24,13 +26,8 @@ class RegisterFragment : BaseBottomSheet<FragmentRegisterBinding>(FragmentRegist
             findNavController().navigate(R.id.action_registerBottomSheet_to_loginBottomSheet)
         }
 
-        lateinit var email : String
-
         binding.registerButton.setOnClickListener {
-            email = binding.emailET.text.toString()
-            val password = binding.passwordET.text.toString()
-            val confirmPassword = binding.confirmPasswordET.text.toString()
-            viewModel.register(email, password, confirmPassword)
+            register()
         }
 
         binding.emailET.doOnTextChanged { _, _, _, _ ->
@@ -46,6 +43,18 @@ class RegisterFragment : BaseBottomSheet<FragmentRegisterBinding>(FragmentRegist
         binding.confirmPasswordET.doOnTextChanged { _, _, _, _ ->
             binding.confirmPasswordLayout.error = null
             viewModel.clearResult()
+        }
+
+        binding.confirmPasswordET.setOnEditorActionListener { _, i, _ ->
+            if (i == android.view.inputmethod.EditorInfo.IME_ACTION_NEXT ||
+                i == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+
+                register()
+
+                true
+            } else {
+                false
+            }
         }
 
         lifecycleScope.launch {
@@ -81,27 +90,37 @@ class RegisterFragment : BaseBottomSheet<FragmentRegisterBinding>(FragmentRegist
                         val emailText = binding.emailET.text.toString()
                         val passwordText = binding.passwordET.text.toString()
                         val confirmPasswordText = binding.confirmPasswordET.text.toString()
+                        val isEmailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(emailText).matches()
 
                         if (emailText.isEmpty()) {
                             binding.emailLayout.error = "Vui lòng nhập email"
+                        } else if (!isEmailValid) {
+                            binding.emailLayout.error = "Vui lòng nhập đúng định dạng email"
                         }
+
                         if (passwordText.isEmpty()) {
                             binding.passwordLayout.error = "Vui lòng nhập mật khẩu"
                         }
+
                         if (confirmPasswordText.isEmpty()) {
                             binding.confirmPasswordLayout.error = "Vui lòng nhập mật khẩu"
                         }
-                        if (binding.emailET.inputType != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS && emailText.isNotEmpty()) {
-                            binding.emailLayout.error = "Vui lòng nhập đúng định dạng email"
-                        }
-                        if (passwordText.isNotEmpty() && confirmPasswordText.isNotEmpty() && emailText.isNotEmpty()) {
-                            binding.emailLayout.error = ""
-                            binding.passwordLayout.error = ""
+
+                        if (isEmailValid && passwordText.isNotEmpty() && confirmPasswordText.isNotEmpty()) {
+                            binding.emailLayout.error = null
+                            binding.passwordLayout.error = null
                             binding.confirmPasswordLayout.error = state.message
                         }
                     }
                 }
             }
         }
+    }
+
+    private fun register() {
+        email = binding.emailET.text.toString()
+        val password = binding.passwordET.text.toString()
+        val confirmPassword = binding.confirmPasswordET.text.toString()
+        viewModel.register(email, password, confirmPassword)
     }
 }

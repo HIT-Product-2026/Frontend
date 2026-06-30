@@ -1,10 +1,13 @@
 package com.pando.app.core.network
 
-import com.pando.app.core.api.AuthApi
-import com.pando.app.core.api.UserApi
+import android.content.Context
+import com.pando.app.core.data.api.AuthApi
+import com.pando.app.core.data.api.UserApi
+import com.pando.app.core.data.local.AuthPreferences
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -86,5 +89,11 @@ object RetrofitClient {
     @Singleton
     fun provideUserApi(@Named("MainRetrofit") retrofit: Retrofit): UserApi {
         return retrofit.create(UserApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAuthPreferences(@ApplicationContext context: Context): AuthPreferences {
+        return AuthPreferences(context)
     }
 }
