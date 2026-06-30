@@ -1,5 +1,6 @@
 package com.pando.app.core.base
 
+import android.util.Log
 import com.pando.app.core.network.ApiResponse
 import com.pando.app.core.utils.DataResult
 import retrofit2.Response
@@ -10,14 +11,17 @@ open class BaseRepository {
             val response = call()
             if (response.isSuccessful) {
                 val body = response.body()
-                if (body != null) {
+                if (body != null && body.success) {
                     DataResult.Success(body)
                 } else {
-                    DataResult.Error("Response body is null", response.code())
+                    DataResult.Error(body?.message ?: "Response body is null")
                 }
             } else {
+                val body = response.errorBody()?.string()
+                val apiResponse = com.google.gson.Gson().fromJson(body, ApiResponse::class.java)
+                val message: String = apiResponse.message
                 DataResult.Error(
-                    message = response.message().ifBlank { "HTTP Error: ${response.code()}" },
+                    message = message,
                     code = response.code()
                 )
             }

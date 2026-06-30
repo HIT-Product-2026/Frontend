@@ -1,4 +1,4 @@
-package com.pando.app.features.auth.data.api
+package com.pando.app.core.api
 
 import com.pando.app.core.network.ApiConstants
 import com.pando.app.core.network.ApiResponse
@@ -9,10 +9,11 @@ import com.pando.app.features.auth.data.model.request.LoginRequest
 import com.pando.app.features.auth.data.model.request.RegisterSendOtpRequest
 import com.pando.app.features.auth.data.model.request.RegisterVerifyOtpRequest
 import com.pando.app.features.auth.data.model.response.LoginResponse
-import com.pando.app.features.auth.data.model.response.RegisterResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Query
 
 interface AuthApi {
     @POST(ApiConstants.Auth.LOGIN)
@@ -22,7 +23,7 @@ interface AuthApi {
     suspend fun registerSendOtp(@Body request: RegisterSendOtpRequest): Response<ApiResponse<Void>>
 
     @POST(ApiConstants.Auth.REGISTER_VERIFY_OTP)
-    suspend fun registerVerifyOtp(@Body request: RegisterVerifyOtpRequest): Response<ApiResponse<RegisterResponse>>
+    suspend fun registerVerifyOtp(@Body request: RegisterVerifyOtpRequest): Response<ApiResponse<Void>>
 
     @POST(ApiConstants.Auth.FORGOT_PASSWORD_SEND_OTP)
     suspend fun forgotPasswordSendOtp(@Body request: FPSendEmailRequest): Response<ApiResponse<Void>>
