@@ -8,4 +8,7 @@
     <color name="accent4">#EAF3FF</color>
     <color name="accent5">#3080CB</color>
     <color name="accent6">#4D0E74F0</color>
+    <color name="accent7">#1A0E74F0</color>
+
+    <color name="neutral2">#888888</color>
 </resources>

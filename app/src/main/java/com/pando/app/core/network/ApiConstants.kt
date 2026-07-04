@@ -13,6 +13,9 @@ object ApiConstants {
         const val RESET_PASSWORD = "auth/forgot-password/reset"
     }
 
+    object Post {
+        const val CREATE_POST = "post"
+    }
     object User {
         const val SEND_FCM_TOKEN = "user/me/fcm-token"
     }

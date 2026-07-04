@@ -14,16 +14,24 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.google.android.material.snackbar.Snackbar
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.network.TokenManager
+import com.pando.app.core.ui.UiState
 import com.pando.app.databinding.FragmentCameraBinding
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
+import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -34,35 +42,76 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     @Inject
     lateinit var tokenManager: TokenManager
 
-    private val viewModel : CameraViewModel by viewModels()
+    private val viewModel: CameraViewModel by viewModels()
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
     private var lensFacing = CameraSelector.LENS_FACING_BACK
     private var savedPhotoFile: File? = null
 
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private var currentLat: Double? = null
+    private var currentLng: Double? = null
+
+    private val multiplePermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
+        val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+
+        if (cameraGranted) {
             startCamera()
         } else {
             Snackbar.make(binding.root, "Cần cấp quyền Camera!", Snackbar.LENGTH_SHORT).show()
+        }
+
+        if (!locationGranted) {
+            Toast.makeText(
+                requireContext(),
+                "Hãy cấp quyền Vị trí để ghim tọa độ ảnh!",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
     override fun initData() {
         cameraExecutor = Executors.newSingleThreadExecutor()
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
-            == PackageManager.PERMISSION_GRANTED) {
+        val hasCamera = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        val hasLocation = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+
+        if (hasCamera && hasLocation) {
             startCamera()
         } else {
-            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+            multiplePermissionsLauncher.launch(
+                arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
+            )
+        }
+
+        lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.cameraViewMode.collect { mode ->
+                    when (mode) {
+                        is CameraViewMode.Capture -> {
+                            switchToCaptureMode()
+                        }
+                        is CameraViewMode.Send -> {
+                            switchToSendMode(Uri.fromFile(mode.photoFile))
+                        }
+                    }
+                }
+            }
         }
     }
 
     override fun initView() {
-        switchToCaptureMode()
     }
 
     override fun initActionView() {
@@ -76,15 +125,29 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
 
         binding.btnCapture.setOnClickListener {
+            captureLocation()
             takePhoto()
         }
 
         binding.btnCancel.setOnClickListener {
+            binding.captionET.text?.clear()
             savedPhotoFile?.delete()
+            currentLat = null
+            currentLng = null
             switchToCaptureMode()
         }
 
+        binding.friendBtn.setOnClickListener {
+            findNavController().navigate(R.id.action_cameraFragment_to_friendFragment)
+        }
+
         binding.btnSend.setOnClickListener {
+            val caption = binding.captionET.text.toString()
+
+            viewModel.sendPost(caption, currentLng, currentLat)
+        }
+
+        binding.profileIcon.setOnClickListener {
             tokenManager.clear()
 
             val navOptions = NavOptions.Builder()
@@ -96,6 +159,31 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                 null,
                 navOptions
             )
+        }
+
+        lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    when (state) {
+                        is UiState.Idle -> { }
+                        is UiState.Loading -> {
+                            binding.btnSend.isEnabled = false
+                        }
+                        is UiState.Success -> {
+                            binding.btnSend.isEnabled = true
+                            Toast.makeText(requireContext(), "Đã gửi!", Toast.LENGTH_SHORT).show()
+                            switchToCaptureMode()
+                            viewModel.clearResult()
+                        }
+                        is UiState.Error -> {
+                            binding.btnSend.isEnabled = true
+                            Log.e("Camera", state.message)
+                            Toast.makeText(requireContext(), "Lỗi: ${state.message}", Toast.LENGTH_SHORT).show()
+                            viewModel.clearResult()
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -155,7 +243,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     savedPhotoFile = photoFile
-                    switchToSendMode(Uri.fromFile(photoFile))
+                    viewModel.setSendMode(photoFile)
                 }
             }
         )
@@ -171,6 +259,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.switchModeContainer.visibility = View.GONE
 
         binding.sendFunctionsBar.visibility = View.VISIBLE
+        binding.historyBtn.visibility = View.GONE
+
+        binding.captionLayout.visibility = View.VISIBLE
     }
 
     private fun switchToCaptureMode() {
@@ -181,6 +272,32 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.switchModeContainer.visibility = View.VISIBLE
 
         binding.sendFunctionsBar.visibility = View.GONE
+        binding.historyBtn.visibility = View.VISIBLE
+
+        binding.captionLayout.visibility = View.GONE
+    }
+
+    private fun captureLocation() {
+        if (ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            ) {
+            fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_HIGH_ACCURACY,
+                null
+            ).addOnSuccessListener { location ->
+                    if (location != null) {
+                        currentLat = location.latitude
+                        currentLng = location.longitude
+                        Log.d("LOCATION", "Đã lấy tọa độ: Lat=$currentLat, Lng=$currentLng")
+                    } else {
+                        Log.d("LOCATION", "Không thể lấy tọa độ (Có thể do đang ở trong nhà quá kín)")
+                    }
+                }
+        } else {
+            currentLat = null
+            currentLng = null
+        }
     }
 
     override fun onDestroyView() {

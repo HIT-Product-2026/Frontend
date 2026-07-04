@@ -23,7 +23,7 @@
             app:layout_constraintVertical_chainStyle="spread_inside">
 
             <com.google.android.material.imageview.ShapeableImageView
-                android:id="@+id/circle_border"
+                android:id="@+id/profileIcon"
                 android:layout_width="55dp"
                 android:layout_height="55dp"
                 android:layout_alignParentStart="true"
@@ -39,6 +39,7 @@
                 app:strokeWidth="2dp" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/friendBtn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_centerHorizontal="true"
@@ -88,6 +89,34 @@
                 android:layout_height="match_parent"
                 android:scaleType="centerCrop"
                 android:visibility="gone" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/captionLayout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center|bottom"
+                android:layout_marginBottom="@dimen/_10sdp"
+                android:maxWidth="@dimen/_175sdp"
+                android:visibility="gone"
+                app:hintEnabled="false">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/captionET"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_caption"
+                    android:hint="Thêm một tin nhắn"
+                    android:includeFontPadding="false"
+                    android:maxLength="35"
+                    android:paddingStart="@dimen/_10sdp"
+                    android:paddingTop="@dimen/_8sdp"
+                    android:paddingEnd="@dimen/_10sdp"
+                    android:paddingBottom="@dimen/_8sdp"
+                    android:textColor="@color/white"
+                    android:textColorHint="@color/white"
+                    android:textSize="@dimen/_10sdp" />
+
+            </com.google.android.material.textfield.TextInputLayout>
         </androidx.cardview.widget.CardView>
 
         <View
@@ -204,18 +233,34 @@
                     android:layout_alignParentStart="true"
                     android:layout_centerVertical="true"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/x_icon_smaller"/>
+                    android:src="@drawable/x_icon_smaller" />
 
                 <ImageView
                     android:id="@+id/btnSend"
                     android:layout_width="@dimen/_60sdp"
                     android:layout_height="@dimen/_60sdp"
-                    android:layout_centerVertical="true"
                     android:layout_centerHorizontal="true"
+                    android:layout_centerVertical="true"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/send_btn"/>
+                    android:src="@drawable/send_btn" />
             </RelativeLayout>
 
         </RelativeLayout>
+
+        <TextView
+            android:id="@+id/historyBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawableEnd="@drawable/outline_arrow_drop_down_24"
+            android:drawableTint="@color/white"
+            android:paddingStart="@dimen/_10sdp"
+            android:text="Lịch sử"
+            android:textColor="@color/white"
+            android:textSize="@dimen/_15sdp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/allFunctionsBar" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 </FrameLayout>

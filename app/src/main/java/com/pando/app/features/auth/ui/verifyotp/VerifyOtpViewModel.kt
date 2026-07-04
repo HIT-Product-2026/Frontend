@@ -10,7 +10,7 @@ import jakarta.inject.Inject
 
 sealed interface VerifyOtpResult {
     data class RegisterSuccess(val response: ApiResponse<Void>) : VerifyOtpResult
-    data class ForgotPasswordSuccess(val response: ApiResponse<java.lang.Void>) : VerifyOtpResult
+    data class ForgotPasswordSuccess(val response: ApiResponse<Void>) : VerifyOtpResult
 }
 
 @HiltViewModel

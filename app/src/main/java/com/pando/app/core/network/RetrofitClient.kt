@@ -2,6 +2,7 @@ package com.pando.app.core.network
 
 import android.content.Context
 import com.pando.app.core.data.api.AuthApi
+import com.pando.app.core.data.api.PostApi
 import com.pando.app.core.data.api.UserApi
 import com.pando.app.core.data.local.AuthPreferences
 import dagger.Module
@@ -46,10 +47,10 @@ object RetrofitClient {
     @Named("AuthenticatedClient")
     fun provideAuthenticatedOkHttpClient(
         loggingInterceptor: HttpLoggingInterceptor,
-        authInterceptor: AuthInterceptor // Inject interceptor thêm token ở đây
+        authInterceptor: AuthInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
-            .addInterceptor(authInterceptor) // <--- Thêm ở đây
+            .addInterceptor(authInterceptor)
             .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
@@ -89,6 +90,12 @@ object RetrofitClient {
     @Singleton
     fun provideUserApi(@Named("MainRetrofit") retrofit: Retrofit): UserApi {
         return retrofit.create(UserApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun providePostApi(@Named("MainRetrofit") retrofit: Retrofit): PostApi {
+        return retrofit.create(PostApi::class.java)
     }
 
     @Provides

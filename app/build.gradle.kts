@@ -55,11 +55,13 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.0")
     implementation("androidx.fragment:fragment-ktx:1.7.1")
     implementation("com.github.bumptech.glide:glide:4.16.0")
+    implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation("id.zelory:compressor:3.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.3.9")
     implementation("com.intuit.sdp:sdp-android:1.1.1")
     implementation("io.github.chaosleung:pinview:1.4.4")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("com.google.android.gms:play-services-location:21.2.0")
 
     val lifecycle_version = "2.8.7"
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version")
