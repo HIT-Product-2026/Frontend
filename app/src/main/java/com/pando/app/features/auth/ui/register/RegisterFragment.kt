@@ -4,7 +4,9 @@ import android.text.InputType
 import android.view.View
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.pando.app.R
 import com.pando.app.core.base.BaseBottomSheet
@@ -58,58 +60,60 @@ class RegisterFragment : BaseBottomSheet<FragmentRegisterBinding>(FragmentRegist
         }
 
         lifecycleScope.launch {
-            viewModel.uiState.collect { state ->
-                when (state) {
-                    is UiState.Idle -> {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    when (state) {
+                        is UiState.Idle -> {
 
-                    }
-                    is UiState.Loading -> {
-                        binding.registerButton.isEnabled = false
-                        binding.registerText.visibility = View.GONE
-                        binding.registerProgressBar.visibility = View.VISIBLE
-                    }
-                    is UiState.Success -> {
-                        binding.registerText.visibility = View.VISIBLE
-                        binding.registerProgressBar.visibility = View.GONE
-
-                        val action = RegisterFragmentDirections.actionRegisterBottomSheetToVerifyOtpFragment(
-                            isRegister = "true",
-                            receiveEmail = email
-                        )
-                        findNavController().navigate(action)
-                    }
-                    is UiState.Error -> {
-                        binding.registerButton.isEnabled = true
-                        binding.registerText.visibility = View.VISIBLE
-                        binding.registerProgressBar.visibility = View.GONE
-
-                        binding.emailLayout.error = null
-                        binding.passwordLayout.error = null
-                        binding.confirmPasswordLayout.error = null
-
-                        val emailText = binding.emailET.text.toString()
-                        val passwordText = binding.passwordET.text.toString()
-                        val confirmPasswordText = binding.confirmPasswordET.text.toString()
-                        val isEmailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(emailText).matches()
-
-                        if (emailText.isEmpty()) {
-                            binding.emailLayout.error = "Vui lòng nhập email"
-                        } else if (!isEmailValid) {
-                            binding.emailLayout.error = "Vui lòng nhập đúng định dạng email"
                         }
-
-                        if (passwordText.isEmpty()) {
-                            binding.passwordLayout.error = "Vui lòng nhập mật khẩu"
+                        is UiState.Loading -> {
+                            binding.registerButton.isEnabled = false
+                            binding.registerText.visibility = View.GONE
+                            binding.registerProgressBar.visibility = View.VISIBLE
                         }
+                        is UiState.Success -> {
+                            binding.registerText.visibility = View.VISIBLE
+                            binding.registerProgressBar.visibility = View.GONE
 
-                        if (confirmPasswordText.isEmpty()) {
-                            binding.confirmPasswordLayout.error = "Vui lòng nhập mật khẩu"
+                            val action = RegisterFragmentDirections.actionRegisterBottomSheetToVerifyOtpFragment(
+                                isRegister = "true",
+                                receiveEmail = email
+                            )
+                            findNavController().navigate(action)
                         }
+                        is UiState.Error -> {
+                            binding.registerButton.isEnabled = true
+                            binding.registerText.visibility = View.VISIBLE
+                            binding.registerProgressBar.visibility = View.GONE
 
-                        if (isEmailValid && passwordText.isNotEmpty() && confirmPasswordText.isNotEmpty()) {
                             binding.emailLayout.error = null
                             binding.passwordLayout.error = null
-                            binding.confirmPasswordLayout.error = state.message
+                            binding.confirmPasswordLayout.error = null
+
+                            val emailText = binding.emailET.text.toString()
+                            val passwordText = binding.passwordET.text.toString()
+                            val confirmPasswordText = binding.confirmPasswordET.text.toString()
+                            val isEmailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(emailText).matches()
+
+                            if (emailText.isEmpty()) {
+                                binding.emailLayout.error = "Vui lòng nhập email"
+                            } else if (!isEmailValid) {
+                                binding.emailLayout.error = "Vui lòng nhập đúng định dạng email"
+                            }
+
+                            if (passwordText.isEmpty()) {
+                                binding.passwordLayout.error = "Vui lòng nhập mật khẩu"
+                            }
+
+                            if (confirmPasswordText.isEmpty()) {
+                                binding.confirmPasswordLayout.error = "Vui lòng nhập mật khẩu"
+                            }
+
+                            if (isEmailValid && passwordText.isNotEmpty() && confirmPasswordText.isNotEmpty()) {
+                                binding.emailLayout.error = null
+                                binding.passwordLayout.error = null
+                                binding.confirmPasswordLayout.error = state.message
+                            }
                         }
                     }
                 }

@@ -3,6 +3,7 @@ package com.pando.app.features.auth.ui.login
 import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.messaging.FirebaseMessaging
+import com.pando.app.R
 import com.pando.app.core.base.BaseVM
 import com.pando.app.core.network.ApiResponse
 import com.pando.app.core.ui.UiState
@@ -28,9 +29,11 @@ class LoginViewModel @Inject constructor(
             val loginResult = authRepository.login(email, password)
 
             if (loginResult is DataResult.Success) {
-                viewModelScope.launch {
-                    getAndSendFcmToken()
-                }
+                sendEvent(ViewModelEvent.ShowSnackbar("Đăng nhập thành công!"))
+
+                getAndSendFcmToken()
+
+                sendEvent(ViewModelEvent.Navigate(R.id.action_loginBottomSheet_to_cameraFragment))
             }
 
             loginResult
