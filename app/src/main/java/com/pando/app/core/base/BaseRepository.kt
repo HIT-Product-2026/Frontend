@@ -1,6 +1,5 @@
 package com.pando.app.core.base
 
-import android.util.Log
 import com.pando.app.core.network.ApiResponse
 import com.pando.app.core.utils.DataResult
 import retrofit2.Response

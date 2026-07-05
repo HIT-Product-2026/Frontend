@@ -1,12 +1,19 @@
 package com.pando.app.features.auth.ui.login
 
+import android.util.Log
+import androidx.lifecycle.viewModelScope
+import com.google.firebase.messaging.FirebaseMessaging
+import com.pando.app.R
 import com.pando.app.core.base.BaseVM
 import com.pando.app.core.network.ApiResponse
 import com.pando.app.core.ui.UiState
+import com.pando.app.core.utils.DataResult
 import com.pando.app.features.auth.data.model.response.LoginResponse
 import com.pando.app.features.auth.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
@@ -18,6 +25,32 @@ class LoginViewModel @Inject constructor(
             return
         }
 
-        getData { authRepository.login(email, password) }
+        getData {
+            val loginResult = authRepository.login(email, password)
+
+            if (loginResult is DataResult.Success) {
+                sendEvent(ViewModelEvent.ShowSnackbar("Đăng nhập thành công!"))
+
+                getAndSendFcmToken()
+
+                sendEvent(ViewModelEvent.Navigate(R.id.action_loginBottomSheet_to_cameraFragment))
+            }
+
+            loginResult
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private suspend fun getAndSendFcmToken() {
+        try {
+            val fcmToken = FirebaseMessaging.getInstance().token.await()
+
+            if (!fcmToken.isNullOrEmpty()) {
+                authRepository.sendFcmToken(fcmToken)
+                Log.d("FCM", "FCM Token lấy thành công: $fcmToken")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }

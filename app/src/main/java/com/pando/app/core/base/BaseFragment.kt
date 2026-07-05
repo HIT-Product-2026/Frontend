@@ -14,11 +14,6 @@ abstract class BaseFragment<B : ViewBinding>(
     private var _binding: B? = null
     protected val binding get() = _binding!!
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        initData()
-    }
-
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -30,7 +25,7 @@ abstract class BaseFragment<B : ViewBinding>(
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
+        initData()
         initView()
         initActionView()
     }

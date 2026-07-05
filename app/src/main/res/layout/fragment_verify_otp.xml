@@ -41,7 +41,7 @@
                 android:layout_marginBottom="@dimen/_10sdp"
                 android:text="Nhập mã OTP"
                 android:textAlignment="center"
-                android:textColor="#89FF5A"
+                android:textColor="@color/accent5"
                 android:textSize="@dimen/_20sdp"
                 android:textStyle="bold" />
 
@@ -81,15 +81,15 @@
                 android:focusableInTouchMode="true"
                 android:gravity="center"
                 android:inputType="number"
-                android:itemBackground="@drawable/green1_bg"
-                android:textColor="@color/green1"
+                android:itemBackground="@drawable/bg_accent4"
+                android:textColor="@color/accent5"
                 android:textSize="@dimen/_18sdp"
                 android:textStyle="bold"
                 app:itemCount="6"
                 app:itemHeight="@dimen/_40sdp"
                 app:itemRadius="@dimen/_13sdp"
                 app:itemWidth="@dimen/_40sdp"
-                app:lineColor="@color/green1"
+                app:lineColor="@color/accent5"
                 app:viewType="rectangle" />
 
             <RelativeLayout
@@ -105,7 +105,7 @@
                     android:layout_marginBottom="@dimen/_10sdp"
                     android:text="Gửi lại mã"
                     android:textAlignment="center"
-                    android:textColor="#89FF5A"
+                    android:textColor="@color/accent5"
                     android:textSize="@dimen/_13sdp"
                     android:textStyle="bold" />
             </RelativeLayout>
@@ -117,7 +117,7 @@
             android:layout_height="@dimen/_40sdp"
             android:layout_marginTop="@dimen/_20sdp"
             android:layout_marginBottom="@dimen/_50sdp"
-            android:background="@drawable/green_bg"
+            android:background="@drawable/bg_btn"
             android:clickable="true"
             android:focusable="true"
             app:layout_constraintBottom_toBottomOf="parent"
