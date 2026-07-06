@@ -4,6 +4,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
+import android.util.Rational
+import android.view.OrientationEventListener
+import android.view.Surface
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,6 +14,8 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
+import androidx.camera.core.ViewPort
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.viewModels
@@ -51,7 +56,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var currentLat: Double? = null
     private var currentLng: Double? = null
-
+    private var orientationEventListener: OrientationEventListener? = null
     private val multiplePermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -76,6 +81,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     override fun initData() {
         cameraExecutor = Executors.newSingleThreadExecutor()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
+
+        initOrientationListener()
 
         val hasCamera = ContextCompat.checkSelfPermission(
             requireContext(),
@@ -102,6 +109,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                         is CameraViewMode.Capture -> {
                             switchToCaptureMode()
                         }
+
                         is CameraViewMode.Send -> {
                             switchToSendMode(Uri.fromFile(mode.photoFile))
                         }
@@ -165,20 +173,27 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
                     when (state) {
-                        is UiState.Idle -> { }
+                        is UiState.Idle -> {}
                         is UiState.Loading -> {
                             binding.btnSend.isEnabled = false
                         }
+
                         is UiState.Success -> {
                             binding.btnSend.isEnabled = true
                             Toast.makeText(requireContext(), "Đã gửi!", Toast.LENGTH_SHORT).show()
                             switchToCaptureMode()
                             viewModel.clearResult()
+                            binding.captionET.text?.clear()
                         }
+
                         is UiState.Error -> {
                             binding.btnSend.isEnabled = true
                             Log.e("Camera", state.message)
-                            Toast.makeText(requireContext(), "Lỗi: ${state.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                requireContext(),
+                                "Lỗi: ${state.message}",
+                                Toast.LENGTH_SHORT
+                            ).show()
                             viewModel.clearResult()
                         }
                     }
@@ -187,6 +202,15 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        orientationEventListener?.enable()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        orientationEventListener?.disable()
+    }
 
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
@@ -206,8 +230,20 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
             try {
                 cameraProvider.unbindAll()
+
+                val viewPort = ViewPort.Builder(
+                    Rational(1, 1),
+                    binding.viewFinder.display.rotation
+                ).build()
+
+                val useCaseGroup = UseCaseGroup.Builder()
+                    .addUseCase(preview)
+                    .addUseCase(imageCapture!!)
+                    .setViewPort(viewPort)
+                    .build()
+
                 cameraProvider.bindToLifecycle(
-                    viewLifecycleOwner, cameraSelector, preview, imageCapture
+                    viewLifecycleOwner, cameraSelector, useCaseGroup
                 )
             } catch (exc: Exception) {
                 Log.e("CameraX", "Khởi tạo camera thất bại", exc)
@@ -253,7 +289,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.viewFinder.visibility = View.INVISIBLE
         binding.imgPreviewCaptured.visibility = View.VISIBLE
 
-        Glide.with(this).load(imageUri).into(binding.imgPreviewCaptured)
+        Glide.with(this)
+            .load(imageUri)
+            .into(binding.imgPreviewCaptured)
 
         binding.functionsBar.visibility = View.GONE
         binding.switchModeContainer.visibility = View.GONE
@@ -280,23 +318,42 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private fun captureLocation() {
         if (ContextCompat.checkSelfPermission(
                 requireContext(),
-                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-            ) {
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
             fusedLocationClient.getCurrentLocation(
                 Priority.PRIORITY_HIGH_ACCURACY,
                 null
             ).addOnSuccessListener { location ->
-                    if (location != null) {
-                        currentLat = location.latitude
-                        currentLng = location.longitude
-                        Log.d("LOCATION", "Đã lấy tọa độ: Lat=$currentLat, Lng=$currentLng")
-                    } else {
-                        Log.d("LOCATION", "Không thể lấy tọa độ (Có thể do đang ở trong nhà quá kín)")
-                    }
+                if (location != null) {
+                    currentLat = location.latitude
+                    currentLng = location.longitude
+                    Log.d("LOCATION", "Đã lấy tọa độ: Lat=$currentLat, Lng=$currentLng")
+                } else {
+                    Log.d("LOCATION", "Không thể lấy tọa độ (Có thể do đang ở trong nhà quá kín)")
                 }
+            }
         } else {
             currentLat = null
             currentLng = null
+        }
+    }
+
+    private fun initOrientationListener() {
+        orientationEventListener = object : OrientationEventListener(requireContext()) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+
+                val rotation = when (orientation) {
+                    in 45..134 -> Surface.ROTATION_270
+                    in 135..224 -> Surface.ROTATION_180
+                    in 225..314 -> Surface.ROTATION_90
+                    else -> Surface.ROTATION_0
+                }
+
+                // Cập nhật metadata xoay ảnh cho CameraX
+                imageCapture?.targetRotation = rotation
+            }
         }
     }
 
