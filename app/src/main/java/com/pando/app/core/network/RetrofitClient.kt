@@ -2,6 +2,7 @@ package com.pando.app.core.network
 
 import android.content.Context
 import com.pando.app.core.data.api.AuthApi
+import com.pando.app.core.data.api.FriendshipApi
 import com.pando.app.core.data.api.PostApi
 import com.pando.app.core.data.api.UserApi
 import com.pando.app.core.data.local.AuthPreferences
@@ -96,6 +97,12 @@ object RetrofitClient {
     @Singleton
     fun providePostApi(@Named("MainRetrofit") retrofit: Retrofit): PostApi {
         return retrofit.create(PostApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideFriendshipApi(@Named("MainRetrofit") retrofit: Retrofit): FriendshipApi {
+        return retrofit.create(FriendshipApi::class.java)
     }
 
     @Provides

@@ -2,9 +2,10 @@ package com.pando.app.features.home.data.model.response
 
 import com.pando.app.features.home.data.model.dto.UserDto
 import com.pando.app.features.home.data.model.entity.PostModeLocation
+import java.util.UUID
 
 data class PostResponse (
-    val id : String,
+    val id : UUID,
     val user: UserDto,
     val caption: String,
     val imageUrl: String,

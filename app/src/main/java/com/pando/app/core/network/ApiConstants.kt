@@ -1,7 +1,7 @@
 package com.pando.app.core.network
 
 object ApiConstants {
-    const val BASE_URL = "http://47.129.173.245:8080"
+    const val BASE_URL = "http://52.221.198.144:8081"
     const val API_V1 = "/api/v1/"
 
     object Auth {
@@ -17,6 +17,12 @@ object ApiConstants {
         const val CREATE_POST = "post"
     }
     object User {
-        const val SEND_FCM_TOKEN = "user/me/fcm-token"
+        const val SEND_FCM_TOKEN = "user/fcm-token"
+        const val GET_USER_AVATAR = "user/{user_id}/avatar"
+    }
+
+    object FriendShip {
+        const val GET_FRIEND_LIST = "friendship/friends"
+        const val SEARCH_USER = "friendship/friendships/search"
     }
 }

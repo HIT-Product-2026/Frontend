@@ -33,7 +33,4 @@ interface AuthApi {
 
     @POST(ApiConstants.Auth.RESET_PASSWORD)
     suspend fun resetPassword(@Body request: FPResetPasswordRequest): Response<ApiResponse<Void>>
-
-    @PUT(ApiConstants.User.SEND_FCM_TOKEN)
-    suspend fun sendFcmToken(@Query("fcm_token") fcmToken: String) : Response<ApiResponse<Void>>
 }

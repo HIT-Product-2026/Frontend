@@ -14,13 +14,31 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
-    @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        val navHostFragment = supportFragmentManager.findFragmentById(R.id.FragmentContainer) as NavHostFragment
+        val navController = navHostFragment.navController
+
+        val navGraph = navController.navInflater.inflate(R.navigation.nav_graph)
+
+        val authPreferences = AuthPreferences(this)
+        sendFCMToken()
+
+        if (authPreferences.isLoggedIn()) {
+            navGraph.setStartDestination(R.id.cameraFragment)
+        } else {
+            navGraph.setStartDestination(R.id.startFragment)
+        }
+
+        navController.graph = navGraph
+    }
+
+    @Suppress("DEPRECATION")
+    private fun sendFCMToken() {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w("FCM_INIT", "Lấy FCM token thất bại", task.exception)
@@ -30,20 +48,5 @@ class MainActivity : AppCompatActivity() {
             val token = task.result
             Log.d("FCM_INIT", "FCM Token của tui là: $token")
         }
-
-        val navHostFragment = supportFragmentManager.findFragmentById(R.id.FragmentContainer) as NavHostFragment
-        val navController = navHostFragment.navController
-
-        val navGraph = navController.navInflater.inflate(R.navigation.nav_graph)
-
-        val authPreferences = AuthPreferences(this)
-
-        if (authPreferences.isLoggedIn()) {
-            navGraph.setStartDestination(R.id.cameraFragment)
-        } else {
-            navGraph.setStartDestination(R.id.startFragment)
-        }
-
-        navController.graph = navGraph
     }
 }
