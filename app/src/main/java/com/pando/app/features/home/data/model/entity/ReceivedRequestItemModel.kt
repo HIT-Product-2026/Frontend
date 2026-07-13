@@ -1,18 +1,20 @@
 package com.pando.app.features.home.data.model.entity
 
 import com.pando.app.core.base.BaseItemModel
+import com.pando.app.features.home.ui.friend.FriendAction
 import java.util.UUID
 
-data class SearchItemModel (
+data class ReceivedRequestItemModel (
     override val id: UUID,
     val name: String,
-    val isLoading: Boolean = false,
+    val friendshipId: UUID,
+    val loadingAction: FriendAction? = null,
     val errorMessage: String? = null
 ) : BaseItemModel
 
-class DataSearchItem {
+class DataReceivedRequestItem {
     companion object {
         var total : Int? = null
-        val data : MutableList<SearchItemModel> = mutableListOf()
+        val data : MutableList<ReceivedRequestItemModel> = mutableListOf()
     }
 }

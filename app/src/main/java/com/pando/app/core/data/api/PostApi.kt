@@ -13,8 +13,9 @@ import retrofit2.http.Query
 interface PostApi {
     @Multipart
     @POST(ApiConstants.Post.CREATE_POST)
-    suspend fun doPost(@Query("caption") caption: String,
-                       @Query("longitude") longitude: Double?,
-                       @Query("latitude") latitude: Double?,
-                       @Part file : MultipartBody.Part) : Response<ApiResponse<PostResponse>>
+    suspend fun doPost(
+        @Query("longitude") longitude: Double?,
+        @Query("latitude") latitude: Double?,
+        @Part file: MultipartBody.Part,
+        @Query("caption") caption: String?): Response<ApiResponse<PostResponse>>
 }

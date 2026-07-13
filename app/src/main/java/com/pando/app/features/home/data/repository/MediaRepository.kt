@@ -15,7 +15,7 @@ class MediaRepository @Inject constructor(
     private val postApi: PostApi
 ) : BaseRepository() {
     suspend fun sendPost(
-        caption: String,
+        caption: String?,
         longitude: Double?,
         latitude: Double?,
         photoFile: File
@@ -29,7 +29,7 @@ class MediaRepository @Inject constructor(
         )
 
         return safeApiCall {
-            postApi.doPost(caption, longitude, latitude, body)
+            postApi.doPost(longitude, latitude, body, caption)
         }
     }
 }

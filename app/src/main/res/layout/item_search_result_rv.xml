@@ -18,9 +18,9 @@
             android:layout_width="@dimen/_40sdp"
             android:layout_height="@dimen/_40sdp"
             android:layout_gravity="center_vertical"
+            android:layout_marginStart="@dimen/_11sdp"
             android:padding="2dp"
             android:scaleType="centerCrop"
-            android:layout_marginStart="@dimen/_11sdp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -38,12 +38,12 @@
             android:textSize="@dimen/_13sdp"
             android:textStyle="bold"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/functionBtn"
+            app:layout_constraintEnd_toStartOf="@+id/addFriendBtn"
             app:layout_constraintStart_toEndOf="@+id/profileIcon"
             app:layout_constraintTop_toTopOf="parent" />
 
         <FrameLayout
-            android:id="@+id/functionBtn"
+            android:id="@+id/addFriendBtn"
             android:layout_width="@dimen/_40sdp"
             android:layout_height="@dimen/_40sdp"
             android:layout_marginEnd="@dimen/_5sdp"
@@ -52,7 +52,7 @@
             app:layout_constraintTop_toTopOf="parent">
 
             <ImageView
-                android:id="@+id/addFriendBtn"
+                android:id="@+id/iconBtn"
                 android:layout_width="@dimen/_32sdp"
                 android:layout_height="@dimen/_32sdp"
                 android:layout_gravity="center"

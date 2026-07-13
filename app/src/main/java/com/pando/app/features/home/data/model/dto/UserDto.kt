@@ -1,6 +1,6 @@
 package com.pando.app.features.home.data.model.dto
 
-import com.pando.app.features.home.data.model.entity.UserMode
+import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
 import java.util.UUID
 
 data class UserDto (

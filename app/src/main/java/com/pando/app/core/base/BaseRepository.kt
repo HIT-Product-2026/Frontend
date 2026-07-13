@@ -31,26 +31,19 @@ open class BaseRepository {
         }
     }
 
-    protected suspend fun safeFileCall(
-        call: suspend () -> Response<ResponseBody>
-    ): DataResult<ByteArray> {
+    protected suspend fun safeFileCall(call: suspend () -> Response<ResponseBody>): DataResult<ByteArray> {
         return try {
             val response = call()
 
             if (!response.isSuccessful) {
                 return DataResult.Error(
-                    message = response.message().ifBlank {
-                        "HTTP Error: ${response.code()}"
-                    },
-                    code = response.code()
+                    response.message().ifBlank {"HTTP Error: ${response.code()}" },
+                    response.code()
                 )
             }
 
             val body = response.body()
-                ?: return DataResult.Error(
-                    message = "Response body is null",
-                    code = response.code()
-                )
+                ?: return DataResult.Error("Response body is null", response.code())
 
             body.use { responseBody ->
                 val bytes = responseBody.byteStream().use { inputStream ->

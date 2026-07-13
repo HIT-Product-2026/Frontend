@@ -22,7 +22,13 @@ object ApiConstants {
     }
 
     object FriendShip {
+        const val REQUEST_FRIEND = "friendship/request"
         const val GET_FRIEND_LIST = "friendship/friends"
         const val SEARCH_USER = "friendship/friendships/search"
+        const val ACCEPT_FRIEND = "friendship/accept/{friendships_id}"
+        const val REJECT_FRIEND = "friendship/reject/{friendships_id}"
+        const val GET_SENT_REQUESTED_USERS = "friendship/friendships/requester"
+        const val GET_RECEIVED_REQUESTED_USERS = "friendship/friendships/received"
+        const val UNFRIEND = "friendship/unfriend/{friendId}"
     }
 }

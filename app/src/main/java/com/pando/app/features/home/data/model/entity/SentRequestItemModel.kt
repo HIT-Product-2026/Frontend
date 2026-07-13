@@ -3,16 +3,17 @@ package com.pando.app.features.home.data.model.entity
 import com.pando.app.core.base.BaseItemModel
 import java.util.UUID
 
-data class SearchItemModel (
+data class SentRequestItemModel (
     override val id: UUID,
     val name: String,
+    val friendshipId: UUID,
     val isLoading: Boolean = false,
     val errorMessage: String? = null
 ) : BaseItemModel
 
-class DataSearchItem {
+class DataSentRequestItem {
     companion object {
         var total : Int? = null
-        val data : MutableList<SearchItemModel> = mutableListOf()
+        val data : MutableList<SentRequestItemModel> = mutableListOf()
     }
 }

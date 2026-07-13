@@ -1,7 +1,7 @@
 package com.pando.app.features.home.data.model.response
 
 import com.pando.app.features.home.data.model.dto.UserDto
-import com.pando.app.features.home.data.model.entity.PostModeLocation
+import com.pando.app.features.home.data.model.entity.enumEntity.PostModeLocation
 import java.util.UUID
 
 data class PostResponse (

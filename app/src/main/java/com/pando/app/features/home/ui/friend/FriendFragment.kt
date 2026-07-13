@@ -1,6 +1,11 @@
 package com.pando.app.features.home.ui.friend
 
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
+import android.widget.PopupWindow
 import androidx.appcompat.widget.SearchView
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -18,25 +23,41 @@ import com.pando.app.core.ui.UiState
 import com.pando.app.databinding.FragmentFriendBinding
 import com.pando.app.databinding.ItemFriendsRvBinding
 import com.pando.app.databinding.ItemInviteRvBinding
+import com.pando.app.databinding.ItemReceivedFriendRequestRvBinding
 import com.pando.app.databinding.ItemSearchResultRvBinding
+import com.pando.app.databinding.ItemSentFriendRequestRvBinding
+import com.pando.app.databinding.PopupFriendActionBinding
 import com.pando.app.features.home.data.model.entity.DataFriendItem
 import com.pando.app.features.home.data.model.entity.DataInviteItem
+import com.pando.app.features.home.data.model.entity.DataReceivedRequestItem
 import com.pando.app.features.home.data.model.entity.DataSearchItem
+import com.pando.app.features.home.data.model.entity.DataSentRequestItem
 import com.pando.app.features.home.data.model.entity.FriendItemModel
 import com.pando.app.features.home.data.model.entity.InviteItemModel
+import com.pando.app.features.home.data.model.entity.ReceivedRequestItemModel
 import com.pando.app.features.home.data.model.entity.SearchItemModel
+import com.pando.app.features.home.data.model.entity.SentRequestItemModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.util.UUID
+import androidx.core.graphics.drawable.toDrawable
+import androidx.viewbinding.ViewBinding
 
 @AndroidEntryPoint
 class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding::inflate) {
+    private var avatarMap: Map<UUID, ByteArray> = emptyMap()
+
+    //View Model
     private val friendViewModel: FriendViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by viewModels()
+
+    //Adapter
     private lateinit var inviteItemAdapter: BaseAdapter<InviteItemModel, ItemInviteRvBinding>
     private lateinit var friendsItemAdapter: BaseAdapter<FriendItemModel, ItemFriendsRvBinding>
     private lateinit var searchItemAdapter: BaseAdapter<SearchItemModel, ItemSearchResultRvBinding>
-    private var avatarMap: Map<UUID, ByteArray> = emptyMap()
+    private lateinit var receivedRequestedAdapter: BaseAdapter<ReceivedRequestItemModel, ItemReceivedFriendRequestRvBinding>
+    private lateinit var sentRequestedAdapter: BaseAdapter<SentRequestItemModel, ItemSentFriendRequestRvBinding>
+
     private val inviteDiffCallBack = object : DiffUtil.ItemCallback<InviteItemModel>() {
         override fun areItemsTheSame(oldItem: InviteItemModel, newItem: InviteItemModel) =
             oldItem.id == newItem.id
@@ -44,6 +65,9 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         override fun areContentsTheSame(oldItem: InviteItemModel, newItem: InviteItemModel) =
             oldItem == newItem
     }
+
+    //Popup Window FriendItem
+    private var friendPopupWindow: PopupWindow? = null
 
     override fun initData() {
     }
@@ -53,12 +77,17 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         setupRecyclerViews()
 
         friendViewModel.getFriendList()
+        friendViewModel.getSentRequestedUsers()
+        friendViewModel.getReceivedRequestedUsers()
 
-        inviteItemAdapter.submitList(DataInviteItem.data)
+        binding.friendNumberText.visibility = View.GONE
+        binding.friendsLayout.visibility = View.GONE
         binding.resultLayout.visibility = View.GONE
         binding.sentFriendRequestLayout.visibility = View.GONE
         binding.receivedFriendRequestLayout.visibility = View.GONE
         binding.btnToggleList.visibility = View.GONE
+
+        inviteItemAdapter.submitList(DataInviteItem.data)
     }
 
     override fun initActionView() {
@@ -66,9 +95,6 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             findNavController().navigateUp()
         }
 
-        val searchPlate = binding.searchView
-
-        searchPlate.background = null
         binding.searchView.queryHint = "Nhập email hoặc username của bạn bè"
         binding.searchView.setIconifiedByDefault(false)
         binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
@@ -112,33 +138,124 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
                         is UiState.Success -> {
                             when (state.data) {
                                 is FriendResult.FriendListSuccess -> {
-                                    binding.friendNumberText.text = "${DataFriendItem.total} người bạn"
+                                    updateFriendRV()
+                                }
 
-                                    friendsItemAdapter.submitList(
-                                        DataFriendItem.data.toList()
-                                    )
+                                is FriendResult.SentRequestedUsersSuccess -> {
+                                    updateSentRV()
+                                }
+
+                                is FriendResult.ReceivedRequestedUsersSuccess -> {
+                                    updateReceivedRV()
                                 }
 
                                 is FriendResult.SearchState -> {
-                                    val searchItems = DataSearchItem.data.toList()
+                                    updateSearchRV()
+                                }
 
-                                    if (searchItems.isNotEmpty()) {
-                                        binding.resultLayout.visibility = View.VISIBLE
+                                is FriendResult.UnfriendSuccess -> {
+                                    val result = state.data.response.data
+                                    val friend = DataFriendItem.data.firstOrNull { item ->
+                                        result.receiver.id == item.id
+                                    }
 
-                                        searchItemAdapter.submitList(searchItems)
-
-                                        avatarViewModel.loadAvatars(
-                                            searchItems.map { it.id }
-                                        )
-                                    } else {
-                                        binding.resultLayout.visibility = View.GONE
-                                        searchItemAdapter.submitList(emptyList())
+                                    if (friend != null) {
+                                        DataFriendItem.data.remove(friend)
+                                        DataFriendItem.total = DataFriendItem.total?.minus(1)
+                                        updateFriendRV()
                                     }
                                 }
                             }
                         }
 
                         is UiState.Error -> {
+
+                        }
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                friendViewModel.actionStates.collect { states ->
+                    updateSearchActionStates(states)
+                    updateSentActionStates(states)
+                    updateReceivedActionStates(states)
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                friendViewModel.friendEvent.collect { event ->
+                    when (event) {
+                        is FriendEvent.RequestFriendSuccess -> {
+                            val requested = event.response.data
+                            val searchUser = DataSearchItem.data.firstOrNull { item ->
+                                requested.receiver.id == item.id
+                            }
+                            binding.searchView.clearFocus()
+
+                            if (searchUser != null) {
+                                DataSearchItem.data.remove(searchUser)
+                                DataSearchItem.total = DataSearchItem.total?.minus(1)
+
+                                DataSentRequestItem.data.add(
+                                    SentRequestItemModel(
+                                        searchUser.id,
+                                        searchUser.name,
+                                        requested.id
+                                    )
+                                )
+
+                                updateSearchRV()
+                                updateSentRV()
+                            }
+                        }
+
+                        is FriendEvent.RejectFriendSuccess -> {
+                            val result = event.response.data
+                            val received = DataReceivedRequestItem.data.firstOrNull { item ->
+                                result.requester.id == item.id
+                            }
+                            val requested = DataSentRequestItem.data.firstOrNull { item ->
+                                result.receiver.id == item.id
+                            }
+
+                            if (received != null) {
+                                DataReceivedRequestItem.data.remove(received)
+                                DataReceivedRequestItem.total = DataReceivedRequestItem.total?.minus(1)
+
+                                updateReceivedRV()
+                            } else if (requested != null) {
+                                DataSentRequestItem.data.remove(requested)
+                                DataSentRequestItem.total = DataSentRequestItem.total?.minus(1)
+
+                                updateSentRV()
+                            }
+                        }
+
+                        is FriendEvent.AcceptFriendSuccess -> {
+                            val result = event.response.data
+                            val requested = DataReceivedRequestItem.data.firstOrNull { item ->
+                                result.requester.id == item.id
+                            }
+
+                            if (requested != null) {
+                                DataReceivedRequestItem.data.remove(requested)
+                                DataReceivedRequestItem.total = DataReceivedRequestItem.total?.minus(1)
+
+                                DataFriendItem.data.add(
+                                    FriendItemModel(
+                                        requested.id,
+                                        requested.name
+                                    )
+                                )
+
+                                updateReceivedRV()
+                                updateFriendRV()
+                            }
                         }
                     }
                 }
@@ -173,6 +290,10 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             if (avatar == null) {
                 avatarViewModel.loadAvatar(item.id)
             }
+
+            itemBinding.functionBtn.setOnClickListener {
+                showFriendActions(itemBinding, item)
+            }
         }
 
         searchItemAdapter = BaseAdapter(
@@ -193,6 +314,62 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             if (avatar == null) {
                 avatarViewModel.loadAvatar(item.id)
             }
+
+            itemBinding.addFriendBtn.setOnClickListener {
+                friendViewModel.requestFriend(item.id)
+            }
+        }
+
+        sentRequestedAdapter = BaseAdapter(
+            ItemSentFriendRequestRvBinding::inflate,
+            BaseDiffCallBack()
+        ) { itemBinding, item ->
+            itemBinding.tvName.text = item.name
+
+            val avatar = avatarMap[item.id]
+
+            Glide.with(itemBinding.root)
+                .load(avatar)
+                .placeholder(R.drawable.ic_default_avatar)
+                .error(R.drawable.ic_default_avatar)
+                .circleCrop()
+                .into(itemBinding.profileIcon)
+
+            if (avatar == null) {
+                avatarViewModel.loadAvatar(item.id)
+            }
+
+            itemBinding.cancelBtn.setOnClickListener {
+                friendViewModel.rejectFriend(item.friendshipId)
+            }
+        }
+
+        receivedRequestedAdapter = BaseAdapter(
+            ItemReceivedFriendRequestRvBinding::inflate,
+            BaseDiffCallBack()
+        ) { itemBinding, item ->
+            itemBinding.tvName.text = item.name
+
+            val avatar = avatarMap[item.id]
+
+            Glide.with(itemBinding.root)
+                .load(avatar)
+                .placeholder(R.drawable.ic_default_avatar)
+                .error(R.drawable.ic_default_avatar)
+                .circleCrop()
+                .into(itemBinding.profileIcon)
+
+            if (avatar == null) {
+                avatarViewModel.loadAvatar(item.id)
+            }
+
+            itemBinding.cancelBtn.setOnClickListener {
+                friendViewModel.rejectFriend(item.friendshipId)
+            }
+
+            itemBinding.acceptBtn.setOnClickListener {
+                friendViewModel.acceptFriend(item.friendshipId)
+            }
         }
     }
 
@@ -211,6 +388,168 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             layoutManager = LinearLayoutManager(context)
             adapter = searchItemAdapter
         }
+
+        binding.sentFriendRequestRV.apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = sentRequestedAdapter
+        }
+
+        binding.receivedFriendRequestRV.apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = receivedRequestedAdapter
+        }
     }
 
+    fun updateSentRV() {
+        val dataItems = DataSentRequestItem.data.toList()
+
+        if (dataItems.isNotEmpty()) {
+            binding.sentFriendRequestLayout.visibility = View.VISIBLE
+
+            sentRequestedAdapter.submitList(dataItems)
+
+            avatarViewModel.loadAvatars(
+                dataItems.map { it.id }
+            )
+        } else {
+            binding.sentFriendRequestLayout.visibility = View.GONE
+            sentRequestedAdapter.submitList(emptyList())
+        }
+    }
+
+    fun updateReceivedRV() {
+        val dataItems = DataReceivedRequestItem.data.toList()
+
+        if (dataItems.isNotEmpty()) {
+            binding.receivedFriendRequestLayout.visibility =
+                View.VISIBLE
+
+            receivedRequestedAdapter.submitList(dataItems)
+
+            avatarViewModel.loadAvatars(
+                dataItems.map { it.id }
+            )
+        } else {
+            binding.receivedFriendRequestLayout.visibility = View.GONE
+            receivedRequestedAdapter.submitList(emptyList())
+        }
+    }
+
+    fun updateSearchRV() {
+        val searchItems = DataSearchItem.data.toList()
+
+        if (searchItems.isNotEmpty()) {
+            binding.resultLayout.visibility = View.VISIBLE
+
+            searchItemAdapter.submitList(searchItems)
+
+            avatarViewModel.loadAvatars(
+                searchItems.map { it.id }
+            )
+        } else {
+            binding.resultLayout.visibility = View.GONE
+            searchItemAdapter.submitList(emptyList())
+        }
+    }
+
+    fun updateFriendRV() {
+        val dataItems = DataFriendItem.data.toList()
+
+        if (dataItems.isNotEmpty()) {
+            binding.friendNumberText.visibility = View.VISIBLE
+            binding.friendsLayout.visibility = View.VISIBLE
+            binding.friendNumberText.text =
+                "${DataFriendItem.total} người bạn"
+
+            friendsItemAdapter.submitList(dataItems)
+
+            avatarViewModel.loadAvatars(
+                dataItems.map { it.id }
+            )
+        } else {
+            binding.friendNumberText.visibility = View.GONE
+            binding.friendsLayout.visibility = View.GONE
+            friendsItemAdapter.submitList(emptyList())
+        }
+    }
+
+    private fun updateSearchActionStates(states: Map<UUID, FriendActionState>) {
+        val updatedItems = DataSearchItem.data.map { item ->
+            val state = states[item.id]
+
+            item.copy(
+                isLoading = state?.isLoading == true && state.action == FriendAction.REQUEST,
+                errorMessage = state?.errorMessage
+            )
+        }
+
+        searchItemAdapter.submitList(updatedItems)
+    }
+
+    private fun updateSentActionStates(states: Map<UUID, FriendActionState>) {
+        val updatedItems = DataSentRequestItem.data.map { item ->
+            val state = states[item.friendshipId]
+
+            item.copy(
+                isLoading = state?.isLoading == true,
+                errorMessage = state?.errorMessage
+            )
+        }
+
+        sentRequestedAdapter.submitList(updatedItems)
+    }
+
+    private fun updateReceivedActionStates(states: Map<UUID, FriendActionState>) {
+        val updatedItems = DataReceivedRequestItem.data.map { item ->
+            val state = states[item.friendshipId]
+
+            item.copy(
+                loadingAction = if (state?.isLoading == true) state.action else null,
+                errorMessage = state?.errorMessage
+            )
+        }
+
+        receivedRequestedAdapter.submitList(updatedItems)
+    }
+
+    private fun showFriendActions(view: ViewBinding, friend: FriendItemModel) {
+        if (friendPopupWindow?.isShowing == true) {
+            friendPopupWindow?.dismiss()
+            return
+        }
+
+        val popupBinding = PopupFriendActionBinding.inflate(layoutInflater)
+
+        val popupWindow = PopupWindow(
+            popupBinding.root,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            isOutsideTouchable = true
+
+            setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
+
+            setOnDismissListener { friendPopupWindow = null }
+        }
+
+        friendPopupWindow = popupWindow
+
+        popupBinding.btnRemoveFriend.setOnClickListener {
+            popupWindow.dismiss()
+
+            friendViewModel.unfriend(friend.id)
+        }
+
+        popupBinding.root.measure(
+            View.MeasureSpec.UNSPECIFIED,
+            View.MeasureSpec.UNSPECIFIED
+        )
+
+        val popupWidth = popupBinding.root.measuredWidth
+
+        val xOffset = view.root.width - popupWidth
+
+        popupWindow.showAsDropDown(view.root, xOffset, -20)
+    }
 }
