@@ -99,6 +99,9 @@
         <action
             android:id="@+id/action_cameraFragment_to_settingFragment"
             app:destination="@id/settingFragment" />
+        <action
+            android:id="@+id/action_cameraFragment_to_chatMenuFragment"
+            app:destination="@id/chatMenuFragment" />
     </fragment>
     <fragment
         android:id="@+id/friendFragment"
@@ -115,9 +118,23 @@
             app:destination="@id/profileFragment" />
     </fragment>
     <fragment
+        android:id="@+id/chatMenuFragment"
+        android:name="com.pando.app.features.home.ui.chatmenu.ChatMenuFragment"
+        android:label="fragment_chat_menu"
+        tools:layout="@layout/fragment_chat_menu" >
+        <action
+            android:id="@+id/action_chatMenuFragment_to_chatFragment"
+            app:destination="@id/chatFragment" />
+    </fragment>
+    <fragment
         android:id="@+id/profileFragment"
         android:name="com.pando.app.features.home.ui.profile.ProfileFragment"
         android:label="fragment_profile"
         tools:layout="@layout/fragment_profile" />
+    <fragment
+        android:id="@+id/chatFragment"
+        android:name="com.pando.app.features.home.ui.chat.ChatFragment"
+        android:label="fragment_chat"
+        tools:layout="@layout/fragment_chat" />
 
 </navigation>
