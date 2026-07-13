@@ -96,11 +96,28 @@
         <action
             android:id="@+id/action_cameraFragment_to_friendFragment"
             app:destination="@id/friendFragment" />
+        <action
+            android:id="@+id/action_cameraFragment_to_settingFragment"
+            app:destination="@id/settingFragment" />
     </fragment>
     <fragment
         android:id="@+id/friendFragment"
         android:name="com.pando.app.features.home.ui.friend.FriendFragment"
         android:label="fragment_friend"
         tools:layout="@layout/fragment_friend" />
+    <fragment
+        android:id="@+id/settingFragment"
+        android:name="com.pando.app.features.home.ui.setting.SettingFragment"
+        android:label="fragment_setting"
+        tools:layout="@layout/fragment_setting" >
+        <action
+            android:id="@+id/action_settingFragment_to_profileFragment"
+            app:destination="@id/profileFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.pando.app.features.home.ui.profile.ProfileFragment"
+        android:label="fragment_profile"
+        tools:layout="@layout/fragment_profile" />
 
 </navigation>

@@ -43,10 +43,6 @@ import java.util.concurrent.Executors
 
 @AndroidEntryPoint
 class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding::inflate) {
-
-    @Inject
-    lateinit var tokenManager: TokenManager
-
     private val viewModel: CameraViewModel by viewModels()
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
@@ -156,17 +152,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
 
         binding.profileIcon.setOnClickListener {
-            tokenManager.clear()
-
-            val navOptions = NavOptions.Builder()
-                .setPopUpTo(R.id.nav_graph, true)
-                .build()
-
-            findNavController().navigate(
-                R.id.startFragment,
-                null,
-                navOptions
-            )
+            findNavController().navigate(R.id.action_cameraFragment_to_settingFragment)
         }
 
         lifecycleScope.launch {
@@ -351,7 +337,6 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                     else -> Surface.ROTATION_0
                 }
 
-                // Cập nhật metadata xoay ảnh cho CameraX
                 imageCapture?.targetRotation = rotation
             }
         }
