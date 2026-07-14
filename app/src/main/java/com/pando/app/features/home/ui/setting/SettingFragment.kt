@@ -62,6 +62,10 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
                 navOptions
             )
         }
+
+        binding.editBtn.setOnClickListener {
+            findNavController().navigate(R.id.action_settingFragment_to_profileFragment)
+        }
     }
 
 }

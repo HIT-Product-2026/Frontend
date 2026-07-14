@@ -173,14 +173,15 @@
             android:layout_height="wrap_content"
             android:layout_below="@+id/groupSupport"
             android:layout_marginTop="@dimen/_20sdp"
+            android:layout_marginBottom="@dimen/_10sdp"
             android:background="@drawable/bg_menu_group"
             android:orientation="vertical"
             android:padding="@dimen/_10sdp">
 
             <TextView
-                android:textColor="@android:color/holo_red_light"
                 style="@style/MenuTextStyle"
-                android:text="Xóa tài khoản" />
+                android:text="Xóa tài khoản"
+                android:textColor="@android:color/holo_red_light" />
 
             <TextView
                 android:id="@+id/logoutBtn"

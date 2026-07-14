@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:app/src/main/java/com/pando/app/features/shared/AvatarViewModel.kt
 package com.pando.app.features.shared
+========
+package com.pando.app.features.home.ui
+>>>>>>>> 190d678 (feat: refactor AvatarViewModel and use for managing many user avatars, implement profile editing UI, and enhance settings layout):app/src/main/java/com/pando/app/features/home/ui/AvatarViewModel.kt
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -35,7 +39,7 @@ class AvatarViewModel @Inject constructor (
                 }
 
                 is DataResult.Error -> {
-                    // Có thể emit event nếu cần
+                    // Emit event
                 }
             }
 

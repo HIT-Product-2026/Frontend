@@ -126,6 +126,8 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
                     friendsItemAdapter.notifyDataSetChanged()
                     searchItemAdapter.notifyDataSetChanged()
                     inviteItemAdapter.notifyDataSetChanged()
+                    receivedRequestedAdapter.notifyDataSetChanged()
+                    sentRequestedAdapter.notifyDataSetChanged()
                 }
             }
         }

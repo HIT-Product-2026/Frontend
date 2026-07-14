@@ -16,4 +16,10 @@
     <string name="dang_ky">Đăng ký</string>
     <string name="pando">Pando</string>
     <string name="xac_nhan">Xác nhận</string>
+
+    <string-array name="gioi_tinh">
+        <item>Nam</item>
+        <item>Nữ</item>
+        <item>Khác</item>
+    </string-array>
 </resources>
