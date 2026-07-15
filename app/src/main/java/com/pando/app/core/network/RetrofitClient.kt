@@ -65,7 +65,7 @@ object RetrofitClient {
     @Named("AuthRetrofit")
     fun provideAuthRetrofit(@Named("PublicClient") okHttpClient: OkHttpClient): Retrofit {
         return Retrofit.Builder()
-            .baseUrl(ApiConstants.BASE_URL + ApiConstants.API_V1)
+            .baseUrl(ApiConstants.BASE_URL + ApiConstants.API_NOW)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -76,7 +76,7 @@ object RetrofitClient {
     @Named("MainRetrofit")
     fun provideMainRetrofit(@Named("AuthenticatedClient") okHttpClient: OkHttpClient): Retrofit {
         return Retrofit.Builder()
-            .baseUrl(ApiConstants.BASE_URL + ApiConstants.API_V1)
+            .baseUrl(ApiConstants.BASE_URL + ApiConstants.API_NOW)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
