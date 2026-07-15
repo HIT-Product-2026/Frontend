@@ -65,6 +65,7 @@ dependencies {
     implementation("androidx.cardview:cardview:1.0.0")
     implementation("io.coil-kt.coil3:coil:3.3.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
+    implementation("androidx.viewpager2:viewpager2:1.1.0")
     implementation("com.auth0.android:jwtdecode:2.0.2")
 
     val lifecycle_version = "2.8.7"
