@@ -5,9 +5,9 @@ import java.util.UUID
 
 data class ChatMenuItemModel (
     override val id: UUID,
-    val name: String,
-    val previewChat : String,
-    val time : String
+    val name: String?,
+    val previewChat : String?,
+    val time : String?
 ) : BaseItemModel
 
 class DataChatMenuItem {

@@ -18,6 +18,7 @@ import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.ViewPort
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -33,12 +34,14 @@ import com.google.android.gms.location.Priority
 import com.google.android.material.snackbar.Snackbar
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
+import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.network.TokenManager
 import com.pando.app.core.session.UserSession
 import com.pando.app.core.ui.UiState
 import com.pando.app.databinding.FragmentCameraBinding
 import com.pando.app.features.home.data.model.entity.CurrentUser
 import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
+import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.launch
@@ -50,11 +53,11 @@ import java.util.concurrent.Executors
 @AndroidEntryPoint
 class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding::inflate) {
     @Inject
-    private lateinit var tokenManager: TokenManager
+    lateinit var tokenManager: TokenManager
 
     @Inject
-    private lateinit var userSession: UserSession
-
+    lateinit var userSession: UserSession
+    private val avatarViewModel: AvatarViewModel by activityViewModels()
     private val viewModel: CameraViewModel by viewModels()
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
@@ -130,6 +133,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun initView() {
+        userSession.getCurrentUserId()?.let {
+            avatarViewModel.loadAvatar(it)
+        }
     }
 
     override fun initActionView() {
@@ -145,6 +151,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.btnCapture.setOnClickListener {
             captureLocation()
             takePhoto()
+        }
+
+        binding.chatBtn.setOnClickListener {
+            findNavController().navigate(R.id.action_cameraFragment_to_chatMenuFragment)
         }
 
         binding.btnCancel.setOnClickListener {

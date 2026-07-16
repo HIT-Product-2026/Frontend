@@ -3,10 +3,11 @@ package com.pando.app.core.session
 import com.pando.app.features.home.data.model.entity.CurrentUser
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class UserSession {
+class UserSession @Inject constructor() {
     private val _currentUser = MutableStateFlow<CurrentUser?>(null)
 
     val currentUser = _currentUser.asStateFlow()

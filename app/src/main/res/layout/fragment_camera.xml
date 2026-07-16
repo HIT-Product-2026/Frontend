@@ -54,6 +54,7 @@
                 app:iconTint="@color/white" />
 
             <ImageButton
+                android:id="@+id/chatBtn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"

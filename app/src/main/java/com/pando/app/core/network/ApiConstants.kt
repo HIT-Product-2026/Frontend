@@ -1,8 +1,8 @@
 package com.pando.app.core.network
 
 object ApiConstants {
-    const val BASE_URL = "http://52.221.198.144:8081"
-    const val API_V1 = "/api/v1/"
+    const val BASE_URL = "http://52.221.198.144:8080"
+    const val API_V1 = "/api/v2/"
 
     object Auth {
         const val LOGIN = "auth/login"

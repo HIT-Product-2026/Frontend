@@ -2,6 +2,7 @@ package com.pando.app.core.network
 
 import android.content.Context
 import com.pando.app.core.data.api.AuthApi
+import com.pando.app.core.data.api.ConversationApi
 import com.pando.app.core.data.api.FriendshipApi
 import com.pando.app.core.data.api.PostApi
 import com.pando.app.core.data.api.UserApi
@@ -103,6 +104,12 @@ object RetrofitClient {
     @Singleton
     fun provideFriendshipApi(@Named("MainRetrofit") retrofit: Retrofit): FriendshipApi {
         return retrofit.create(FriendshipApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideConversationApi(@Named("MainRetrofit") retrofit: Retrofit): ConversationApi {
+        return retrofit.create(ConversationApi::class.java)
     }
 
     @Provides

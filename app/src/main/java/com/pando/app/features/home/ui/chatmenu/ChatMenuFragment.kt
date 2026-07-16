@@ -6,16 +6,17 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.bumptech.glide.Glide
-import com.pando.app.R
 import com.pando.app.core.base.BaseAdapter
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.ui.UiState
 import com.pando.app.databinding.FragmentChatMenuBinding
 import com.pando.app.databinding.ItemChatMenuRvBinding
 import com.pando.app.features.home.data.model.entity.ChatMenuItemModel
+import com.pando.app.features.home.data.model.entity.DataChatMenuItem
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -26,7 +27,7 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
     private var avatarMap: Map<UUID, ByteArray> = emptyMap()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
     private val chatMenuViewModel: ChatMenuViewModel by viewModels()
-    private val chatMenuAdapter : BaseAdapter<ChatMenuItemModel, ItemChatMenuRvBinding> by lazy {
+    private val chatMenuAdapter: BaseAdapter<ChatMenuItemModel, ItemChatMenuRvBinding> by lazy {
         BaseAdapter(
             ItemChatMenuRvBinding::inflate,
             BaseDiffCallBack()
@@ -51,12 +52,42 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
     }
 
     override fun initActionView() {
+        binding.backButton.setOnClickListener {
+            findNavController().navigateUp()
+        }
+
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 avatarViewModel.avatars.collect { avatars ->
                     avatarMap = avatars
 
                     chatMenuAdapter.notifyDataSetChanged()
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                chatMenuViewModel.uiState.collect { state ->
+                    when (state) {
+                        is UiState.Idle -> {}
+                        is UiState.Loading -> {}
+                        is UiState.Success -> {
+                            val data = DataChatMenuItem.data.toList()
+
+                            if (data.isNotEmpty()) {
+                                chatMenuAdapter.submitList(data)
+
+                                avatarViewModel.loadAvatars(
+                                    data.map { it.id }
+                                )
+                            } else {
+                                chatMenuAdapter.submitList(emptyList())
+                            }
+                        }
+
+                        is UiState.Error -> {}
+                    }
                 }
             }
         }

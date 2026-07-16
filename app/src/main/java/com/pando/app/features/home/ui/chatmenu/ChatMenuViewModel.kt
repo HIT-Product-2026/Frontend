@@ -38,14 +38,14 @@ class ChatMenuViewModel @Inject constructor(
                         DataChatMenuItem.data.add(
                             ChatMenuItemModel(
                                 id = if (getCurrentUserId()?.equals(item.user1.id) == true) {
-                                    item.user1.id
-                                } else {
                                     item.user2.id
+                                } else {
+                                    item.user1.id
                                 },
                                 name = if (getCurrentUserId()?.equals(item.user1.id) == true) {
-                                    item.user1.displayName.ifEmpty { item.user1.username }
-                                } else {
                                     item.user2.displayName.ifEmpty { item.user2.username }
+                                } else {
+                                    item.user1.displayName.ifEmpty { item.user1.username }
                                 },
                                 previewChat = item.lastMessageContent,
                                 time = item.lastMessageTime
