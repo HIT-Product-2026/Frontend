@@ -1,12 +1,4 @@
-<<<<<<<< HEAD:app/src/main/java/com/pando/app/features/shared/AvatarViewModel.kt
-<<<<<<<< HEAD:app/src/main/java/com/pando/app/features/shared/AvatarViewModel.kt
 package com.pando.app.features.shared
-========
-package com.pando.app.features.home.ui
->>>>>>>> 190d678 (feat: refactor AvatarViewModel and use for managing many user avatars, implement profile editing UI, and enhance settings layout):app/src/main/java/com/pando/app/features/home/ui/AvatarViewModel.kt
-========
-package com.pando.app.features.home.ui.friend
->>>>>>>> 4f34ab1 (refactor: for rebase):app/src/main/java/com/pando/app/features/home/ui/friend/AvatarViewModel.kt
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
