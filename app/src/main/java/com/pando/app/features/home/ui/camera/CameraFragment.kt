@@ -381,7 +381,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                 return
             }
 
-            userSession.setCurrentUser(CurrentUser(uuid, userName, displayName, email))
+            userSession.setCurrentUser(CurrentUser(uuid, userName, displayName, null))
             Log.d("JWT_DECODE", "Cập nhật User thành công")
 
         } catch (e : DecodeException) {
