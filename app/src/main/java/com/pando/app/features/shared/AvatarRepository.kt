@@ -1,4 +1,4 @@
-package com.pando.app.features.home.data.repository
+package com.pando.app.features.shared
 
 import com.pando.app.core.base.BaseRepository
 import com.pando.app.core.data.api.UserApi

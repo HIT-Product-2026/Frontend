@@ -6,10 +6,12 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.pando.app.R
 import com.pando.app.core.base.BaseVM
 import com.pando.app.core.network.ApiResponse
+import com.pando.app.core.session.UserSession
 import com.pando.app.core.ui.UiState
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.auth.data.model.response.LoginResponse
 import com.pando.app.features.auth.data.repository.AuthRepository
+import com.pando.app.features.home.data.model.entity.CurrentUser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
 import kotlinx.coroutines.launch
@@ -17,7 +19,8 @@ import kotlinx.coroutines.tasks.await
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val userSession: UserSession
 ) : BaseVM<ApiResponse<LoginResponse>>() {
     fun login(email: String, password: String) {
         if (email.isEmpty() || password.isEmpty()) {
@@ -29,6 +32,17 @@ class LoginViewModel @Inject constructor(
             val loginResult = authRepository.login(email, password)
 
             if (loginResult is DataResult.Success) {
+                val response = loginResult.data.data
+
+                userSession.setCurrentUser(
+                    CurrentUser(
+                        response.user.id,
+                        response.user.username,
+                        response.user.displayName,
+                        response.user.mode
+                        )
+                )
+
                 sendEvent(ViewModelEvent.ShowSnackbar("Đăng nhập thành công!"))
 
                 getAndSendFcmToken()

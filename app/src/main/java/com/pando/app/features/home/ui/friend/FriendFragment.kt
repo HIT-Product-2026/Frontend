@@ -1,10 +1,9 @@
 package com.pando.app.features.home.ui.friend
 
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.PopupWindow
 import androidx.appcompat.widget.SearchView
 import androidx.fragment.app.viewModels
@@ -41,7 +40,10 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.util.UUID
 import androidx.core.graphics.drawable.toDrawable
+import androidx.fragment.app.activityViewModels
 import androidx.viewbinding.ViewBinding
+import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.features.shared.AvatarViewModel
 
 @AndroidEntryPoint
 class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding::inflate) {
@@ -49,7 +51,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
 
     //View Model
     private val friendViewModel: FriendViewModel by viewModels()
-    private val avatarViewModel: AvatarViewModel by viewModels()
+    private val avatarViewModel: AvatarViewModel by activityViewModels()
 
     //Adapter
     private lateinit var inviteItemAdapter: BaseAdapter<InviteItemModel, ItemInviteRvBinding>
@@ -278,18 +280,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            val avatar = avatarMap[item.id]
-
-            Glide.with(itemBinding.root)
-                .load(avatar)
-                .placeholder(R.drawable.ic_default_avatar)
-                .error(R.drawable.ic_default_avatar)
-                .circleCrop()
-                .into(itemBinding.profileIcon)
-
-            if (avatar == null) {
-                avatarViewModel.loadAvatar(item.id)
-            }
+            bindAvatar(itemBinding.profileIcon, item.id)
 
             itemBinding.functionBtn.setOnClickListener {
                 showFriendActions(itemBinding, item)
@@ -302,18 +293,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            val avatar = avatarMap[item.id]
-
-            Glide.with(itemBinding.root)
-                .load(avatar)
-                .placeholder(R.drawable.ic_default_avatar)
-                .error(R.drawable.ic_default_avatar)
-                .circleCrop()
-                .into(itemBinding.profileIcon)
-
-            if (avatar == null) {
-                avatarViewModel.loadAvatar(item.id)
-            }
+            bindAvatar(itemBinding.profileIcon, item.id)
 
             itemBinding.addFriendBtn.setOnClickListener {
                 friendViewModel.requestFriend(item.id)
@@ -326,18 +306,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            val avatar = avatarMap[item.id]
-
-            Glide.with(itemBinding.root)
-                .load(avatar)
-                .placeholder(R.drawable.ic_default_avatar)
-                .error(R.drawable.ic_default_avatar)
-                .circleCrop()
-                .into(itemBinding.profileIcon)
-
-            if (avatar == null) {
-                avatarViewModel.loadAvatar(item.id)
-            }
+            bindAvatar(itemBinding.profileIcon, item.id)
 
             itemBinding.cancelBtn.setOnClickListener {
                 friendViewModel.rejectFriend(item.friendshipId)
@@ -350,18 +319,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            val avatar = avatarMap[item.id]
-
-            Glide.with(itemBinding.root)
-                .load(avatar)
-                .placeholder(R.drawable.ic_default_avatar)
-                .error(R.drawable.ic_default_avatar)
-                .circleCrop()
-                .into(itemBinding.profileIcon)
-
-            if (avatar == null) {
-                avatarViewModel.loadAvatar(item.id)
-            }
+            bindAvatar(itemBinding.profileIcon, item.id)
 
             itemBinding.cancelBtn.setOnClickListener {
                 friendViewModel.rejectFriend(item.friendshipId)
@@ -551,5 +509,15 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         val xOffset = view.root.width - popupWidth
 
         popupWindow.showAsDropDown(view.root, xOffset, -20)
+    }
+
+    private fun bindAvatar(imageView: ImageView, userId: UUID) {
+        val avatar = avatarMap[userId]
+
+        imageView.loadAvatar(avatar)
+
+        if (avatar == null) {
+            avatarViewModel.loadAvatar(userId)
+        }
     }
 }

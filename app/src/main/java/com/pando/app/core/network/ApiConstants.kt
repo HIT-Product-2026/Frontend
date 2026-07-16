@@ -31,4 +31,8 @@ object ApiConstants {
         const val GET_RECEIVED_REQUESTED_USERS = "friendship/friendships/received"
         const val UNFRIEND = "friendship/unfriend/{friendId}"
     }
+
+    object Conversation {
+        const val GET_CONVERSATIONS = "conversations/conversations"
+    }
 }
