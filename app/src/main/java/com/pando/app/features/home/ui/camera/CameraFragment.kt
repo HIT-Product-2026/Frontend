@@ -23,6 +23,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import com.auth0.android.jwt.Claim
 import com.auth0.android.jwt.DecodeException
 import com.auth0.android.jwt.JWT
 import com.bumptech.glide.Glide
@@ -37,6 +38,7 @@ import com.pando.app.core.session.UserSession
 import com.pando.app.core.ui.UiState
 import com.pando.app.databinding.FragmentCameraBinding
 import com.pando.app.features.home.data.model.entity.CurrentUser
+import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.launch
@@ -372,7 +374,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             val id = jwt.getClaim("id").asString()
             val userName = jwt.getClaim("username").asString()
             val displayName = jwt.getClaim("displayName").asString()
-            val email = jwt.getClaim("email").asString()
+            val userMode = jwt.getClaim("mode").asString()
 
             val uuid = try {
                 UUID.fromString(id)
@@ -381,7 +383,18 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                 return
             }
 
-            userSession.setCurrentUser(CurrentUser(uuid, userName, displayName, null))
+            val mode: UserMode? = try {
+                if (userMode != null) {
+                    UserMode.valueOf(userMode.uppercase())
+                } else {
+                    null
+                }
+            } catch (e: IllegalArgumentException) {
+                Log.e("JWT_DECODE", "mode từ Token không đúng định dạng: $userMode")
+                null
+            }
+
+            userSession.setCurrentUser(CurrentUser(uuid, userName, displayName, mode))
             Log.d("JWT_DECODE", "Cập nhật User thành công")
 
         } catch (e : DecodeException) {
