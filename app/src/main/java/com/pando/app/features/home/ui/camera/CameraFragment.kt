@@ -22,8 +22,9 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
+import com.auth0.android.jwt.DecodeException
+import com.auth0.android.jwt.JWT
 import com.bumptech.glide.Glide
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -32,17 +33,26 @@ import com.google.android.material.snackbar.Snackbar
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.network.TokenManager
+import com.pando.app.core.session.UserSession
 import com.pando.app.core.ui.UiState
 import com.pando.app.databinding.FragmentCameraBinding
+import com.pando.app.features.home.data.model.entity.CurrentUser
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 @AndroidEntryPoint
 class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding::inflate) {
+    @Inject
+    private lateinit var tokenManager: TokenManager
+
+    @Inject
+    private lateinit var userSession: UserSession
+
     private val viewModel: CameraViewModel by viewModels()
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
@@ -75,6 +85,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun initData() {
+        decodeToken(tokenManager.getAccessToken())
+
         cameraExecutor = Executors.newSingleThreadExecutor()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
@@ -339,6 +351,41 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
                 imageCapture?.targetRotation = rotation
             }
+        }
+    }
+
+    fun decodeToken(token: String?) {
+        if (token.isNullOrEmpty()) {
+            Log.e("JWT_DECODE", "Token null")
+            return
+        }
+
+        try {
+            val jwt = JWT(token)
+
+            val isTokenExpired = jwt.isExpired(10)
+            if (isTokenExpired) {
+                Log.e("JWT_DECODE", "Token đã hết hạn sử dụng. Vui lòng đăng nhập lại")
+                return
+            }
+
+            val id = jwt.getClaim("id").asString()
+            val userName = jwt.getClaim("username").asString()
+            val displayName = jwt.getClaim("displayName").asString()
+            val email = jwt.getClaim("email").asString()
+
+            val uuid = try {
+                UUID.fromString(id)
+            } catch (e: IllegalArgumentException) {
+                Log.e("JWT_DECODE", "ID từ Token không đúng định dạng UUID: $id")
+                return
+            }
+
+            userSession.setCurrentUser(CurrentUser(uuid, userName, displayName, email))
+            Log.d("JWT_DECODE", "Cập nhật User thành công")
+
+        } catch (e : DecodeException) {
+            Log.e("JWT_DECODE", "Token không hợp lệ hoặc bị lỗi cấu trúc: ${e.message}")
         }
     }
 

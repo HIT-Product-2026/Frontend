@@ -1,7 +1,6 @@
 package com.pando.app.features.auth.ui.login
 
 import android.util.Log
-import androidx.lifecycle.viewModelScope
 import com.google.firebase.messaging.FirebaseMessaging
 import com.pando.app.R
 import com.pando.app.core.base.BaseVM
@@ -14,7 +13,6 @@ import com.pando.app.features.auth.data.repository.AuthRepository
 import com.pando.app.features.home.data.model.entity.CurrentUser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 @HiltViewModel
