@@ -102,6 +102,9 @@
         <action
             android:id="@+id/action_cameraFragment_to_chatMenuFragment"
             app:destination="@id/chatMenuFragment" />
+        <action
+            android:id="@+id/action_cameraFragment_to_postReelFragment"
+            app:destination="@id/postReelFragment" />
     </fragment>
     <fragment
         android:id="@+id/friendFragment"
@@ -144,5 +147,10 @@
         android:id="@+id/bottomSheetEditAvatarFragment"
         android:name="com.pando.app.features.home.ui.profile.BottomSheetEditAvatarFragment"
         android:label="BottomSheetEditAvatarFragment" />
+    <fragment
+        android:id="@+id/postReelFragment"
+        android:name="com.pando.app.features.home.ui.postreel.PostReelFragment"
+        android:label="fragment_post_reel"
+        tools:layout="@layout/fragment_post_reel" />
 
 </navigation>

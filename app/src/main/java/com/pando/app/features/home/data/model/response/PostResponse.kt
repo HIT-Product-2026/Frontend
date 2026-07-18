@@ -8,8 +8,6 @@ data class PostResponse (
     val id : UUID,
     val user: UserDto,
     val caption: String,
-    val imageUrl: String,
-    val contentType: String,
     val latitude: Double,
     val longitude: Double,
     val modeLocation: PostModeLocation

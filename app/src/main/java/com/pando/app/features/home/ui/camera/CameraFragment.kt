@@ -185,6 +185,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             findNavController().navigate(R.id.action_cameraFragment_to_settingFragment)
         }
 
+        binding.historyBtn.setOnClickListener {
+            findNavController().navigate((R.id.action_cameraFragment_to_postReelFragment))
+        }
+
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->

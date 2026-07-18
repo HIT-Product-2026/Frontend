@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:background="@color/primary1"
     tools:context=".features.home.ui.postreel.PostReelFragment">
 
@@ -62,17 +62,46 @@
         </RelativeLayout>
 
         <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/postReelViewPager"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"/>
+            android:layout_height="match_parent" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/inputTextLayout"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/_40sdp"
+            android:layout_marginBottom="@dimen/_15sdp"
+            app:boxStrokeColor="@color/accent5"
+            app:boxStrokeErrorColor="@android:color/holo_red_dark"
+            app:errorEnabled="true"
+            app:errorIconDrawable="@null"
+            app:errorTextColor="@android:color/holo_red_dark"
+            app:hintEnabled="false"
+            app:layout_constraintBottom_toTopOf="@+id/allFunctionsBar"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/inputTextET"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_search_bar"
+                android:hint="Soạn tin nhắn...."
+                android:textColor="@color/white"
+                android:textColorHint="@color/white" />
+
+        </com.google.android.material.textfield.TextInputLayout>
 
         <RelativeLayout
             android:id="@+id/allFunctionsBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="@dimen/_40sdp"
+            android:layout_marginBottom="@dimen/_15sdp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            android:layout_marginBottom="@dimen/_15sdp"
             app:layout_constraintStart_toStartOf="parent">
 
             <RelativeLayout
@@ -87,7 +116,7 @@
                     android:layout_alignParentStart="true"
                     android:layout_centerVertical="true"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/all_image"
+                    android:src="@drawable/ic_point_map"
                     app:tint="@android:color/white" />
 
                 <ImageView
@@ -105,7 +134,7 @@
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/change_direction"
+                    android:src="@drawable/dot_horizontal"
                     app:tint="@android:color/white" />
             </RelativeLayout>
 
