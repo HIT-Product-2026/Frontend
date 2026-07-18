@@ -29,6 +29,11 @@ class UserSession @Inject constructor() {
         return _currentUser.value
     }
 
+    fun updateAvatar(avatar: ByteArray?) {
+        updateCurrentUser { user ->
+            user.copy(avatar = avatar)
+        }
+    }
     fun getCurrentUserId() = _currentUser.value?.id
 
     val isLoggedIn: Boolean

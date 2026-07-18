@@ -1,6 +1,7 @@
 package com.pando.app.features.auth.ui.login
 
 import android.view.View
+import android.view.WindowManager
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -22,6 +23,7 @@ class LoginFragment : BaseBottomSheet<FragmentLoginBinding>(FragmentLoginBinding
     private val viewModel: LoginViewModel by viewModels()
 
     override fun initView() {
+        dialog?.window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
     }
 
     override fun initActionView() {

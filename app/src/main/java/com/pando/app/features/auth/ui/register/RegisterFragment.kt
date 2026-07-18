@@ -2,6 +2,7 @@ package com.pando.app.features.auth.ui.register
 
 import android.text.InputType
 import android.view.View
+import android.view.WindowManager
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -21,6 +22,7 @@ class RegisterFragment : BaseBottomSheet<FragmentRegisterBinding>(FragmentRegist
     private lateinit var email : String
 
     override fun initView() {
+        dialog?.window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
     }
 
     override fun initActionView() {

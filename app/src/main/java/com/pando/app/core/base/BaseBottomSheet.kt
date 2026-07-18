@@ -44,9 +44,6 @@ abstract class BaseBottomSheet<B : ViewBinding>(
             }
         }
 
-        dialog?.window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-
-
         initView()
         initActionView()
     }

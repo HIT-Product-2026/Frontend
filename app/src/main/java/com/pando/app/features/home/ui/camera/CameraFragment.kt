@@ -90,7 +90,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun initData() {
-        decodeToken(tokenManager.getAccessToken())
+        if (userSession.getCurrentUser() == null) {
+            decodeToken(tokenManager.getAccessToken())
+        }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
@@ -133,8 +135,12 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun initView() {
-        userSession.getCurrentUserId()?.let {
-            avatarViewModel.loadAvatar(it)
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                userSession.currentUser.collect { user ->
+                    binding.profileIcon.loadAvatar(user?.avatar)
+                }
+            }
         }
     }
 
@@ -404,7 +410,23 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                 null
             }
 
-            userSession.setCurrentUser(CurrentUser(uuid, userName, displayName, mode))
+            val currentAvatar = userSession.getCurrentUser()
+                ?.takeIf { it.id == uuid }
+                ?.avatar
+
+            userSession.setCurrentUser(
+                CurrentUser(
+                    id = uuid,
+                    username = userName,
+                    displayName = displayName,
+                    mode = mode,
+                    avatar = currentAvatar
+                )
+            )
+
+            if (currentAvatar == null) {
+                avatarViewModel.loadAvatar(uuid)
+            }
             Log.d("JWT_DECODE", "Cập nhật User thành công")
 
         } catch (e : DecodeException) {

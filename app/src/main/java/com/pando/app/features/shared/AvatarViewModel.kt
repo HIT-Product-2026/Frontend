@@ -2,6 +2,7 @@ package com.pando.app.features.shared
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pando.app.core.session.UserSession
 import com.pando.app.core.utils.DataResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +14,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AvatarViewModel @Inject constructor (
-    private val avatarRepository: AvatarRepository
+    private val avatarRepository: AvatarRepository,
+    private val userSession: UserSession
 ): ViewModel() {
 
     private val _avatars = MutableStateFlow<Map<UUID, ByteArray>>(emptyMap())
@@ -23,7 +25,14 @@ class AvatarViewModel @Inject constructor (
     private val loadingIds = mutableSetOf<UUID>()
 
     fun loadAvatar(userId: UUID) {
-        if (_avatars.value.containsKey(userId)) return
+        if (_avatars.value.containsKey(userId)) {
+            val avatar = _avatars.value[userId]
+
+            if (userSession.getCurrentUserId() == userId) {
+                userSession.updateAvatar(avatar)
+            }
+            return
+        }
         if (!loadingIds.add(userId)) return
 
         viewModelScope.launch {
@@ -31,6 +40,10 @@ class AvatarViewModel @Inject constructor (
                 is DataResult.Success -> {
                     _avatars.update { current ->
                         current + (userId to result.data)
+                    }
+
+                    if (userSession.getCurrentUserId() == userId) {
+                        userSession.updateAvatar(result.data)
                     }
                 }
 

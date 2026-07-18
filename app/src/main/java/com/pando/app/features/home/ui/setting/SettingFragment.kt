@@ -1,10 +1,15 @@
 package com.pando.app.features.home.ui.setting
 
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
+import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.network.TokenManager
+import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentSettingBinding
 import com.pando.app.features.home.data.model.entity.DataFriendItem
 import com.pando.app.features.home.data.model.entity.DataReceivedRequestItem
@@ -12,16 +17,20 @@ import com.pando.app.features.home.data.model.entity.DataSearchItem
 import com.pando.app.features.home.data.model.entity.DataSentRequestItem
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBinding::inflate) {
     @Inject
     lateinit var tokenManager: TokenManager
+    @Inject
+    lateinit var userSession: UserSession
 
     override fun initData() {
     }
 
     override fun initView() {
+        loadCurrentUser()
     }
 
     override fun initActionView() {
@@ -31,6 +40,7 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
 
         binding.logoutBtn.setOnClickListener {
             tokenManager.clear()
+            userSession.clearCurrentUser()
 
             DataSentRequestItem.apply {
                 data.clear()
@@ -68,4 +78,15 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
         }
     }
 
+    private fun loadCurrentUser() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                userSession.currentUser.collect { user ->
+                    binding.imgAvatar.loadAvatar(user?.avatar)
+                    binding.displayNameTV.text = user?.displayName.orEmpty()
+                    binding.usernameTV.text = user?.username.orEmpty()
+                }
+            }
+        }
+    }
 }

@@ -11,6 +11,7 @@ import com.pando.app.core.utils.DataResult
 import com.pando.app.features.auth.data.model.response.LoginResponse
 import com.pando.app.features.auth.data.repository.AuthRepository
 import com.pando.app.features.home.data.model.entity.CurrentUser
+import com.pando.app.features.shared.AvatarRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
 import kotlinx.coroutines.tasks.await
@@ -18,6 +19,7 @@ import kotlinx.coroutines.tasks.await
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository,
+    private val avatarRepository: AvatarRepository,
     private val userSession: UserSession
 ) : BaseVM<ApiResponse<LoginResponse>>() {
     fun login(email: String, password: String) {
@@ -31,15 +33,7 @@ class LoginViewModel @Inject constructor(
 
             if (loginResult is DataResult.Success) {
                 val response = loginResult.data.data
-
-                userSession.setCurrentUser(
-                    CurrentUser(
-                        response.user.id,
-                        response.user.username,
-                        response.user.displayName,
-                        response.user.mode
-                        )
-                )
+                saveAvatarOfUserSession(response)
 
                 sendEvent(ViewModelEvent.ShowSnackbar("Đăng nhập thành công!"))
 
@@ -63,6 +57,29 @@ class LoginViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private suspend fun saveAvatarOfUserSession(response: LoginResponse) {
+        val user = response.user
+
+        userSession.setCurrentUser(
+            CurrentUser(
+                id = user.id,
+                username = user.username,
+                displayName = user.displayName,
+                mode = user.mode
+            )
+        )
+
+        when (val avatarResult = avatarRepository.getUserAvatar(user.id)) {
+            is DataResult.Success -> {
+                userSession.updateAvatar(avatarResult.data)
+            }
+
+            is DataResult.Error -> {
+
+            }
         }
     }
 }

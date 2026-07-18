@@ -5,8 +5,10 @@ import com.pando.app.core.data.api.AuthApi
 import com.pando.app.core.data.api.ConversationApi
 import com.pando.app.core.data.api.FriendshipApi
 import com.pando.app.core.data.api.PostApi
+import com.pando.app.core.data.api.ProfileApi
 import com.pando.app.core.data.api.UserApi
 import com.pando.app.core.data.local.AuthPreferences
+import com.pando.app.core.session.UserSession
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -114,7 +116,19 @@ object RetrofitClient {
 
     @Provides
     @Singleton
+    fun provideProfileApi(@Named("MainRetrofit") retrofit: Retrofit): ProfileApi {
+        return retrofit.create(ProfileApi::class.java)
+    }
+
+    @Provides
+    @Singleton
     fun provideAuthPreferences(@ApplicationContext context: Context): AuthPreferences {
         return AuthPreferences(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideUserSession() : UserSession {
+        return UserSession()
     }
 }

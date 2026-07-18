@@ -1,7 +1,7 @@
 package com.pando.app.core.network
 
 object ApiConstants {
-    const val BASE_URL = "http://52.221.198.144:8080"
+    const val BASE_URL = "https://lockly-api.duckdns.org"
     const val API_V1 = "/api/v1/"
     const val API_V2 = "/api/v2/"
     const val API_NOW = API_V2
@@ -20,6 +20,8 @@ object ApiConstants {
     object User {
         const val SEND_FCM_TOKEN = "user/fcm-token"
         const val GET_USER_AVATAR = "user/{user_id}/avatar"
+        const val UPDATE_DISPLAY_NAME = "user/display-name"
+        const val UPDATE_AVATAR = "user/avatar"
     }
 
     object FriendShip {
@@ -35,5 +37,9 @@ object ApiConstants {
 
     object Conversation {
         const val GET_CONVERSATIONS = "conversations/conversations"
+    }
+
+    object Profile {
+        const val UPDATE_PROFILE = "profile"
     }
 }

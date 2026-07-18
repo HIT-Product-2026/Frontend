@@ -140,30 +140,28 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="@dimen/_4sdp"
                     android:fontFamily="sans-serif-medium"
-                    android:text="Email"
+                    android:text="Số điện thoại"
                     android:textColor="@color/white"
                     android:textSize="@dimen/_14sdp" />
 
                 <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/emailLayout"
+                    android:id="@+id/phoneLayout"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     app:boxStrokeColor="@color/accent5"
                     app:boxStrokeErrorColor="@android:color/holo_red_dark"
-                    app:endIconMode="password_toggle"
-                    app:endIconTint="@color/primary1"
                     app:errorEnabled="true"
                     app:errorIconDrawable="@null"
                     app:errorTextColor="@android:color/holo_red_dark"
                     app:hintEnabled="false">
 
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/emailET"
+                        android:id="@+id/phoneET"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:background="@drawable/stroke_accent5_r10"
-                        android:hint="Email"
+                        android:hint="Số điện thoại"
                         android:textColor="@color/white"
                         android:textColorHint="@color/white" />
 

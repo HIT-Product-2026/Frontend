@@ -3,10 +3,14 @@ package com.pando.app.core.data.api
 import com.pando.app.core.network.ApiConstants
 import com.pando.app.core.network.ApiResponse
 import com.pando.app.features.home.data.model.response.FriendListResponse
+import okhttp3.MultipartBody
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.GET
+import retrofit2.http.Multipart
+import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Streaming
@@ -18,4 +22,9 @@ interface UserApi {
     @Streaming
     @GET(ApiConstants.User.GET_USER_AVATAR)
     suspend fun getUserAvatar(@Path("user_id") userid : UUID) : Response<ResponseBody>
+    @PUT(ApiConstants.User.UPDATE_DISPLAY_NAME)
+    suspend fun updateDisplayName(@Query("displayName") displayName: String) : Response<ApiResponse<Void>>
+    @Multipart
+    @POST(ApiConstants.User.UPDATE_AVATAR)
+    suspend fun updateAvatar(@Part file: MultipartBody.Part) : Response<ApiResponse<Void>>
 }
