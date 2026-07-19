@@ -14,6 +14,7 @@ import com.pando.app.core.base.BaseAdapter
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.session.UserSession
 import com.pando.app.core.ui.UiState
 import com.pando.app.databinding.FragmentPostReelBinding
 import com.pando.app.databinding.ItemPostReelBinding
@@ -23,6 +24,7 @@ import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.util.UUID
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelBinding::inflate) {
@@ -30,6 +32,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     private var imageMap: Map<UUID, ByteArray> = emptyMap()
     private val postReelViewModel: PostReelViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
+    @Inject
+    lateinit var userSession : UserSession
     private val postReelAdapter : BaseAdapter<PostReelItemModel, ItemPostReelBinding> by lazy {
         BaseAdapter(
             ItemPostReelBinding::inflate,
@@ -40,7 +44,6 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
             Glide.with(this)
                 .load(image)
-                .circleCrop()
                 .into(itemBinding.imgCaptured)
 
             if (image == null) {
@@ -81,6 +84,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     override fun initView() {
+        loadCurrentUser()
         setupPostReel()
 
         postReelAdapter.submitList(
@@ -137,6 +141,16 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
         if (avatar == null) {
             avatarViewModel.loadAvatar(userId)
+        }
+    }
+
+    private fun loadCurrentUser() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                userSession.currentUser.collect { user ->
+                    binding.profileIcon.loadAvatar(user?.avatar)
+                }
+            }
         }
     }
 

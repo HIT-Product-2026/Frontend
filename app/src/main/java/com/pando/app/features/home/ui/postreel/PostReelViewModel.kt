@@ -55,12 +55,6 @@ class PostReelViewModel @Inject constructor(
     fun getPosts() {
         if (isLoading) return
 
-        val total = DataPostReelItem.total
-        if (total != null &&
-            DataPostReelItem.data.size >= total) {
-            return
-        }
-
         if (DataPostReelItem.hasLoadedFirstPage &&
             DataPostReelItem.nextCursor == null) {
             return
@@ -75,7 +69,7 @@ class PostReelViewModel @Inject constructor(
             if (result is DataResult.Success) {
                 val response = result.data.data
 
-                DataPostReelItem.total = response.total
+                DataPostReelItem.total = DataPostReelItem.total?.plus(response.total)
 
                 val existingIds = DataPostReelItem.data
                     .mapTo(hashSetOf()) { it.id }
