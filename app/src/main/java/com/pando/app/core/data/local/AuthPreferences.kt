@@ -10,6 +10,7 @@ import jakarta.inject.Inject
 import jakarta.inject.Singleton
 
 @Singleton
+@Suppress("DEPRECATION")
 class AuthPreferences @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) {

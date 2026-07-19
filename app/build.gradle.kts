@@ -6,18 +6,29 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+configurations.configureEach {
+    resolutionStrategy {
+        force(
+            "org.jetbrains.kotlin:kotlin-stdlib:2.2.0",
+            "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.2.0",
+            "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.2.0"
+        )
+    }
+}
+
 android {
     namespace = "com.pando.app"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 37
+//    compileSdk {
+//        version = release(37) {
+//            minorApiLevel = 1
+//        }
+//    }
 
     defaultConfig {
         applicationId = "com.jollibee.frontend"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 

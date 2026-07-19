@@ -33,7 +33,7 @@
                 android:padding="2dp"
                 android:scaleType="centerCrop"
                 android:src="@drawable/ic_default_avatar"
-                app:shapeAppearanceOverlay="@style/circle"
+                app:shapeAppearanceOverlay="@style/rectangle_cornered"
                 app:strokeColor="@color/accent6"
                 app:strokeWidth="2dp" />
 

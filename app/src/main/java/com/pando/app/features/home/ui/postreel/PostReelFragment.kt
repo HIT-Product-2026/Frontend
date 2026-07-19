@@ -74,6 +74,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         }
     
     override fun initData() {
+        DataPostReelItem.reset()
         if (DataPostReelItem.data.isEmpty()) {
             postReelViewModel.getPosts()
         }

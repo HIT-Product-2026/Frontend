@@ -1,5 +1,6 @@
 package com.pando.app.features.home.ui.profile
 
+import android.os.Bundle
 import androidx.core.os.bundleOf
 import com.pando.app.core.base.BaseBottomSheet
 import com.pando.app.databinding.FragmentBottomSheetEditAvatarBinding
@@ -21,7 +22,9 @@ class BottomSheetEditAvatarFragment
         binding.chooseImage.setOnClickListener {
             parentFragmentManager.setFragmentResult(
                 REQUEST_KEY,
-                bundleOf(RESULT_KEY to ACTION_CHOOSE_IMAGE)
+                Bundle().apply {
+                    putString(RESULT_KEY, ACTION_CHOOSE_IMAGE)
+                }
             )
 
             dismiss()
