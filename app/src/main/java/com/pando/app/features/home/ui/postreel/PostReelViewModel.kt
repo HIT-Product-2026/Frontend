@@ -56,7 +56,13 @@ class PostReelViewModel @Inject constructor(
         if (isLoading) return
 
         val total = DataPostReelItem.total
-        if (total != null && DataPostReelItem.data.size >= total) {
+        if (total != null &&
+            DataPostReelItem.data.size >= total) {
+            return
+        }
+
+        if (DataPostReelItem.hasLoadedFirstPage &&
+            DataPostReelItem.nextCursor == null) {
             return
         }
 
@@ -64,7 +70,7 @@ class PostReelViewModel @Inject constructor(
         val requestedCursor = DataPostReelItem.nextCursor
 
         getData {
-            val result = postRepository.getPosts(requestedCursor.toString())
+            val result = postRepository.getPosts(requestedCursor)
 
             if (result is DataResult.Success) {
                 val response = result.data.data
@@ -88,8 +94,8 @@ class PostReelViewModel @Inject constructor(
                     }
 
                 DataPostReelItem.data.addAll(newPosts)
-
-                DataPostReelItem.nextCursor = requestedCursor + 1
+                DataPostReelItem.hasLoadedFirstPage = true
+                DataPostReelItem.nextCursor = result.data.data.cursor
             }
 
             isLoading = false

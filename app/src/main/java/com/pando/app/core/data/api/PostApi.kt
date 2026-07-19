@@ -24,7 +24,7 @@ interface PostApi {
         @Part file: MultipartBody.Part,
         @Query("caption") caption: String?): Response<ApiResponse<PostResponse>>
     @GET(ApiConstants.Post.GET_POST)
-    suspend fun getPosts(@Query("cursor") cursor: String) : Response<ApiResponse<PostsResponse>>
+    suspend fun getPosts(@Query("cursor") cursor: String?) : Response<ApiResponse<PostsResponse>>
     @GET(ApiConstants.Post.GET_POST_IMAGE)
     suspend fun getPostImage(@Path("post_id") postId: UUID) : Response<ResponseBody>
 }

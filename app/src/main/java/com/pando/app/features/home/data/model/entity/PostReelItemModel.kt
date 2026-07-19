@@ -5,8 +5,8 @@ import com.pando.app.features.home.data.model.dto.UserDto
 import com.pando.app.features.home.data.model.entity.enumEntity.PostModeLocation
 import java.util.UUID
 
-data class PostReelItemModel (
-    override val id : UUID,
+data class PostReelItemModel(
+    override val id: UUID,
     val user: UserDto,
     val caption: String,
     val latitude: Double,
@@ -16,14 +16,16 @@ data class PostReelItemModel (
 
 class DataPostReelItem {
     companion object {
-        var total : Int? = null
-        var nextCursor: Int = 0
+        var total: Int? = null
+        var nextCursor: String? = ""
+        var hasLoadedFirstPage = false
 
-        val data : MutableList<PostReelItemModel> = mutableListOf()
-        
+        val data: MutableList<PostReelItemModel> = mutableListOf()
+
         fun reset() {
             total = null
-            nextCursor = 0
+            nextCursor = ""
+            hasLoadedFirstPage = false
             data.clear()
         }
     }

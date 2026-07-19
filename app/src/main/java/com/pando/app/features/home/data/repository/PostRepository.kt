@@ -37,7 +37,7 @@ class PostRepository @Inject constructor (
         postCache.clear()
     }
 
-    suspend fun getPosts(cursor: String) : DataResult<ApiResponse<PostsResponse>> {
+    suspend fun getPosts(cursor: String?) : DataResult<ApiResponse<PostsResponse>> {
         return safeApiCall {
             postApi.getPosts(cursor)
         }
