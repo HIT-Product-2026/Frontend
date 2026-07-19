@@ -52,7 +52,6 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
 
-    implementation("androidx.activity:activity-ktx:1.13.0")
     implementation("androidx.fragment:fragment-ktx:1.8.9")
     implementation("com.github.bumptech.glide:glide:5.0.9")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
