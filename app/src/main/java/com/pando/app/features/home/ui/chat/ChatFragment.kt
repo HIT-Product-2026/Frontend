@@ -11,6 +11,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
+import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.session.UserSession
 import com.pando.app.core.ui.UiState
 import com.pando.app.databinding.FragmentChatBinding
 import com.pando.app.databinding.ItemImageMessageReceivedBinding
@@ -22,6 +24,7 @@ import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.util.UUID
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::inflate) {
@@ -30,7 +33,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
     private val chatViewModel: ChatViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
 
-    //    @Inject
+//    @Inject
 //    lateinit var userSession: UserSession
     private val chatAdapter: ChatAdapter by lazy {
         ChatAdapter(
@@ -71,6 +74,8 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
     }
 
     override fun initView() {
+        binding.toolbarName.text = args.name
+
         if (DataChatMessageItem.data.isEmpty()) {
             chatViewModel.getMessageList(args.conversationId, args.recipientId)
         }
@@ -97,6 +102,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                     avatarViewModel.avatars.collect { avatars ->
                         avatars[args.recipientId]?.let { avatar ->
                             chatAdapter.updateRecipientAvatar(avatar)
+                            binding.toolBarAvatar.loadAvatar(avatar)
                         }
                     }
                 }
@@ -114,12 +120,11 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                             is UiState.Success -> {
                                 when (val event = state.data) {
                                     is ChatEvent.GetChatHistoryEvent -> {
-                                        chatAdapter.submitList(DataChatMessageItem.data.toList())
+                                        submitMessagesAndScrollToBottom()
                                     }
 
                                     is ChatEvent.SendTextEvent -> {
-                                        DataChatMessageItem.data.add(
-                                            0, ChatMessageItemModel(
+                                        DataChatMessageItem.data.add(ChatMessageItemModel(
                                                 id = event.response.data.id,
                                                 conversationId = args.conversationId,
                                                 senderId = event.response.data.sender.id,
@@ -131,7 +136,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                                         )
 
                                         chatAdapter.submitList(DataChatMessageItem.data.toList())
-
+                                        submitMessagesAndScrollToBottom()
                                         binding.sendMessageET.text?.clear()
                                         chatViewModel.clearResult()
                                     }
@@ -152,6 +157,22 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                 stackFromEnd = true
             }
             adapter = chatAdapter
+        }
+    }
+
+    private fun submitMessagesAndScrollToBottom(smooth: Boolean = true) {
+        val messages = DataChatMessageItem.data.toList()
+
+        chatAdapter.submitList(messages) {
+            if (messages.isEmpty()) return@submitList
+
+            val lastPosition = messages.lastIndex
+
+            if (smooth) {
+                binding.messageList.smoothScrollToPosition(lastPosition)
+            } else {
+                binding.messageList.scrollToPosition(lastPosition)
+            }
         }
     }
 }
