@@ -11,8 +11,8 @@
         android:id="@+id/toolBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:paddingTop="@dimen/_30sdp"
         app:navigationIcon="@drawable/baseline_chevron_left_24"
-        android:paddingTop="@dimen/_24sdp"
         app:navigationIconTint="@color/white">
 
         <LinearLayout
@@ -25,16 +25,16 @@
                 android:id="@+id/toolBarAvatar"
                 android:layout_width="@dimen/_40sdp"
                 android:layout_height="@dimen/_40sdp"
+                android:layout_marginEnd="@dimen/_12sdp"
                 android:padding="2dp"
                 android:scaleType="centerCrop"
-                android:layout_marginEnd="@dimen/_12sdp"
                 android:src="@android:color/darker_gray"
                 app:shapeAppearanceOverlay="@style/circle"
                 app:strokeColor="@color/accent6"
                 app:strokeWidth="2dp" />
 
             <TextView
-                android:id="@+id/toolbarTitle"
+                android:id="@+id/toolbarName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Username"
@@ -51,7 +51,9 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_above="@+id/bottomLayout"
-        android:layout_below="@+id/toolBar" />
+        android:layout_below="@+id/toolBar"
+        android:paddingTop="@dimen/_5sdp"
+        android:paddingBottom="@dimen/_10sdp" />
 
     <LinearLayout
         android:id="@+id/bottomLayout"

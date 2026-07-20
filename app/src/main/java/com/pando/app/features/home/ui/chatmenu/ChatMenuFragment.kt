@@ -32,13 +32,24 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
             ItemChatMenuRvBinding::inflate,
             BaseDiffCallBack()
         ) { itemBinding, item ->
-            itemBinding.tvName.text = item.name
+            itemBinding.tvName.text = item.name.orEmpty()
 
-            bindAvatar(itemBinding.profileIcon, item.id)
+            bindAvatar(itemBinding.profileIcon, item.recipientId)
 
-            itemBinding.chatPreviewTV.text = item.previewChat
+            itemBinding.chatPreviewTV.text =
+                item.previewChat?.takeIf { it.isNotBlank() } ?: "Hãy bắt đầu cuộc trò chuyện!"
 
-            itemBinding.hourTV.text = item.time
+            itemBinding.hourTV.text = item.time?.takeIf { it.isNotBlank() } ?: ""
+
+            itemBinding.chatCard.setOnClickListener {
+                val action = ChatMenuFragmentDirections.actionChatMenuFragmentToChatFragment(
+                    conversationId = item.conversationId,
+                    senderId = item.id,
+                    recipientId = item.recipientId,
+                    name = item.name.orEmpty()
+                )
+                findNavController().navigate(action)
+            }
         }
     }
 

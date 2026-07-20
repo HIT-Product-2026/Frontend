@@ -39,6 +39,13 @@ object ApiConstants {
 
     object Conversation {
         const val GET_CONVERSATIONS = "conversations/conversations"
+        const val GET_CONVERSATION_MESSAGES = "conversations/{conversation_id}/messages"
+    }
+
+    object Message {
+        const val SEND_TEXT_MESSAGE = "message/text"
+        const val SEND_IMAGE_MESSAGE = "message/image"
+        const val GET_IMAGE_MESSAGE = "message/{message_id}/image"
     }
 
     object Profile {

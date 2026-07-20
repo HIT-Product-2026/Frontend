@@ -38,6 +38,12 @@ class ChatMenuViewModel @Inject constructor(
                         DataChatMenuItem.data.add(
                             ChatMenuItemModel(
                                 id = if (getCurrentUserId()?.equals(item.user1.id) == true) {
+                                    item.user1.id
+                                } else {
+                                    item.user2.id
+                                },
+                                conversationId = item.id,
+                                recipientId = if (getCurrentUserId()?.equals(item.user1.id) == true) {
                                     item.user2.id
                                 } else {
                                     item.user1.id

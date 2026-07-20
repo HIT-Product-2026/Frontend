@@ -11,7 +11,10 @@ import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.network.TokenManager
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentSettingBinding
+import com.pando.app.features.home.data.model.entity.DataChatMenuItem
+import com.pando.app.features.home.data.model.entity.DataChatMessageItem
 import com.pando.app.features.home.data.model.entity.DataFriendItem
+import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.DataReceivedRequestItem
 import com.pando.app.features.home.data.model.entity.DataSearchItem
 import com.pando.app.features.home.data.model.entity.DataSentRequestItem
@@ -41,6 +44,21 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
         binding.logoutBtn.setOnClickListener {
             tokenManager.clear()
             userSession.clearCurrentUser()
+
+            DataPostReelItem.apply {
+                data.clear()
+                total = 0
+            }
+
+            DataChatMenuItem.apply {
+                data.clear()
+                total = 0
+            }
+
+            DataChatMessageItem.apply {
+                data.clear()
+                total = 0
+            }
 
             DataSentRequestItem.apply {
                 data.clear()
