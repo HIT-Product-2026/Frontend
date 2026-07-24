@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/chatCard"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
     android:layout_marginTop="@dimen/_6sdp"
     app:cardCornerRadius="@dimen/_5sdp"
     app:cardElevation="0dp">
@@ -71,8 +71,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
-                    android:layout_marginStart="@dimen/_20sdp"
-                    android:layout_marginEnd="@dimen/_28sdp"
+                    android:layout_marginStart="@dimen/_10sdp"
                     android:text="3d"
                     android:textColor="@color/neutral2"
                     android:textSize="@dimen/_12sdp" />

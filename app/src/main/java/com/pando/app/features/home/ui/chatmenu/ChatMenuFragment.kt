@@ -1,5 +1,6 @@
 package com.pando.app.features.home.ui.chatmenu
 
+import android.util.Log
 import android.widget.ImageView
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -12,7 +13,7 @@ import com.pando.app.core.base.BaseAdapter
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
-import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentChatMenuBinding
 import com.pando.app.databinding.ItemChatMenuRvBinding
@@ -25,6 +26,10 @@ import java.util.UUID
 
 @AndroidEntryPoint
 class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuBinding::inflate) {
+    companion object {
+        private const val TAG = "SOCKET_CONNECTION"
+    }
+
     private var avatarMap: Map<UUID, ByteArray> = emptyMap()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
     private val chatMenuViewModel: ChatMenuViewModel by viewModels()
@@ -44,8 +49,8 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
 
             itemBinding.chatCard.setOnClickListener {
                 val action = ChatMenuFragmentDirections.actionChatMenuFragmentToChatFragment(
-                    conversationId = item.conversationId,
-                    senderId = item.id,
+                    conversationId = item.id,
+                    senderId = item.senderId,
                     recipientId = item.recipientId,
                     name = item.name.orEmpty()
                 )
@@ -70,35 +75,60 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
 
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                avatarViewModel.avatars.collect { avatars ->
-                    avatarMap = avatars
+                launch {
+                    avatarViewModel.avatars.collect { avatars ->
+                        avatarMap = avatars
 
-                    chatMenuAdapter.notifyDataSetChanged()
+                        chatMenuAdapter.notifyDataSetChanged()
+                    }
                 }
-            }
-        }
+                launch {
+                    chatMenuViewModel.uiState.collect { state ->
+                        when (state) {
+                            is UiState.Idle -> {}
+                            is UiState.Loading -> {}
+                            is UiState.Success -> {
+                                val data = DataChatMenuItem.data.toList()
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                chatMenuViewModel.uiState.collect { state ->
-                    when (state) {
-                        is UiState.Idle -> {}
-                        is UiState.Loading -> {}
-                        is UiState.Success -> {
-                            val data = DataChatMenuItem.data.toList()
+                                if (data.isNotEmpty()) {
+                                    chatMenuAdapter.submitList(data)
 
-                            if (data.isNotEmpty()) {
-                                chatMenuAdapter.submitList(data)
+                                    avatarViewModel.loadAvatars(
+                                        data.map { it.recipientId }
+                                    )
+                                } else {
+                                    chatMenuAdapter.submitList(emptyList())
+                                }
+                            }
 
-                                avatarViewModel.loadAvatars(
-                                    data.map { it.id }
-                                )
-                            } else {
-                                chatMenuAdapter.submitList(emptyList())
+                            is UiState.Error -> {}
+                        }
+                    }
+                }
+                launch {
+                    chatMenuViewModel.socketConnectionState.collect { state ->
+                        when (state) {
+                            SocketConnectionState.Connecting -> {}
+
+                            SocketConnectionState.Connected -> {
+                                chatMenuViewModel.subscribeConversations()
+                            }
+
+                            SocketConnectionState.Disconnected -> {
+                                Log.d(TAG, "Đã ngắt kết nối")
+                                chatMenuViewModel.unsubscribeConversations()
+                            }
+
+                            is SocketConnectionState.Error -> {
+                                Log.e(TAG, state.message)
+                                chatMenuViewModel.unsubscribeConversations()
                             }
                         }
-
-                        is UiState.Error -> {}
+                    }
+                }
+                launch {
+                    chatMenuViewModel.conversations.collect { conversations ->
+                        chatMenuAdapter.submitList(conversations)
                     }
                 }
             }
@@ -120,5 +150,10 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
         if (avatar == null) {
             avatarViewModel.loadAvatar(userId)
         }
+    }
+
+    override fun onDestroyView() {
+        chatMenuViewModel.unsubscribeConversations()
+        super.onDestroyView()
     }
 }

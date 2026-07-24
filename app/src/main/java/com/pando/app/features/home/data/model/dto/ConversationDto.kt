@@ -7,5 +7,6 @@ data class ConversationDto (
     val user1: UserDto,
     val user2: UserDto,
     val lastMessageContent: String,
-    val lastMessageTime: String
+    val lastMessageTime: String,
+//    val lastMessageSequence: Long?
 )

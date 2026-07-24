@@ -5,7 +5,7 @@ import java.util.UUID
 
 data class ChatMenuItemModel (
     override val id: UUID,
-    val conversationId: UUID,
+    val senderId: UUID,
     val recipientId: UUID,
     val name: String?,
     val previewChat : String?,
