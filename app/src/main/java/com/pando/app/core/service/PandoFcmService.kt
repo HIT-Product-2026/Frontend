@@ -1,4 +1,4 @@
-package com.pando.app.service
+package com.pando.app.core.service
 
 import android.util.Log
 import com.google.firebase.messaging.FirebaseMessagingService

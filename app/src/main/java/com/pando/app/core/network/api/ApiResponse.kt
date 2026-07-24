@@ -1,4 +1,4 @@
-package com.pando.app.core.network
+package com.pando.app.core.network.api
 
 data class ApiResponse<T>(
     val code: Int,

@@ -17,7 +17,7 @@ import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.session.UserSession
-import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentProfileBinding
 import com.pando.app.features.home.data.model.entity.enumEntity.Gender
 import dagger.hilt.android.AndroidEntryPoint

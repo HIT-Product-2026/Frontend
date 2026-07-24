@@ -1,4 +1,4 @@
-package com.pando.app.core.network
+package com.pando.app.core.network.api
 
 import okhttp3.Interceptor
 import okhttp3.Response

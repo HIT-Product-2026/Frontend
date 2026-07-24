@@ -2,8 +2,8 @@ package com.pando.app.features.home.ui.chat
 
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.base.BaseVM
-import com.pando.app.core.network.ApiResponse
-import com.pando.app.core.session.UserSession
+import com.pando.app.core.network.api.ApiResponse
+import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.entity.ChatMessageItemModel
 import com.pando.app.features.home.data.model.entity.DataChatMessageItem
@@ -12,9 +12,7 @@ import com.pando.app.features.home.data.model.response.ChatMessageResponse
 import com.pando.app.features.home.data.model.response.MessagePageResponse
 import com.pando.app.features.home.data.repository.ConversationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch

@@ -13,7 +13,7 @@ import com.google.android.material.snackbar.Snackbar
 import com.pando.app.R
 import com.pando.app.core.base.BaseBottomSheet
 import com.pando.app.core.base.BaseVM
-import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentLoginBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch

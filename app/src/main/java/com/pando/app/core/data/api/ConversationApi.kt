@@ -1,7 +1,7 @@
 package com.pando.app.core.data.api
 
-import com.pando.app.core.network.ApiConstants
-import com.pando.app.core.network.ApiResponse
+import com.pando.app.core.network.api.ApiConstants
+import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.features.home.data.model.request.SendMessageRequest
 import com.pando.app.features.home.data.model.response.ChatMessageResponse
 import com.pando.app.features.home.data.model.response.ConversationsResponse
@@ -24,7 +24,7 @@ interface ConversationApi {
 
     @GET(ApiConstants.Conversation.GET_CONVERSATION_MESSAGES)
     suspend fun getConversationMessages(
-        @Path("conversation_id") conversationId: UUID,
+        @Query("conversation_id") conversationId: UUID,
         @Query("cursor") cursor: String?): Response<ApiResponse<MessagePageResponse>>
 
     @GET(ApiConstants.Message.GET_IMAGE_MESSAGE)

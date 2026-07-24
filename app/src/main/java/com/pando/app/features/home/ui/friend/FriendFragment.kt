@@ -13,12 +13,10 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.bumptech.glide.Glide
-import com.pando.app.R
 import com.pando.app.core.base.BaseAdapter
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
-import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentFriendBinding
 import com.pando.app.databinding.ItemFriendsRvBinding
 import com.pando.app.databinding.ItemInviteRvBinding

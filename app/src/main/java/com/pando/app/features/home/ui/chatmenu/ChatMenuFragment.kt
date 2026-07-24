@@ -13,6 +13,7 @@ import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentChatMenuBinding
 import com.pando.app.databinding.ItemChatMenuRvBinding
 import com.pando.app.features.home.data.model.entity.ChatMenuItemModel

@@ -1,10 +1,9 @@
 package com.pando.app.core.base
 
-import com.pando.app.core.network.ApiResponse
+import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.utils.DataResult
 import okhttp3.ResponseBody
 import retrofit2.Response
-import java.io.IOException
 
 open class BaseRepository {
     protected suspend fun <T> safeApiCall(call: suspend () -> Response<ApiResponse<T>>): DataResult<ApiResponse<T>> {

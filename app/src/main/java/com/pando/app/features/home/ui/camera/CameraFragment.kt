@@ -24,7 +24,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
-import com.auth0.android.jwt.Claim
 import com.auth0.android.jwt.DecodeException
 import com.auth0.android.jwt.JWT
 import com.bumptech.glide.Glide
@@ -35,9 +34,11 @@ import com.google.android.material.snackbar.Snackbar
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
-import com.pando.app.core.network.TokenManager
+import com.pando.app.core.network.api.TokenManager
+import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.session.UserSession
 import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentCameraBinding
 import com.pando.app.features.home.data.model.entity.CurrentUser
 import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
@@ -433,7 +434,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             }
             Log.d("JWT_DECODE", "Cập nhật User thành công")
 
-        } catch (e : DecodeException) {
+        } catch (e: DecodeException) {
             Log.e("JWT_DECODE", "Token không hợp lệ hoặc bị lỗi cấu trúc: ${e.message}")
         }
     }

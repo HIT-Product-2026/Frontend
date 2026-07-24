@@ -14,6 +14,7 @@ import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.session.UserSession
 import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentChatBinding
 import com.pando.app.databinding.ItemImageMessageReceivedBinding
 import com.pando.app.databinding.ItemImageMessageSentBinding

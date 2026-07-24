@@ -1,4 +1,4 @@
-package com.pando.app.core.network
+package com.pando.app.core.network.api
 
 import com.pando.app.core.data.local.AuthPreferences
 import javax.inject.Inject

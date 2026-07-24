@@ -1,17 +1,13 @@
 package com.pando.app.features.auth.ui.forgotpassword
 
-import android.os.Bundle
 import android.text.InputType
 import android.view.View
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import androidx.navigation.fragment.navArgs
-import com.google.android.material.snackbar.Snackbar
-import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
-import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentForgotPasswordBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch

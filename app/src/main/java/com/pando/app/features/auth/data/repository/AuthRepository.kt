@@ -3,8 +3,8 @@ package com.pando.app.features.auth.data.repository
 import com.pando.app.core.base.BaseRepository
 import com.pando.app.core.data.api.AuthApi
 import com.pando.app.core.data.api.UserApi
-import com.pando.app.core.network.ApiResponse
-import com.pando.app.core.network.TokenManager
+import com.pando.app.core.network.api.ApiResponse
+import com.pando.app.core.network.api.TokenManager
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.auth.data.model.request.FPResetPasswordRequest
 import com.pando.app.features.auth.data.model.request.FPSendEmailRequest

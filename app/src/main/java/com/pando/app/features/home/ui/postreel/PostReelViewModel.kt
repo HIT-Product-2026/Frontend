@@ -2,7 +2,7 @@ package com.pando.app.features.home.ui.postreel
 
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.base.BaseVM
-import com.pando.app.core.network.ApiResponse
+import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel

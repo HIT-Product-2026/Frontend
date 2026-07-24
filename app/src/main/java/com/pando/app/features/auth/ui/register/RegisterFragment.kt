@@ -1,6 +1,5 @@
 package com.pando.app.features.auth.ui.register
 
-import android.text.InputType
 import android.view.View
 import android.view.WindowManager
 import androidx.core.widget.doOnTextChanged
@@ -11,7 +10,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.pando.app.R
 import com.pando.app.core.base.BaseBottomSheet
-import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentRegisterBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch

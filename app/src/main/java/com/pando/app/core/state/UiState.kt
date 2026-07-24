@@ -1,4 +1,4 @@
-package com.pando.app.core.ui
+package com.pando.app.core.state
 
 sealed class UiState<out T> {
     object Idle : UiState<Nothing>()

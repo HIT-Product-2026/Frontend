@@ -4,9 +4,9 @@ import android.util.Log
 import com.google.firebase.messaging.FirebaseMessaging
 import com.pando.app.R
 import com.pando.app.core.base.BaseVM
-import com.pando.app.core.network.ApiResponse
+import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.session.UserSession
-import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.UiState
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.auth.data.model.response.LoginResponse
 import com.pando.app.features.auth.data.repository.AuthRepository

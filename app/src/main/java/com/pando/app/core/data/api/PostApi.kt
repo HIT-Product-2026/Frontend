@@ -1,7 +1,7 @@
 package com.pando.app.core.data.api
 
-import com.pando.app.core.network.ApiConstants
-import com.pando.app.core.network.ApiResponse
+import com.pando.app.core.network.api.ApiConstants
+import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.features.home.data.model.response.PostResponse
 import com.pando.app.features.home.data.model.response.PostsResponse
 import okhttp3.MultipartBody

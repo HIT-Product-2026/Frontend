@@ -1,7 +1,7 @@
 package com.pando.app.core.data.api
 
-import com.pando.app.core.network.ApiConstants
-import com.pando.app.core.network.ApiResponse
+import com.pando.app.core.network.api.ApiConstants
+import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.features.auth.data.model.request.FPResetPasswordRequest
 import com.pando.app.features.auth.data.model.request.FPSendEmailRequest
 import com.pando.app.features.auth.data.model.request.FPVerifyOtpRequest
@@ -12,8 +12,6 @@ import com.pando.app.features.auth.data.model.response.LoginResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
-import retrofit2.http.PUT
-import retrofit2.http.Query
 
 interface AuthApi {
     @POST(ApiConstants.Auth.LOGIN)

@@ -1,4 +1,4 @@
-package com.pando.app.core.network
+package com.pando.app.core.network.api
 
 object ApiConstants {
     const val BASE_URL = "https://lockly-api.duckdns.org"
@@ -39,7 +39,7 @@ object ApiConstants {
 
     object Conversation {
         const val GET_CONVERSATIONS = "conversations/conversations"
-        const val GET_CONVERSATION_MESSAGES = "conversations/{conversation_id}/messages"
+        const val GET_CONVERSATION_MESSAGES = "conversations/messages"
     }
 
     object Message {
