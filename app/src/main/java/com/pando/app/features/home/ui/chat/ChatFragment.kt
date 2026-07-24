@@ -84,6 +84,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
 
     override fun initView() {
         binding.toolbarName.text = args.name
+        setupKeyboardInsets()
 
         if (DataChatMessageItem.data.isEmpty()) {
             chatViewModel.getMessageList(args.conversationId, args.recipientId)
@@ -212,20 +213,32 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
         }
     }
 
-    private fun submitMessagesAndScrollToBottom(smooth: Boolean = true) {
-        val messages = DataChatMessageItem.data.toList()
+    private fun setupKeyboardInsets() {
+        val initialBottomPadding = binding.root.paddingBottom
 
-        chatAdapter.submitList(messages) {
-            if (messages.isEmpty()) return@submitList
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, windowInsets ->
+            val imeBottom = windowInsets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val navigationBarBottom =
+                windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
 
-            val lastPosition = messages.lastIndex
+            view.updatePadding(
+                bottom = initialBottomPadding + maxOf(imeBottom, navigationBarBottom)
+            )
 
-            if (smooth) {
-                binding.messageList.smoothScrollToPosition(lastPosition)
-            } else {
-                binding.messageList.scrollToPosition(lastPosition)
+            val isKeyboardVisible =
+                windowInsets.isVisible(WindowInsetsCompat.Type.ime())
+
+            if (!isKeyboardVisible) {
+                binding.sendMessageET.clearFocus()
             }
+
+            windowInsets
         }
+
+        ViewCompat.requestApplyInsets(binding.root)
+    }
+
+
 //    private fun submitMessagesAndScrollToBottom(smooth: Boolean = true) {
 //        val messages = DataChatMessageItem.data.toList()
 //
@@ -241,5 +254,10 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
 //            }
 //        }
 //    }
+
+    override fun onDestroyView() {
+        binding.messageList.adapter = null
+        chatViewModel.unsubscribeMessage()
+        super.onDestroyView()
     }
 }
