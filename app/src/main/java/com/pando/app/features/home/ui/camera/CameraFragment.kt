@@ -35,9 +35,8 @@ import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.network.api.TokenManager
-import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.session.UserSession
-import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentCameraBinding
 import com.pando.app.features.home.data.model.entity.CurrentUser
@@ -53,6 +52,10 @@ import java.util.concurrent.Executors
 
 @AndroidEntryPoint
 class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding::inflate) {
+    companion object {
+        private const val TAG = "SOCKET_CONNECTION"
+    }
+
     @Inject
     lateinit var tokenManager: TokenManager
 
@@ -60,7 +63,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     lateinit var userSession: UserSession
     private val avatarViewModel: AvatarViewModel by activityViewModels()
     private val viewModel: CameraViewModel by viewModels()
+
     private var imageCapture: ImageCapture? = null
+
     private lateinit var cameraExecutor: ExecutorService
     private var lensFacing = CameraSelector.LENS_FACING_BACK
     private var savedPhotoFile: File? = null
@@ -68,7 +73,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var currentLat: Double? = null
     private var currentLng: Double? = null
+
     private var orientationEventListener: OrientationEventListener? = null
+
     private val multiplePermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -143,6 +150,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                 }
             }
         }
+
+        viewModel.socketConnect()
     }
 
     override fun initActionView() {
@@ -192,30 +201,54 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect { state ->
-                    when (state) {
-                        is UiState.Idle -> {}
-                        is UiState.Loading -> {
-                            binding.btnSend.isEnabled = false
-                        }
+                launch {
+                    viewModel.uiState.collect { state ->
+                        when (state) {
+                            is UiState.Idle -> {}
+                            is UiState.Loading -> {
+                                binding.btnSend.isEnabled = false
+                            }
 
-                        is UiState.Success -> {
-                            binding.btnSend.isEnabled = true
-                            Toast.makeText(requireContext(), "Đã gửi!", Toast.LENGTH_SHORT).show()
-                            switchToCaptureMode()
-                            viewModel.clearResult()
-                            binding.captionET.text?.clear()
-                        }
+                            is UiState.Success -> {
+                                binding.btnSend.isEnabled = true
+                                Toast.makeText(requireContext(), "Đã gửi!", Toast.LENGTH_SHORT)
+                                    .show()
+                                switchToCaptureMode()
+                                viewModel.clearResult()
+                                binding.captionET.text?.clear()
+                            }
 
-                        is UiState.Error -> {
-                            binding.btnSend.isEnabled = true
-                            Log.e("Camera", state.message)
-                            Toast.makeText(
-                                requireContext(),
-                                "Lỗi: ${state.message}",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            viewModel.clearResult()
+                            is UiState.Error -> {
+                                binding.btnSend.isEnabled = true
+                                Log.e("Camera", state.message)
+                                Toast.makeText(
+                                    requireContext(),
+                                    "Lỗi: ${state.message}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                viewModel.clearResult()
+                            }
+                        }
+                    }
+                }
+                launch {
+                    viewModel.connectionState.collect { state ->
+                        when (state) {
+                            SocketConnectionState.Connecting -> {
+                                Log.d(TAG, "Đang kết nối")
+                            }
+
+                            SocketConnectionState.Connected -> {
+                                Log.d(TAG, "Đã kết nối")
+                            }
+
+                            SocketConnectionState.Disconnected -> {
+                                Log.d(TAG, "Đã ngắt kết nối")
+                            }
+
+                            is SocketConnectionState.Error -> {
+                                Log.e(TAG, state.message)
+                            }
                         }
                     }
                 }
@@ -440,7 +473,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun onDestroyView() {
-        super.onDestroyView()
         cameraExecutor.shutdown()
+//        viewModel.socketDisconnect()
+
+        super.onDestroyView()
     }
 }

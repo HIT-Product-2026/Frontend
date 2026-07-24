@@ -25,13 +25,25 @@ sealed interface CameraViewMode {
     object Capture : CameraViewMode                // Chế độ live preview để chụp
     data class Send(val photoFile: File) : CameraViewMode  // Chế độ hiển thị ảnh vừa chụp kèm nút Gửi
 }
+
 @HiltViewModel
 class CameraViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    private val socketConnectionManager: SocketConnectionManager
 ) : BaseVM<ApiResponse<PostResponse>>() {
     private val _cameraViewMode = MutableStateFlow<CameraViewMode>(CameraViewMode.Capture)
     val cameraViewMode: StateFlow<CameraViewMode> = _cameraViewMode.asStateFlow()
+
+    val connectionState = socketConnectionManager.connectionState
+
+    fun socketConnect() {
+        socketConnectionManager.connect()
+    }
+
+    fun socketDisconnect() {
+        socketConnectionManager.disconnect()
+    }
 
     fun setSendMode(photoFile: File) {
         _cameraViewMode.value = CameraViewMode.Send(photoFile)
