@@ -1,7 +1,9 @@
 package com.pando.app.features.home.ui.chat
 
+import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.base.BaseVM
+import com.pando.app.core.extensions.formatDateTime
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.utils.DataResult
@@ -11,6 +13,7 @@ import com.pando.app.features.home.data.model.entity.enumEntity.MessageType
 import com.pando.app.features.home.data.model.response.ChatMessageResponse
 import com.pando.app.features.home.data.model.response.MessagePageResponse
 import com.pando.app.features.home.data.repository.ConversationRepository
+import com.pando.app.features.home.data.socket.MessagesSocket
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,16 +25,79 @@ import javax.inject.Inject
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
-    private val userSession: UserSession
-) : BaseVM<ChatEvent>() {
-
-    private var isLoading = false
+    socketConnectionManager: SocketConnectionManager,
+    private val messagesSocket: MessagesSocket
+) : BaseVM<ApiResponse<MessagePageResponse>>() {
 
     private val _images = MutableStateFlow<Map<UUID, ByteArray>>(emptyMap())
 
     val images = _images.asStateFlow()
 
+    val socketConnectionState = socketConnectionManager.connectionState
+    private val _messages = MutableStateFlow<List<ChatMessageItemModel>>(emptyList())
+
+    val messages = _messages.asStateFlow()
+
+    private lateinit var currentConversationId: UUID
+    private lateinit var currentRecipientId: UUID
+
+    private var isLoading = false
+
     private val loadingIds = mutableSetOf<UUID>()
+
+    init {
+        viewModelScope.launch {
+            messagesSocket.message.collect { message ->
+                updateMessages(message)
+            }
+        }
+    }
+
+    fun setCurrentConversationId(conversationId: UUID) {
+        currentConversationId = conversationId
+    }
+
+    fun setCurrentRecipientId(recipientId: UUID) {
+        currentRecipientId = recipientId
+    }
+
+    fun subscribeMessage() {
+        messagesSocket.subscribeConversation(currentConversationId)
+    }
+
+    fun unsubscribeMessage() {
+        messagesSocket.unsubscribeConversation(currentConversationId)
+    }
+
+    fun sendMessage(conversationId: UUID, content: String) {
+        messagesSocket.sendMessage(conversationId, content)
+    }
+
+    fun updateMessages(
+        message: ChatMessageResponse
+    ) {
+        Log.d("MessageSocket", "Dang cap nhat")
+        _messages.update { currentList ->
+            val newMessage = ChatMessageItemModel(
+                id = message.id,
+                senderId = message.sender.id,
+                content = message.content,
+                createdAt = message.createdAt.formatDateTime(),
+                type = message.type,
+                conversationId = currentConversationId,
+                recipientId = currentRecipientId
+            )
+
+            val list = (currentList + newMessage)
+                .associateBy { it.id }
+                .values
+                .sortedBy { it.createdAt }
+
+            Log.d("MessageSocket", "Đã tạo danh sách messages mới")
+            list
+        }
+        Log.d("MessageSocket", "Cập nhật thành công lên data")
+    }
 
     fun loadImageMessage(messageId: UUID) {
         if (_images.value.containsKey(messageId)) {
@@ -96,7 +162,7 @@ class ChatViewModel @Inject constructor(
                                     recipientId = recipientId,
                                     content = message.content,
                                     type = MessageType.TEXT,
-                                    createdAt = message.createdAt
+                                    createdAt = message.createdAt.formatDateTime()
                                 )
                             }
 
@@ -107,37 +173,47 @@ class ChatViewModel @Inject constructor(
                                     senderId = message.sender.id,
                                     recipientId = recipientId,
                                     type = MessageType.IMAGE,
-                                    createdAt = message.createdAt
+                                    createdAt = message.createdAt.formatDateTime()
                                 )
                             }
                         }
                     }
 
                 DataChatMessageItem.data.addAll(newMessages)
+
+                _messages.value = DataChatMessageItem.data
+                    .distinctBy { it.id }
+                    .sortedBy { it.createdAt }
+                    .toList()
+
+                loadImageMessages(
+                    newMessages
+                        .filter { it.type == MessageType.IMAGE }
+                        .map { it.id }
+                )
+
                 DataChatMessageItem.hasLoadedFirstPage = true
                 DataChatMessageItem.nextCursor = result.data.data.cursor
             }
 
             isLoading = false
 
-            when (result) {
-                is DataResult.Success -> DataResult.Success(ChatEvent.GetChatHistoryEvent(result.data))
-                is DataResult.Error -> DataResult.Error(result.message)
-            }
+            result
         }
     }
 
-    fun sendTextMessage(conversationId: UUID, content: String) {
-        getData {
-            when (val result = conversationRepository.sendTextMessage(conversationId, content)) {
-                is DataResult.Success -> DataResult.Success(ChatEvent.SendTextEvent(result.data))
-                is DataResult.Error -> DataResult.Error(result.message)
-            }
-        }
-    }
-}
+//    fun sendTextMessage(conversationId: UUID, content: String) {
+//        getData {
+//            when (val result = conversationRepository.sendTextMessage(conversationId, content)) {
+//                is DataResult.Success -> DataResult.Success(ChatEvent.SendTextEvent(result.data))
+//                is DataResult.Error -> DataResult.Error(result.message)
+//            }
+//        }
+//    }
 
-sealed interface ChatEvent {
-    data class GetChatHistoryEvent(val response: ApiResponse<MessagePageResponse>) : ChatEvent
-    data class SendTextEvent(val response: ApiResponse<ChatMessageResponse>) : ChatEvent
+//    private fun emitEvent(event: ChatEvent) {
+//        viewModelScope.launch {
+//            _chatEvent.emit(event)
+//        }
+//    }
 }

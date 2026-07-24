@@ -4,5 +4,6 @@ import java.util.UUID
 
 data class SendMessageRequest(
     val conversationId: UUID,
-    val content: String
+    val content: String,
+    val isRead: Boolean = false
 )

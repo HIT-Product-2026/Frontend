@@ -1,5 +1,9 @@
 package com.pando.app.features.home.ui.chat
 
+import android.util.Log
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -12,29 +16,29 @@ import com.bumptech.glide.Glide
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
-import com.pando.app.core.session.UserSession
-import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentChatBinding
 import com.pando.app.databinding.ItemImageMessageReceivedBinding
 import com.pando.app.databinding.ItemImageMessageSentBinding
-import com.pando.app.features.home.data.model.entity.ChatMessageItemModel
 import com.pando.app.features.home.data.model.entity.DataChatMessageItem
-import com.pando.app.features.home.data.model.entity.enumEntity.MessageType
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.util.UUID
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::inflate) {
+    companion object {
+        private const val TAG = "SOCKET_CONNECTION"
+    }
+
     private var imageMap: Map<UUID, ByteArray> = emptyMap()
     private val args: ChatFragmentArgs by navArgs()
     private val chatViewModel: ChatViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
 
-//    @Inject
+    //    @Inject
 //    lateinit var userSession: UserSession
     private val chatAdapter: ChatAdapter by lazy {
         ChatAdapter(
@@ -71,6 +75,10 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
 
     override fun initData() {
         DataChatMessageItem.reset()
+
+        chatViewModel.setCurrentConversationId(args.conversationId)
+        chatViewModel.setCurrentRecipientId(args.recipientId)
+
         avatarViewModel.loadAvatar(args.recipientId)
     }
 
@@ -92,9 +100,11 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
 
         binding.sendBtn.setOnClickListener {
             val message = binding.sendMessageET.text?.toString()?.trim().orEmpty()
-            if (message.isBlank()) return@setOnClickListener
 
-            chatViewModel.sendTextMessage(args.conversationId, message)
+            if (message.isBlank()) return@setOnClickListener
+            chatViewModel.sendMessage(args.conversationId, message)
+
+            binding.sendMessageET.text?.clear()
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -114,37 +124,78 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                     }
                 }
                 launch {
+                    chatViewModel.messages.collect { messages ->
+                        chatAdapter.submitList(messages) {
+                            if (messages.isNotEmpty()) {
+                                binding.messageList.smoothScrollToPosition(
+                                    messages.lastIndex
+                                )
+                            }
+                        }
+                        Log.d("MessageSocket", "Chap nhat thanh cong len man hinh")
+                    }
+                }
+                launch {
                     chatViewModel.uiState.collect { state ->
                         when (state) {
                             is UiState.Idle -> {}
                             is UiState.Loading -> {}
                             is UiState.Success -> {
-                                when (val event = state.data) {
-                                    is ChatEvent.GetChatHistoryEvent -> {
-                                        submitMessagesAndScrollToBottom()
-                                    }
-
-                                    is ChatEvent.SendTextEvent -> {
-                                        DataChatMessageItem.data.add(ChatMessageItemModel(
-                                                id = event.response.data.id,
-                                                conversationId = args.conversationId,
-                                                senderId = event.response.data.sender.id,
-                                                recipientId = args.recipientId,
-                                                content = event.response.data.content,
-                                                type = MessageType.TEXT,
-                                                createdAt = event.response.data.createdAt
-                                            )
-                                        )
-
-                                        chatAdapter.submitList(DataChatMessageItem.data.toList())
-                                        submitMessagesAndScrollToBottom()
-                                        binding.sendMessageET.text?.clear()
-                                        chatViewModel.clearResult()
-                                    }
-                                }
+                                chatViewModel.clearResult()
+//                                when (val event = state.data) {
+//                                    is ChatEvent.GetChatHistoryEvent -> {
+//                                        chatViewModel.clearResult()
+//                                    }
+////
+//                                    is ChatEvent.SendTextEvent -> {
+//                                        DataChatMessageItem.data.add(
+//                                            ChatMessageItemModel(
+//                                                id = event.response.data.id,
+//                                                conversationId = args.conversationId,
+//                                                senderId = event.response.data.sender.id,
+//                                                recipientId = args.recipientId,
+//                                                content = event.response.data.content,
+//                                                type = MessageType.TEXT,
+//                                                createdAt = event.response.data.createdAt
+//                                            )
+//                                        )
+//
+//                                        chatAdapter.submitList(DataChatMessageItem.data.toList())
+//                                        submitMessagesAndScrollToBottom()
+//                                        binding.sendMessageET.text?.clear()
+//                                        chatViewModel.clearResult()
+//                                    }
+//
+//                                    is ChatEvent.SocketErrorEvent -> {
+//                                        chatViewModel.clearResult()
+//                                    }
+//                                }
                             }
 
                             is UiState.Error -> {}
+                        }
+                    }
+                }
+                launch {
+                    chatViewModel.socketConnectionState.collect { state ->
+                        when (state) {
+                            SocketConnectionState.Connecting -> {
+                                Log.d(TAG, "Đang kết nối")
+                            }
+
+                            SocketConnectionState.Connected -> {
+                                chatViewModel.subscribeMessage()
+                            }
+
+                            SocketConnectionState.Disconnected -> {
+                                Log.d(TAG, "Đã ngắt kết nối")
+                                chatViewModel.unsubscribeMessage()
+                            }
+
+                            is SocketConnectionState.Error -> {
+                                Log.e(TAG, state.message)
+                                chatViewModel.unsubscribeMessage()
+                            }
                         }
                     }
                 }
@@ -175,5 +226,20 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                 binding.messageList.scrollToPosition(lastPosition)
             }
         }
+//    private fun submitMessagesAndScrollToBottom(smooth: Boolean = true) {
+//        val messages = DataChatMessageItem.data.toList()
+//
+//        chatAdapter.submitList(messages) {
+//            if (messages.isEmpty()) return@submitList
+//
+//            val lastPosition = messages.lastIndex
+//
+//            if (smooth) {
+//                binding.messageList.smoothScrollToPosition(lastPosition)
+//            } else {
+//                binding.messageList.scrollToPosition(lastPosition)
+//            }
+//        }
+//    }
     }
 }
