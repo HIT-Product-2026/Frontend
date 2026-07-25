@@ -5,14 +5,12 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-fun String.formatDateTime(): String {
+fun LocalDateTime.formatDateTime(): String {
     val now = LocalDateTime.now()
 
-    val targetDateTime: LocalDateTime = LocalDateTime.parse(this)
-
-    val hoursBetween = ChronoUnit.HOURS.between(targetDateTime, now)
-    val daysBetween = ChronoUnit.DAYS.between(targetDateTime, now)
-    val yearsBetween = ChronoUnit.YEARS.between(targetDateTime, now)
+    val hoursBetween = ChronoUnit.HOURS.between(this, now)
+    val daysBetween = ChronoUnit.DAYS.between(this, now)
+    val yearsBetween = ChronoUnit.YEARS.between(this, now)
 
     val localeVi = Locale.Builder()
         .setLanguage("vi")
@@ -22,22 +20,26 @@ fun String.formatDateTime(): String {
     return when {
         hoursBetween in 0..23 -> {
             val formatter = DateTimeFormatter.ofPattern("hh:mm a", localeVi)
-            targetDateTime.format(formatter)
+            this.format(formatter)
         }
 
         daysBetween in 1..6 -> {
-            val dayOfWeek = targetDateTime.dayOfWeek.value
+            val dayOfWeek = this.dayOfWeek.value
             if (dayOfWeek == 7) "T.CN" else "T.${dayOfWeek + 1}"
         }
 
         yearsBetween < 1 -> {
             val formatter = DateTimeFormatter.ofPattern("dd 'Th'MM", localeVi)
-            targetDateTime.format(formatter)
+            this.format(formatter)
         }
 
         else -> {
             val formatter = DateTimeFormatter.ofPattern("dd 'Th'MM, yyyy", localeVi)
-            targetDateTime.format(formatter)
+            this.format(formatter)
         }
     }
+}
+
+fun String.toLocalDateTime(): LocalDateTime {
+    return LocalDateTime.parse(this)
 }

@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.pando.app.core.base.BaseAdapter
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
+import com.pando.app.core.extensions.formatDateTime
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
@@ -45,7 +46,7 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
             itemBinding.chatPreviewTV.text =
                 item.previewChat?.takeIf { it.isNotBlank() } ?: "Hãy bắt đầu cuộc trò chuyện!"
 
-            itemBinding.hourTV.text = item.time?.takeIf { it.isNotBlank() } ?: ""
+            itemBinding.hourTV.text = item.time?.formatDateTime()
 
             itemBinding.chatCard.setOnClickListener {
                 val action = ChatMenuFragmentDirections.actionChatMenuFragmentToChatFragment(
@@ -87,20 +88,7 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
                         when (state) {
                             is UiState.Idle -> {}
                             is UiState.Loading -> {}
-                            is UiState.Success -> {
-                                val data = DataChatMenuItem.data.toList()
-
-                                if (data.isNotEmpty()) {
-                                    chatMenuAdapter.submitList(data)
-
-                                    avatarViewModel.loadAvatars(
-                                        data.map { it.recipientId }
-                                    )
-                                } else {
-                                    chatMenuAdapter.submitList(emptyList())
-                                }
-                            }
-
+                            is UiState.Success -> {}
                             is UiState.Error -> {}
                         }
                     }
@@ -129,6 +117,10 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
                 launch {
                     chatMenuViewModel.conversations.collect { conversations ->
                         chatMenuAdapter.submitList(conversations)
+
+                        avatarViewModel.loadAvatars(
+                            conversations.map { it.recipientId }
+                        )
                     }
                 }
             }

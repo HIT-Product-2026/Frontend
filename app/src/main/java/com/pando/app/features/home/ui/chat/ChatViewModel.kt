@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.base.BaseVM
 import com.pando.app.core.extensions.formatDateTime
+import com.pando.app.core.extensions.toLocalDateTime
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.utils.DataResult
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 import java.util.UUID
 import javax.inject.Inject
 
@@ -30,12 +32,11 @@ class ChatViewModel @Inject constructor(
 ) : BaseVM<ApiResponse<MessagePageResponse>>() {
 
     private val _images = MutableStateFlow<Map<UUID, ByteArray>>(emptyMap())
-
     val images = _images.asStateFlow()
 
     val socketConnectionState = socketConnectionManager.connectionState
-    private val _messages = MutableStateFlow<List<ChatMessageItemModel>>(emptyList())
 
+    private val _messages = MutableStateFlow<List<ChatMessageItemModel>>(emptyList())
     val messages = _messages.asStateFlow()
 
     private lateinit var currentConversationId: UUID
@@ -82,7 +83,7 @@ class ChatViewModel @Inject constructor(
                 id = message.id,
                 senderId = message.sender.id,
                 content = message.content,
-                createdAt = message.createdAt.formatDateTime(),
+                createdAt = message.createdAt.toLocalDateTime(),
                 type = message.type,
                 conversationId = currentConversationId,
                 recipientId = currentRecipientId
@@ -162,7 +163,7 @@ class ChatViewModel @Inject constructor(
                                     recipientId = recipientId,
                                     content = message.content,
                                     type = MessageType.TEXT,
-                                    createdAt = message.createdAt.formatDateTime()
+                                    createdAt = message.createdAt.toLocalDateTime()
                                 )
                             }
 
@@ -173,18 +174,22 @@ class ChatViewModel @Inject constructor(
                                     senderId = message.sender.id,
                                     recipientId = recipientId,
                                     type = MessageType.IMAGE,
-                                    createdAt = message.createdAt.formatDateTime()
+                                    createdAt = message.createdAt.toLocalDateTime()
                                 )
                             }
                         }
                     }
 
-                DataChatMessageItem.data.addAll(newMessages)
 
-                _messages.value = DataChatMessageItem.data
-                    .distinctBy { it.id }
-                    .sortedBy { it.createdAt }
-                    .toList()
+                _messages.update { current ->
+                    (current + newMessages)
+                        .associateBy { it.id }
+                        .values
+                        .sortedWith(
+                            compareBy<ChatMessageItemModel> { it.createdAt }
+                                .thenBy { it.id.toString() }
+                        )
+                }
 
                 loadImageMessages(
                     newMessages

@@ -1,6 +1,7 @@
 package com.pando.app.features.home.data.model.entity
 
 import com.pando.app.core.base.BaseItemModel
+import java.time.LocalDateTime
 import java.util.UUID
 
 data class ChatMenuItemModel (
@@ -9,7 +10,7 @@ data class ChatMenuItemModel (
     val recipientId: UUID,
     val name: String?,
     val previewChat : String?,
-    val time : String?
+    val time : LocalDateTime?
 ) : BaseItemModel
 
 class DataChatMenuItem {

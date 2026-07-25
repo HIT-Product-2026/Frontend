@@ -2,6 +2,7 @@ package com.pando.app.features.home.data.model.entity
 
 import com.pando.app.core.base.BaseItemModel
 import com.pando.app.features.home.data.model.entity.enumEntity.MessageType
+import java.time.LocalDateTime
 import java.util.UUID
 
 data class ChatMessageItemModel(
@@ -11,7 +12,7 @@ data class ChatMessageItemModel(
     val recipientId: UUID? = null,
     val content: String?=null,
     val type: MessageType,
-    val createdAt: String
+    val createdAt: LocalDateTime
 ) : BaseItemModel
 
 class DataChatMessageItem {

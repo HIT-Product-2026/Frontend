@@ -2,7 +2,7 @@ package com.pando.app.features.home.ui.chatmenu
 
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.base.BaseVM
-import com.pando.app.core.extensions.formatDateTime
+import com.pando.app.core.extensions.toLocalDateTime
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.session.UserSession
@@ -18,7 +18,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -56,21 +55,30 @@ class ChatMenuViewModel @Inject constructor(
     private fun updateConversation(
         response: ConversationDto
     ) {
-        _conversations.update { currentList ->
-            val oldItem = currentList.firstOrNull { item ->
-                item.id == response.id
-            } ?: return@update currentList
+        val oldItem = _conversations.value.firstOrNull { item ->
+            item.id == response.id
+        } ?: return
 
-            val updatedItem = oldItem.copy(
-                previewChat = response.lastMessageContent,
-                time = response.lastMessageTime.formatDateTime()
-            )
+        val updatedItem = oldItem.copy(
+            previewChat = response.lastMessageContent,
+            time = response.lastMessageTime.toLocalDateTime()
+        )
 
-            listOf(updatedItem) + currentList.filterNot { item ->
-                item.id == response.id
-            }
+        val updatedList = _conversations.value
+            .filterNot { it.id == response.id } + updatedItem
+
+        val sortedItems = updatedList
+            .distinctBy { it.id }
+            .sortedByDescending { it.time }
+
+        DataChatMenuItem.data.apply {
+            clear()
+            addAll(sortedItems)
         }
+
+        _conversations.value = sortedItems
     }
+
 
     fun getConversations() {
         getData {
@@ -88,27 +96,33 @@ class ChatMenuViewModel @Inject constructor(
 
                 val data = result.data.data.items
                 if (total > 0) {
-                    data.forEach { item ->
-                        DataChatMenuItem.data.add(
-                            ChatMenuItemModel(
-                                id = item.id,
-                                senderId = if (getCurrentUserId()?.equals(item.user1.id) == true) item.user1.id else item.user2.id,
-                                recipientId = if (getCurrentUserId()?.equals(item.user1.id) == true) item.user2.id else item.user1.id,
-                                name = if (getCurrentUserId()?.equals(item.user1.id) == true) {
-                                    item.user2.displayName.ifEmpty { item.user2.username }
-                                } else {
-                                    item.user1.displayName.ifEmpty { item.user1.username }
-                                },
-                                previewChat = item.lastMessageContent,
-                                time = item.lastMessageTime.formatDateTime()
-                            )
+                    val conversations = data.map { item ->
+                        ChatMenuItemModel(
+                            id = item.id,
+                            senderId =
+                                if (getCurrentUserId()?.equals(item.user1.id) == true) item.user1.id else item.user2.id,
+                            recipientId =
+                                if (getCurrentUserId()?.equals(item.user1.id) == true) item.user2.id else item.user1.id,
+                            name = if (getCurrentUserId()?.equals(item.user1.id) == true) {
+                                item.user2.displayName.ifEmpty { item.user2.username }
+                            } else {
+                                item.user1.displayName.ifEmpty { item.user1.username }
+                            },
+                            previewChat = item.lastMessageContent,
+                            time = item.lastMessageTime.toLocalDateTime()
                         )
                     }
 
-                    _conversations.value = DataChatMenuItem.data
+                    val sortedItems = conversations
                         .distinctBy { it.id }
                         .sortedByDescending { it.time }
-                        .toList()
+
+                    DataChatMenuItem.data.apply {
+                        clear()
+                        addAll(sortedItems)
+                    }
+
+                    _conversations.value = sortedItems
                 }
             }
 

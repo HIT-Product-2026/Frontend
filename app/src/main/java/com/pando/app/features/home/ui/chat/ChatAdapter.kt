@@ -6,6 +6,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import com.pando.app.core.base.BaseDiffCallBack
+import com.pando.app.core.extensions.formatDateTime
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.databinding.ItemImageMessageReceivedBinding
 import com.pando.app.databinding.ItemImageMessageSentBinding
@@ -130,7 +131,7 @@ class ChatAdapter(
         fun bind(item: ChatMessageItemModel) {
             binding.tvMessage.text = item.content
 
-            binding.tvTime.text = item.createdAt
+            binding.tvTime.text = item.createdAt.formatDateTime()
         }
     }
 
@@ -141,7 +142,7 @@ class ChatAdapter(
 
             binding.imgAvatar.loadAvatar(recipientAvatar)
 
-            binding.tvTime.text = item.createdAt
+            binding.tvTime.text = item.createdAt.formatDateTime()
         }
     }
 
