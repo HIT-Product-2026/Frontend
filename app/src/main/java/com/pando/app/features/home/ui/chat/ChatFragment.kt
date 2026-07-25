@@ -12,6 +12,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
@@ -37,6 +38,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
     private val args: ChatFragmentArgs by navArgs()
     private val chatViewModel: ChatViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
+    private var isLoadingOlderMessages = false
 
     //    @Inject
 //    lateinit var userSession: UserSession
@@ -127,10 +129,10 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                 launch {
                     chatViewModel.messages.collect { messages ->
                         chatAdapter.submitList(messages) {
-                            if (messages.isNotEmpty()) {
-                                binding.messageList.smoothScrollToPosition(
-                                    messages.lastIndex
-                                )
+                            if (messages.isNotEmpty() && isLoadingOlderMessages == false) {
+                                binding.messageList.smoothScrollToPosition(messages.lastIndex)
+                            } else if (messages.isNotEmpty() && isLoadingOlderMessages == true) {
+                                isLoadingOlderMessages = false
                             }
                         }
                         Log.d("MessageSocket", "Chap nhat thanh cong len man hinh")
@@ -205,12 +207,56 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
     }
 
     private fun setupRecyclerView() {
-        binding.messageList.apply {
-            layoutManager = LinearLayoutManager(requireContext()).apply {
-                stackFromEnd = true
-            }
-            adapter = chatAdapter
+        val linearLayoutManager = LinearLayoutManager(requireContext()).apply {
+            stackFromEnd = true
         }
+
+        binding.messageList.apply {
+            layoutManager = linearLayoutManager
+            adapter = chatAdapter
+
+            addOnScrollListener(
+                object : RecyclerView.OnScrollListener() {
+                    override fun onScrolled(
+                        recyclerView: RecyclerView,
+                        dx: Int,
+                        dy: Int
+                    ) {
+                        super.onScrolled(recyclerView, dx, dy)
+
+                        // Tọa độ vuốt Oxy
+                        // dy >= 0 vuốt theo chiều Oy tăng thì apdapter cũng được kéo theo chiều đó
+                        // dy < 0 ngược lại theo chiều Oy giảm
+                        // Nên ở đây dùng Oy giảm để kéo hiển thị những message trước đó
+                        if (dy >= 0) return
+
+                        val firstVisiblePosition = linearLayoutManager.findFirstVisibleItemPosition()
+
+                        Log.d("Test", "giá trị firstVisiblePosition $firstVisiblePosition")
+
+                        if (firstVisiblePosition <= 2 && isLoadingOlderMessages == false) {
+                            Log.d("Test", "Đã thỏa mãn điều kiện để load ")
+
+                            loadOlderMessages()
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    private fun loadOlderMessages() {
+        if (isLoadingOlderMessages) return
+        if (DataChatMessageItem.nextCursor?.isBlank() == true) return
+
+        Log.d("Test", "loadOlderMessages đang chạy")
+
+        isLoadingOlderMessages = true
+
+        chatViewModel.getMessageList(
+            conversationId = args.conversationId,
+            recipientId = args.recipientId
+        )
     }
 
     private fun setupKeyboardInsets() {

@@ -128,11 +128,15 @@ class ChatViewModel @Inject constructor(
     }
 
     fun getMessageList(conversationId: UUID, recipientId: UUID) {
-        if (isLoading) return
+        if (isLoading) {
+            Log.d("OkHttp", "Đang load danh sách tin ")
+            return
+        }
 
         if (DataChatMessageItem.hasLoadedFirstPage &&
-            DataChatMessageItem.nextCursor == null
+            DataChatMessageItem.nextCursor?.isBlank() == true
         ) {
+            Log.d("OkHttp", "Đã hết trang")
             return
         }
 
@@ -179,7 +183,6 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                     }
-
 
                 _messages.update { current ->
                     (current + newMessages)
