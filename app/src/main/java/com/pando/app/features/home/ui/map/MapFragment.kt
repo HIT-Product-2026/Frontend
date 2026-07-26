@@ -197,6 +197,11 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     }
 
     override fun onDestroyView() {
+        mapLibreMap = null
+        loadedStyle = null
+        currentLat = null
+        currentLng = null
+
         binding.mapView.onDestroy()
         super.onDestroyView()
     }
