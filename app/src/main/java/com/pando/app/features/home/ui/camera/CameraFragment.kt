@@ -57,11 +57,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     @Inject
-    lateinit var tokenManager: TokenManager
-
-    @Inject
     lateinit var userSession: UserSession
-    private val avatarViewModel: AvatarViewModel by activityViewModels()
     private val viewModel: CameraViewModel by viewModels()
 
     private var imageCapture: ImageCapture? = null
@@ -76,54 +72,13 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
     private var orientationEventListener: OrientationEventListener? = null
 
-    private val multiplePermissionsLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
-        val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
-
-        if (cameraGranted) {
-            startCamera()
-        } else {
-            Snackbar.make(binding.root, "Cần cấp quyền Camera!", Snackbar.LENGTH_SHORT).show()
-        }
-
-        if (!locationGranted) {
-            Toast.makeText(
-                requireContext(),
-                "Hãy cấp quyền Vị trí để ghim tọa độ ảnh!",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
     override fun initData() {
-        if (userSession.getCurrentUser() == null) {
-            decodeToken(tokenManager.getAccessToken())
-        }
+        startCamera()
 
         cameraExecutor = Executors.newSingleThreadExecutor()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
         initOrientationListener()
-
-        val hasCamera = ContextCompat.checkSelfPermission(
-            requireContext(),
-            Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
-        val hasLocation = ContextCompat.checkSelfPermission(
-            requireContext(),
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-
-        if (hasCamera && hasLocation) {
-            startCamera()
-        } else {
-            multiplePermissionsLauncher.launch(
-                arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
-            )
-        }
 
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -407,68 +362,6 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
                 imageCapture?.targetRotation = rotation
             }
-        }
-    }
-
-    fun decodeToken(token: String?) {
-        if (token.isNullOrEmpty()) {
-            Log.e("JWT_DECODE", "Token null")
-            return
-        }
-
-        try {
-            val jwt = JWT(token)
-
-            val isTokenExpired = jwt.isExpired(10)
-            if (isTokenExpired) {
-                Log.e("JWT_DECODE", "Token đã hết hạn sử dụng. Vui lòng đăng nhập lại")
-                return
-            }
-
-            val id = jwt.getClaim("id").asString()
-            val userName = jwt.getClaim("username").asString()
-            val displayName = jwt.getClaim("displayName").asString()
-            val userMode = jwt.getClaim("mode").asString()
-
-            val uuid = try {
-                UUID.fromString(id)
-            } catch (e: IllegalArgumentException) {
-                Log.e("JWT_DECODE", "ID từ Token không đúng định dạng UUID: $id")
-                return
-            }
-
-            val mode: UserMode? = try {
-                if (userMode != null) {
-                    UserMode.valueOf(userMode.uppercase())
-                } else {
-                    null
-                }
-            } catch (e: IllegalArgumentException) {
-                Log.e("JWT_DECODE", "mode từ Token không đúng định dạng: $userMode")
-                null
-            }
-
-            val currentAvatar = userSession.getCurrentUser()
-                ?.takeIf { it.id == uuid }
-                ?.avatar
-
-            userSession.setCurrentUser(
-                CurrentUser(
-                    id = uuid,
-                    username = userName,
-                    displayName = displayName,
-                    mode = mode,
-                    avatar = currentAvatar
-                )
-            )
-
-            if (currentAvatar == null) {
-                avatarViewModel.loadAvatar(uuid)
-            }
-            Log.d("JWT_DECODE", "Cập nhật User thành công")
-
-        } catch (e: DecodeException) {
-            Log.e("JWT_DECODE", "Token không hợp lệ hoặc bị lỗi cấu trúc: ${e.message}")
         }
     }
 

@@ -39,7 +39,7 @@ class LoginViewModel @Inject constructor(
 
                 getAndSendFcmToken()
 
-                sendEvent(ViewModelEvent.Navigate(R.id.action_loginBottomSheet_to_cameraFragment))
+                sendEvent(ViewModelEvent.Navigate(R.id.action_loginBottomSheet_to_mapFragment))
             }
 
             loginResult

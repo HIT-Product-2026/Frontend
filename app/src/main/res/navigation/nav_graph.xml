@@ -33,8 +33,8 @@
             app:destination="@id/registerBottomSheet"
             app:popUpTo="@id/startFragment" />
         <action
-            android:id="@+id/action_loginBottomSheet_to_cameraFragment"
-            app:destination="@id/cameraFragment" />
+            android:id="@+id/action_loginBottomSheet_to_mapFragment"
+            app:destination="@id/mapFragment" />
     </dialog>
 
     <dialog
@@ -166,5 +166,19 @@
         android:name="com.pando.app.features.home.ui.postreel.PostReelFragment"
         android:label="fragment_post_reel"
         tools:layout="@layout/fragment_post_reel" />
+    <fragment
+        android:id="@+id/mapFragment"
+        android:name="com.pando.app.features.home.ui.map.MapFragment"
+        android:label="MapFragment" >
+        <action
+            android:id="@+id/action_mapFragment_to_cameraFragment"
+            app:destination="@id/cameraFragment" />
+        <action
+            android:id="@+id/action_mapFragment_to_settingFragment"
+            app:destination="@id/settingFragment" />
+        <action
+            android:id="@+id/action_mapFragment_to_chatMenuFragment"
+            app:destination="@id/chatMenuFragment" />
+    </fragment>
 
 </navigation>

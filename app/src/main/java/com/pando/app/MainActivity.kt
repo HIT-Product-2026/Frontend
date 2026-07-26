@@ -29,7 +29,7 @@ class MainActivity : AppCompatActivity() {
         sendFCMToken()
 
         if (authPreferences.isLoggedIn()) {
-            navGraph.setStartDestination(R.id.cameraFragment)
+            navGraph.setStartDestination(R.id.mapFragment)
         } else {
             navGraph.setStartDestination(R.id.startFragment)
         }
