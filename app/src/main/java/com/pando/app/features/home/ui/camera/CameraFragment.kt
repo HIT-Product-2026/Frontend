@@ -9,7 +9,6 @@ import android.view.OrientationEventListener
 import android.view.Surface
 import android.view.View
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -18,46 +17,32 @@ import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.ViewPort
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
-import com.auth0.android.jwt.DecodeException
-import com.auth0.android.jwt.JWT
 import com.bumptech.glide.Glide
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import com.google.android.material.snackbar.Snackbar
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
-import com.pando.app.core.network.api.TokenManager
 import com.pando.app.core.session.UserSession
-import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentCameraBinding
-import com.pando.app.features.home.data.model.entity.CurrentUser
-import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
-import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 @AndroidEntryPoint
 class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding::inflate) {
-    companion object {
-        private const val TAG = "SOCKET_CONNECTION"
-    }
-
     @Inject
     lateinit var userSession: UserSession
     private val viewModel: CameraViewModel by viewModels()
@@ -107,8 +92,6 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                 }
             }
         }
-
-        viewModel.socketConnect()
     }
 
     override fun initActionView() {
@@ -188,27 +171,6 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                                     Toast.LENGTH_SHORT
                                 ).show()
                                 viewModel.clearResult()
-                            }
-                        }
-                    }
-                }
-                launch {
-                    viewModel.connectionState.collect { state ->
-                        when (state) {
-                            SocketConnectionState.Connecting -> {
-                                Log.d(TAG, "Đang kết nối")
-                            }
-
-                            SocketConnectionState.Connected -> {
-                                Log.d(TAG, "Đã kết nối")
-                            }
-
-                            SocketConnectionState.Disconnected -> {
-                                Log.d(TAG, "Đã ngắt kết nối")
-                            }
-
-                            is SocketConnectionState.Error -> {
-                                Log.e(TAG, state.message)
                             }
                         }
                     }

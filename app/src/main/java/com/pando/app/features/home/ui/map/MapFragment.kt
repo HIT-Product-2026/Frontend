@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.activityViewModels
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -25,6 +26,7 @@ import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.network.api.TokenManager
 import com.pando.app.core.session.UserSession
+import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.databinding.FragmentMapBinding
 import com.pando.app.features.home.data.model.entity.CurrentUser
 import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
@@ -52,6 +54,10 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate) {
+    companion object {
+        private const val TAG = "SOCKET_CONNECTION"
+    }
+
     @Inject
     lateinit var tokenManager: TokenManager
 
@@ -59,6 +65,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     lateinit var userSession: UserSession
 
     private val avatarViewModel: AvatarViewModel by activityViewModels()
+    private val mapViewModel: MapViewModel by viewModels()
 
     private val styleUrl: String
         get() {
@@ -128,6 +135,8 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     }
 
     override fun initView() {
+        mapViewModel.socketConnect()
+
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 userSession.currentUser.collect { user ->
@@ -168,6 +177,32 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
         binding.btnCurrentLocation.setOnClickListener {
             captureLocation()
+        }
+
+        lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    mapViewModel.connectionState.collect { state ->
+                        when (state) {
+                            SocketConnectionState.Connecting -> {
+                                Log.d(TAG, "Đang kết nối")
+                            }
+
+                            SocketConnectionState.Connected -> {
+                                Log.d(TAG, "Đã kết nối")
+                            }
+
+                            SocketConnectionState.Disconnected -> {
+                                Log.d(TAG, "Đã ngắt kết nối")
+                            }
+
+                            is SocketConnectionState.Error -> {
+                                Log.e(TAG, state.message)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

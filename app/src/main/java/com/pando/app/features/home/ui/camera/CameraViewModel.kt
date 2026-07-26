@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import com.pando.app.core.base.BaseVM
 import com.pando.app.core.network.api.ApiResponse
-import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.response.PostResponse
 import com.pando.app.features.home.data.repository.MediaRepository
@@ -29,21 +28,10 @@ sealed interface CameraViewMode {
 @HiltViewModel
 class CameraViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
-    @param:ApplicationContext private val context: Context,
-    private val socketConnectionManager: SocketConnectionManager
+    @param:ApplicationContext private val context: Context
 ) : BaseVM<ApiResponse<PostResponse>>() {
     private val _cameraViewMode = MutableStateFlow<CameraViewMode>(CameraViewMode.Capture)
     val cameraViewMode: StateFlow<CameraViewMode> = _cameraViewMode.asStateFlow()
-
-    val connectionState = socketConnectionManager.connectionState
-
-    fun socketConnect() {
-        socketConnectionManager.connect()
-    }
-
-    fun socketDisconnect() {
-        socketConnectionManager.disconnect()
-    }
 
     fun setSendMode(photoFile: File) {
         _cameraViewMode.value = CameraViewMode.Send(photoFile)
