@@ -44,7 +44,9 @@ import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.ExecutorService
@@ -120,8 +122,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
 
         binding.btnCapture.setOnClickListener {
-            captureLocation()
-            takePhoto()
+            viewLifecycleOwner.lifecycleScope.launch {
+                captureLocation()
+                takePhoto()
+            }
         }
 
         binding.chatBtn.setOnClickListener {
@@ -142,12 +146,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
         binding.btnSend.setOnClickListener {
             val caption = binding.captionET.text.toString()
-            if (caption.isBlank()) {
-                viewModel.sendPost(null, currentLng, currentLat)
-            } else {
-                viewModel.sendPost(caption, currentLng, currentLat)
-            }
+                .trim()
+                .takeIf { it.isNotEmpty() }
 
+            viewModel.sendPost(caption, currentLng, currentLat)
         }
 
         binding.profileIcon.setOnClickListener {
@@ -328,7 +330,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.captionLayout.visibility = View.GONE
     }
 
-    private fun captureLocation() {
+    private suspend fun captureLocation() = withContext(Dispatchers.IO) {
         if (ContextCompat.checkSelfPermission(
                 requireContext(),
                 Manifest.permission.ACCESS_FINE_LOCATION
