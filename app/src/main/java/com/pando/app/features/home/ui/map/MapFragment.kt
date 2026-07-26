@@ -39,6 +39,9 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression.coalesce
 import org.maplibre.android.style.expressions.Expression.get
+import org.maplibre.android.style.expressions.Expression.literal
+import org.maplibre.android.style.expressions.Expression.match
+import org.maplibre.android.style.expressions.Expression.stop
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
@@ -243,19 +246,39 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
     private fun setVietnameseLabels(style: Style) {
         style.layers.filterIsInstance<SymbolLayer>().forEach { layer ->
-            val hasTextField = layer.textField.expression != null
+            if (layer.textField.expression == null) return@forEach
 
-            if (hasTextField) {
-                layer.setProperties(
-                    textField(coalesce(
-                            get("name:vi"),
-                            get("name_vi"),
-                            get("name"),
-                            get("name:en")
-                        )
-                    )
+            val originalName = coalesce(
+                get("name:vi"),
+                get("name_vi"),
+                get("name"),
+                get("name:en")
+            )
+
+            val displayName = match(
+                originalName,
+                originalName,
+                stop(
+                    "Paracel Islands",
+                    literal("Quần đảo Hoàng Sa")
+                ),
+                stop(
+                    "Paracel Is.",
+                    literal("Quần đảo Hoàng Sa")
+                ),
+                stop(
+                    "Spratly Islands",
+                    literal("Quần đảo Trường Sa")
+                ),
+                stop(
+                    "Spratly Is.",
+                    literal("Quần đảo Trường Sa")
                 )
-            }
+            )
+
+            layer.setProperties(
+                textField(displayName)
+            )
         }
     }
 
