@@ -37,5 +37,6 @@ interface ConversationApi {
     @POST(ApiConstants.Message.SEND_IMAGE_MESSAGE)
     suspend fun sendImageMessage(
         @Query("conversationId") conversationId: UUID,
-        @Part file : MultipartBody.Part) : Response<ApiResponse<ChatMessageResponse>>
+        @Part file : MultipartBody.Part,
+        @Query("isRead") isRead: Boolean = false) : Response<ApiResponse<ChatMessageResponse>>
 }

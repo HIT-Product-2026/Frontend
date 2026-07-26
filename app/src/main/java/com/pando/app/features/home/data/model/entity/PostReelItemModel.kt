@@ -7,6 +7,7 @@ import java.util.UUID
 
 data class PostReelItemModel(
     override val id: UUID,
+    val conversationId: UUID?=null,
     val user: UserDto,
     val caption: String,
     val latitude: Double,

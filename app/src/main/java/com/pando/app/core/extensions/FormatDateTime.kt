@@ -6,6 +6,10 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 fun LocalDateTime.formatDateTime(): String {
+    if (this == null) {
+        return ""
+    }
+
     val now = LocalDateTime.now()
     val messageDate = this.toLocalDate()
     val today = now.toLocalDate()

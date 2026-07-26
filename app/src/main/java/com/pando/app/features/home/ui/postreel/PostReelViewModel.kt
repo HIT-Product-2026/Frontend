@@ -6,20 +6,24 @@ import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
+import com.pando.app.features.home.data.model.response.ChatMessageResponse
 import com.pando.app.features.home.data.model.response.PostsResponse
+import com.pando.app.features.home.data.repository.ConversationRepository
 import com.pando.app.features.home.data.repository.PostRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
 class PostReelViewModel @Inject constructor(
-    private val postRepository: PostRepository
-) : BaseVM<ApiResponse<PostsResponse>>() {
+    private val postRepository: PostRepository,
+    private val conversationRepository: ConversationRepository
+) : BaseVM<PostEvent>() {
     private var isLoading = false
     private val _images = MutableStateFlow<Map<UUID, ByteArray>>(emptyMap())
 
@@ -28,7 +32,9 @@ class PostReelViewModel @Inject constructor(
     private val loadingIds = mutableSetOf<UUID>()
 
     fun loadPost(userId: UUID) {
-        if (_images.value.containsKey(userId)) { return }
+        if (_images.value.containsKey(userId)) {
+            return
+        }
         if (!loadingIds.add(userId)) return
 
         viewModelScope.launch {
@@ -56,7 +62,8 @@ class PostReelViewModel @Inject constructor(
         if (isLoading) return
 
         if (DataPostReelItem.hasLoadedFirstPage &&
-            DataPostReelItem.nextCursor == null) {
+            DataPostReelItem.nextCursor == null
+        ) {
             return
         }
 
@@ -93,7 +100,25 @@ class PostReelViewModel @Inject constructor(
             }
 
             isLoading = false
-            result
+
+            when (result) {
+                is DataResult.Success -> DataResult.Success(PostEvent.GetPostEvent(result.data))
+                is DataResult.Error -> result
+            }
         }
     }
+
+    fun sendImagePost(conversationId: UUID, image: ByteArray) {
+        getData {
+            when (val result = conversationRepository.sendImageMessage(conversationId, image)) {
+                is DataResult.Success -> DataResult.Success(PostEvent.SendImagePost(result.data))
+                is DataResult.Error -> result
+            }
+        }
+    }
+}
+
+sealed interface PostEvent {
+    data class GetPostEvent(val response : ApiResponse<PostsResponse>) : PostEvent
+    data class SendImagePost(val response: ApiResponse<ChatMessageResponse>) : PostEvent
 }

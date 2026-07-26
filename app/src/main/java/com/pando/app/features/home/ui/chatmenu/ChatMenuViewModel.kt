@@ -61,7 +61,7 @@ class ChatMenuViewModel @Inject constructor(
 
         val updatedItem = oldItem.copy(
             previewChat = response.lastMessageContent,
-            time = response.lastMessageTime.toLocalDateTime()
+            time = response.lastMessageTime?.toLocalDateTime()
         )
 
         val updatedList = _conversations.value
@@ -109,7 +109,7 @@ class ChatMenuViewModel @Inject constructor(
                                 item.user1.displayName.ifEmpty { item.user1.username }
                             },
                             previewChat = item.lastMessageContent,
-                            time = item.lastMessageTime.toLocalDateTime()
+                            time = item.lastMessageTime?.toLocalDateTime()
                         )
                     }
 

@@ -53,7 +53,7 @@ class CameraViewModel @Inject constructor(
         _cameraViewMode.value = CameraViewMode.Capture
     }
 
-    fun sendPost(caption: String, longitude: Double?, latitude: Double?) {
+    fun sendPost(caption: String?, longitude: Double?, latitude: Double?) {
         val currentMode = _cameraViewMode.value
         if (currentMode !is CameraViewMode.Send) return
 

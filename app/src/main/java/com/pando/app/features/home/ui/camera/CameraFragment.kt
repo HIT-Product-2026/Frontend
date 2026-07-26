@@ -142,8 +142,12 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
         binding.btnSend.setOnClickListener {
             val caption = binding.captionET.text.toString()
+            if (caption.isBlank()) {
+                viewModel.sendPost(null, currentLng, currentLat)
+            } else {
+                viewModel.sendPost(caption, currentLng, currentLat)
+            }
 
-            viewModel.sendPost(caption, currentLng, currentLat)
         }
 
         binding.profileIcon.setOnClickListener {

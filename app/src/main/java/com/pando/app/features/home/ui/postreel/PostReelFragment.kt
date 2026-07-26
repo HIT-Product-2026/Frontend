@@ -1,7 +1,12 @@
 package com.pando.app.features.home.ui.postreel
 
+import android.content.Context
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -31,9 +36,10 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     private var imageMap: Map<UUID, ByteArray> = emptyMap()
     private val postReelViewModel: PostReelViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
+
     @Inject
-    lateinit var userSession : UserSession
-    private val postReelAdapter : BaseAdapter<PostReelItemModel, ItemPostReelBinding> by lazy {
+    lateinit var userSession: UserSession
+    private val postReelAdapter: BaseAdapter<PostReelItemModel, ItemPostReelBinding> by lazy {
         BaseAdapter(
             ItemPostReelBinding::inflate,
             BaseDiffCallBack()
@@ -74,7 +80,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 }
             }
         }
-    
+
     override fun initData() {
         DataPostReelItem.reset()
         if (DataPostReelItem.data.isEmpty()) {
@@ -85,6 +91,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     override fun initView() {
         loadCurrentUser()
         setupPostReel()
+        setupKeyboardInsets()
 
         postReelAdapter.submitList(
             DataPostReelItem.data.toList()
@@ -92,6 +99,19 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     override fun initActionView() {
+        binding.SendMessageBtn.setOnClickListener {
+            binding.bottomLayout.visibility = View.VISIBLE
+            binding.sendMessageET.requestFocus()
+
+            val inputMethodManager = requireContext()
+                .getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+
+            inputMethodManager.showSoftInput(
+                binding.sendMessageET,
+                InputMethodManager.SHOW_IMPLICIT
+            )
+        }
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
@@ -112,7 +132,15 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                     postReelViewModel.uiState.collect { state ->
                         when (state) {
                             is UiState.Success -> {
-                                postReelAdapter.submitList(DataPostReelItem.data.toList())
+                                when (val result = state.data) {
+                                    is PostEvent.GetPostEvent -> {
+                                        postReelAdapter.submitList(DataPostReelItem.data.toList())
+                                    }
+
+                                    is PostEvent.SendImagePost -> {
+
+                                    }
+                                }
                             }
 
                             is UiState.Error -> {}
@@ -158,5 +186,27 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             .unregisterOnPageChangeCallback(pageChangeCallback)
 
         super.onDestroyView()
+    }
+
+    private fun setupKeyboardInsets() {
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
+            val imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
+
+            binding.bottomLayout.updatePadding(bottom = imeInsets.bottom)
+
+            val isKeyboardVisible =
+                windowInsets.isVisible(WindowInsetsCompat.Type.ime())
+
+            if (!isKeyboardVisible) {
+                binding.sendMessageET.clearFocus()
+                binding.sendMessageET.text?.clear()
+                binding.bottomLayout.visibility = View.GONE
+            }
+
+            windowInsets
+        }
+
+        ViewCompat.requestApplyInsets(binding.root)
     }
 }
