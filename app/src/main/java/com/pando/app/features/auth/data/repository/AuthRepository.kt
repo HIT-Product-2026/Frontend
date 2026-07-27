@@ -26,8 +26,8 @@ class AuthRepository @Inject constructor(
         }
 
         if (result is DataResult.Success) {
-            val token = result.data.data.accessToken
-            tokenManager.saveAccessToken(token)
+            val token = result.data.data
+            tokenManager.saveTokens(token.accessToken, token.refreshToken)
         }
 
         return result

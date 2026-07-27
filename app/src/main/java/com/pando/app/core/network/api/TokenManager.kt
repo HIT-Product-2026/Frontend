@@ -10,8 +10,10 @@ class TokenManager @Inject constructor(
 ) {
     fun getAccessToken(): String? = authPreferences.getAccessToken()
 
-    fun saveAccessToken(token: String) {
-        authPreferences.saveAuthSession(token)
+    fun getRefreshToken(): String? = authPreferences.getRefreshToken()
+
+    fun saveTokens(accessToken: String, refreshToken: String) {
+        authPreferences.saveAuthSession(accessToken, refreshToken)
     }
 
     fun clear() {

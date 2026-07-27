@@ -6,14 +6,24 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+enum class SessionState {
+    ACTIVE,
+    EXPIRED
+}
+
 @Singleton
 class UserSession @Inject constructor() {
+    private val _sessionState = MutableStateFlow(SessionState.ACTIVE)
+
+    val sessionState = _sessionState.asStateFlow()
+    
     private val _currentUser = MutableStateFlow<CurrentUser?>(null)
 
     val currentUser = _currentUser.asStateFlow()
 
     fun setCurrentUser(user: CurrentUser) {
         _currentUser.value = user
+        _sessionState.value = SessionState.ACTIVE
     }
 
     fun updateCurrentUser(transform: (CurrentUser) -> CurrentUser) {
@@ -36,6 +46,12 @@ class UserSession @Inject constructor() {
     }
     fun getCurrentUserId() = _currentUser.value?.id
 
-    val isLoggedIn: Boolean
-        get() = _currentUser.value != null
+    fun notifySessionExpired() {
+        clearCurrentUser()
+        _sessionState.value = SessionState.EXPIRED
+    }
+
+    fun markSessionActive() {
+        _sessionState.value = SessionState.ACTIVE
+    }
 }

@@ -14,6 +14,11 @@ import jakarta.inject.Singleton
 class AuthPreferences @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) {
+    companion object {
+        private const val KEY_ACCESS_TOKEN = "key_access_token"
+        private const val KEY_REFRESH_TOKEN = "key_refresh_token"
+        private const val KEY_IS_LOGGED_IN = "key_is_logged_in"
+    }
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
@@ -25,21 +30,21 @@ class AuthPreferences @Inject constructor(
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
-    companion object {
-        private const val KEY_ACCESS_TOKEN = "key_access_token"
-        private const val KEY_IS_LOGGED_IN = "key_is_logged_in"
-    }
 
-    fun saveAuthSession(token: String) {
-        sharedPreferences.edit().apply {
-            putString(KEY_ACCESS_TOKEN, token)
+    fun saveAuthSession(accessToken: String, refreshToken: String) {
+        sharedPreferences.edit {
+            putString(KEY_ACCESS_TOKEN, accessToken)
+            putString(KEY_REFRESH_TOKEN, refreshToken)
             putBoolean(KEY_IS_LOGGED_IN, true)
-            apply()
         }
     }
 
     fun getAccessToken(): String? {
         return sharedPreferences.getString(KEY_ACCESS_TOKEN, null)
+    }
+
+    fun getRefreshToken(): String? {
+        return sharedPreferences.getString(KEY_REFRESH_TOKEN, null)
     }
 
     fun isLoggedIn(): Boolean {

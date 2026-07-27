@@ -6,9 +6,11 @@ import com.pando.app.features.auth.data.model.request.FPResetPasswordRequest
 import com.pando.app.features.auth.data.model.request.FPSendEmailRequest
 import com.pando.app.features.auth.data.model.request.FPVerifyOtpRequest
 import com.pando.app.features.auth.data.model.request.LoginRequest
+import com.pando.app.features.auth.data.model.request.RefreshTokenRequest
 import com.pando.app.features.auth.data.model.request.RegisterSendOtpRequest
 import com.pando.app.features.auth.data.model.request.RegisterVerifyOtpRequest
 import com.pando.app.features.auth.data.model.response.LoginResponse
+import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
@@ -31,4 +33,7 @@ interface AuthApi {
 
     @POST(ApiConstants.Auth.RESET_PASSWORD)
     suspend fun resetPassword(@Body request: FPResetPasswordRequest): Response<ApiResponse<Void>>
+
+    @POST(ApiConstants.Auth.REFRESH_TOKEN)
+    fun refreshToken(@Body request: RefreshTokenRequest): Call<ApiResponse<LoginResponse>>
 }

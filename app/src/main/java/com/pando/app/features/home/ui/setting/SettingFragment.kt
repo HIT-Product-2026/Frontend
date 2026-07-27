@@ -9,6 +9,7 @@ import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.network.api.TokenManager
+import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentSettingBinding
 import com.pando.app.features.home.data.model.entity.DataChatMenuItem
@@ -28,6 +29,8 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
     lateinit var tokenManager: TokenManager
     @Inject
     lateinit var userSession: UserSession
+    @Inject
+    lateinit var socketConnectionManager: SocketConnectionManager
 
     override fun initData() {
     }
@@ -44,6 +47,7 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
         binding.logoutBtn.setOnClickListener {
             tokenManager.clear()
             userSession.clearCurrentUser()
+            socketConnectionManager.disconnect()
 
             DataPostReelItem.apply {
                 data.clear()

@@ -61,7 +61,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
             itemBinding.captionTV.apply {
                 text = item.caption
-                visibility = if (item.caption.isBlank()) View.GONE else View.VISIBLE
+                visibility = if (item.caption?.isBlank() == true) View.GONE else View.VISIBLE
             }
         }
     }

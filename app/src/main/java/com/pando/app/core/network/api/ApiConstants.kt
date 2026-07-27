@@ -12,6 +12,7 @@ object ApiConstants {
         const val FORGOT_PASSWORD_SEND_OTP = "auth/forgot-password/send-otp"
         const val FORGOT_PASSWORD_VERIFY_OTP = "auth/forgot-password/verify-otp"
         const val RESET_PASSWORD = "auth/forgot-password/reset"
+        const val REFRESH_TOKEN = "auth/refresh"
     }
 
     object Post {
