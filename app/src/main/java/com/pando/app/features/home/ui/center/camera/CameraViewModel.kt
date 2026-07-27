@@ -1,4 +1,4 @@
-package com.pando.app.features.home.ui.camera
+package com.pando.app.features.home.ui.center.camera
 
 import android.content.Context
 import android.graphics.Bitmap

@@ -1,4 +1,4 @@
-package com.pando.app.features.home.ui.camera
+package com.pando.app.features.home.ui.center.camera
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -32,6 +32,7 @@ import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.session.UserSession
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentCameraBinding
+import com.pando.app.features.home.ui.center.CenterFragment
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -112,7 +113,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
 
         binding.chatBtn.setOnClickListener {
-            findNavController().navigate(R.id.action_cameraFragment_to_chatMenuFragment)
+            findNavController().navigate(R.id.action_centerFragment_to_chatMenuFragment)
         }
 
         binding.btnCancel.setOnClickListener {
@@ -124,7 +125,15 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
 
         binding.friendBtn.setOnClickListener {
-            findNavController().navigate(R.id.action_cameraFragment_to_friendFragment)
+            findNavController().navigate(R.id.action_centerFragment_to_friendFragment)
+        }
+
+        binding.profileIcon.setOnClickListener {
+            findNavController().navigate(R.id.action_centerFragment_to_settingFragment)
+        }
+
+        binding.historyBtn.setOnClickListener {
+            (parentFragment as? CenterFragment)?.openPostReel()
         }
 
         binding.btnSend.setOnClickListener {
@@ -134,15 +143,6 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
             viewModel.sendPost(caption, currentLng, currentLat)
         }
-
-        binding.profileIcon.setOnClickListener {
-            findNavController().navigate(R.id.action_cameraFragment_to_settingFragment)
-        }
-
-        binding.historyBtn.setOnClickListener {
-            findNavController().navigate((R.id.action_cameraFragment_to_postReelFragment))
-        }
-
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {

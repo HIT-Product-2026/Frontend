@@ -1,4 +1,4 @@
-package com.pando.app.features.home.ui.map
+package com.pando.app.features.home.ui.center.map
 
 import androidx.lifecycle.ViewModel
 import com.pando.app.core.network.socket.SocketConnectionManager

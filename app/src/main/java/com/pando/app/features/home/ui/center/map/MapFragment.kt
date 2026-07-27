@@ -1,4 +1,4 @@
-package com.pando.app.features.home.ui.map
+package com.pando.app.features.home.ui.center.map
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -34,6 +34,7 @@ import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.databinding.FragmentMapBinding
 import com.pando.app.features.home.data.model.entity.CurrentUser
 import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
+import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -64,7 +65,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     companion object {
         private const val TAG = "SOCKET_CONNECTION"
     }
-
     @Inject
     lateinit var tokenManager: TokenManager
 
@@ -196,15 +196,15 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
     override fun initActionView() {
         binding.btnCapture.setOnClickListener {
-            findNavController().navigate(R.id.action_mapFragment_to_cameraFragment)
+            (parentFragment as? CenterFragment)?.openCamera()
         }
 
         binding.profileIcon.setOnClickListener {
-            findNavController().navigate(R.id.action_mapFragment_to_settingFragment)
+            findNavController().navigate(R.id.action_centerFragment_to_settingFragment)
         }
 
         binding.chatBtn.setOnClickListener {
-            findNavController().navigate(R.id.action_mapFragment_to_chatMenuFragment)
+            findNavController().navigate(R.id.action_centerFragment_to_chatMenuFragment)
         }
 
         binding.btnCurrentLocation.setOnClickListener {

@@ -35,6 +35,9 @@
         <action
             android:id="@+id/action_loginBottomSheet_to_mapFragment"
             app:destination="@id/mapFragment" />
+        <action
+            android:id="@+id/action_loginBottomSheet_to_centerFragment"
+            app:destination="@id/centerFragment" />
     </dialog>
 
     <dialog
@@ -90,7 +93,7 @@
     </fragment>
     <fragment
         android:id="@+id/cameraFragment"
-        android:name="com.pando.app.features.home.ui.camera.CameraFragment"
+        android:name="com.pando.app.features.home.ui.center.camera.CameraFragment"
         android:label="fragment_camera"
         tools:layout="@layout/fragment_camera">
         <action
@@ -163,13 +166,13 @@
         android:label="BottomSheetEditAvatarFragment" />
     <fragment
         android:id="@+id/postReelFragment"
-        android:name="com.pando.app.features.home.ui.postreel.PostReelFragment"
+        android:name="com.pando.app.features.home.ui.center.postreel.PostReelFragment"
         android:label="fragment_post_reel"
         tools:layout="@layout/fragment_post_reel" />
     <fragment
         android:id="@+id/mapFragment"
-        android:name="com.pando.app.features.home.ui.map.MapFragment"
-        android:label="MapFragment" >
+        android:name="com.pando.app.features.home.ui.center.map.MapFragment"
+        android:label="MapFragment">
         <action
             android:id="@+id/action_mapFragment_to_cameraFragment"
             app:destination="@id/cameraFragment" />
@@ -179,6 +182,21 @@
         <action
             android:id="@+id/action_mapFragment_to_chatMenuFragment"
             app:destination="@id/chatMenuFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/centerFragment"
+        android:name="com.pando.app.features.home.ui.center.CenterFragment"
+        android:label="fragment_center"
+        tools:layout="@layout/fragment_center" >
+        <action
+            android:id="@+id/action_centerFragment_to_settingFragment"
+            app:destination="@id/settingFragment" />
+        <action
+            android:id="@+id/action_centerFragment_to_chatMenuFragment"
+            app:destination="@id/chatMenuFragment" />
+        <action
+            android:id="@+id/action_centerFragment_to_friendFragment"
+            app:destination="@id/friendFragment" />
     </fragment>
 
 </navigation>

@@ -1,4 +1,4 @@
-package com.pando.app.features.home.ui.postreel
+package com.pando.app.features.home.ui.center.postreel
 
 import android.content.Context
 import android.view.View
