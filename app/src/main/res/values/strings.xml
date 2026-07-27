@@ -22,4 +22,6 @@
         <item>Nữ</item>
         <item>Khác</item>
     </string-array>
+
+    <string name="widgetdes">PanDoApp</string>
 </resources>
