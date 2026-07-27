@@ -3,6 +3,7 @@ package com.pando.app.features.home.ui.map
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.Toast
@@ -17,6 +18,9 @@ import androidx.navigation.fragment.findNavController
 import com.auth0.android.jwt.DecodeException
 import com.auth0.android.jwt.JWT
 import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.material.snackbar.Snackbar
@@ -80,6 +84,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         }
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationCallback: LocationCallback
     private var currentLat: Double? = null
     private var currentLng: Double? = null
 
@@ -110,6 +115,11 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         }
     }
 
+    private val locationRequest = LocationRequest
+        .Builder(Priority.PRIORITY_HIGH_ACCURACY, 5_000L)
+        .setMinUpdateIntervalMillis(2_000L)
+        .build()
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         binding.mapView.onCreate(savedInstanceState)
@@ -135,6 +145,21 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(
+                locationResult: LocationResult
+            ) {
+                val location = locationResult.lastLocation ?: return
+
+                currentLat = location.latitude
+                currentLng = location.longitude
+
+                Log.d("LOCATION_UPDATE", "Lat=$currentLat, Lng=$currentLng")
+
+                updateCurrentLocationPoint()
+                moveCameraToCurrentLocation()
+            }
+        }
     }
 
     override fun initView() {
@@ -159,7 +184,11 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                 setVietnameseLabels(style)
 
-                showLocationIfReady()
+                updateCurrentLocationPoint()
+
+                if (currentLat != null && currentLng != null) {
+                    moveCameraToCurrentLocation()
+                }
             }
         }
         captureLocation()
@@ -179,7 +208,12 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         }
 
         binding.btnCurrentLocation.setOnClickListener {
-            captureLocation()
+            if (currentLat == null && currentLng == null) {
+                captureLocation()
+                moveCameraToCurrentLocation()
+            } else {
+                moveCameraToCurrentLocation()
+            }
         }
 
         lifecycleScope.launch {
@@ -217,9 +251,17 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     override fun onResume() {
         super.onResume()
         binding.mapView.onResume()
+
+        if (::locationCallback.isInitialized) {
+            startLocationUpdates()
+        }
     }
 
     override fun onPause() {
+        if (::locationCallback.isInitialized) {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        }
+
         binding.mapView.onPause()
         super.onPause()
     }
@@ -282,7 +324,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         }
     }
 
-    private fun showLocationIfReady() {
+    private fun updateCurrentLocationPoint() {
         val style = loadedStyle ?: return
         val latitude = currentLat ?: return
         val longitude = currentLng ?: return
@@ -292,12 +334,14 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             latitude = latitude,
             longitude = longitude
         )
+    }
+
+    private fun moveCameraToCurrentLocation() {
+        val latitude = currentLat ?: return
+        val longitude = currentLng ?: return
 
         mapLibreMap?.animateCamera(
-            CameraUpdateFactory.newLatLngZoom(
-                LatLng(latitude, longitude),
-                zoom = 16.0
-            ),
+            CameraUpdateFactory.newLatLngZoom(LatLng(latitude, longitude), zoom = 16.0),
             800
         )
     }
@@ -316,7 +360,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                     currentLat = location.latitude
                     currentLng = location.longitude
                     Log.d("LOCATION", "Đã lấy tọa độ: Lat=$currentLat, Lng=$currentLng")
-                    showLocationIfReady()
+                    updateCurrentLocationPoint()
                 } else {
                     Log.d("LOCATION", "Không thể lấy tọa độ (Có thể do đang ở trong nhà quá kín)")
                 }
@@ -419,5 +463,19 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         } catch (e: DecodeException) {
             Log.e("JWT_DECODE", "Token không hợp lệ hoặc bị lỗi cấu trúc: ${e.message}")
         }
+    }
+
+    private fun startLocationUpdates() {
+        val hasLocationPermission = ContextCompat.checkSelfPermission(
+                requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasLocationPermission) return
+
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
+            locationCallback,
+            Looper.getMainLooper()
+        )
     }
 }
