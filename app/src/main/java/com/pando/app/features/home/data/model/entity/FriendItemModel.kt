@@ -6,6 +6,9 @@ import java.util.UUID
 data class FriendItemModel (
     override val id: UUID,
     val name: String,
+    val avatarUrl: String?=null,
+    val longitude: Double?=null,
+    val latitude: Double?=null
 ) : BaseItemModel
 
 class DataFriendItem {

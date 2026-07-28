@@ -70,18 +70,14 @@
             android:layout_alignParentEnd="true"
             android:layout_marginEnd="@dimen/_20sdp" />
 
-        <com.google.android.material.button.MaterialButton
+        <ImageButton
             android:id="@+id/friendBtn"
             android:layout_width="50dp"
             android:layout_height="50dp"
             android:layout_marginBottom="40dp"
-            android:insetLeft="0dp"
-            android:insetTop="0dp"
-            android:insetRight="0dp"
-            android:insetBottom="0dp"
-            app:icon="@drawable/_2user"
-            app:iconGravity="textStart"
-            app:iconPadding="0dp"
+            android:background="@drawable/bg_btn"
+            android:src="@drawable/_2user"
+            android:tint="@color/white"
             android:layout_below="@+id/notificationBtn"
             android:layout_alignParentEnd="true"
             android:layout_marginEnd="@dimen/_20sdp" />

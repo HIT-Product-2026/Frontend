@@ -2,13 +2,23 @@ package com.pando.app.features.home.ui.center.map
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.os.Bundle
 import android.os.Looper
+import android.provider.ContactsContract
 import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.toBitmap
+import androidx.core.graphics.scale
+import androidx.core.graphics.toColorInt
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -17,6 +27,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.auth0.android.jwt.DecodeException
 import com.auth0.android.jwt.JWT
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.transition.Transition
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -31,12 +44,16 @@ import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.network.api.TokenManager
 import com.pando.app.core.session.UserSession
 import com.pando.app.core.state.SocketConnectionState
+import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentMapBinding
 import com.pando.app.features.home.data.model.entity.CurrentUser
+import com.pando.app.features.home.data.model.entity.DataFriendItem
+import com.pando.app.features.home.data.model.entity.FriendItemModel
 import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
 import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -48,14 +65,21 @@ import org.maplibre.android.style.expressions.Expression.literal
 import org.maplibre.android.style.expressions.Expression.match
 import org.maplibre.android.style.expressions.Expression.stop
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.Property.ICON_ANCHOR_BOTTOM
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.iconAnchor
+import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
+import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.textField
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
 import java.util.UUID
 import javax.inject.Inject
@@ -65,12 +89,14 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     companion object {
         private const val TAG = "SOCKET_CONNECTION"
     }
+
     @Inject
     lateinit var tokenManager: TokenManager
 
     @Inject
     lateinit var userSession: UserSession
 
+    private var avatarMap: Map<UUID, String> = emptyMap()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
     private val mapViewModel: MapViewModel by viewModels()
 
@@ -95,6 +121,9 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     // để lấy source và layer marker
     private val currentLocationSourceId = "current-location-source"
     private val currentLocationLayerId = "current-location-layer"
+
+    private val friendLocationSourceId = "friend-location-source"
+    private val friendLocationLayerId = "friend-location-layer"
 
     private val multiplePermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -121,14 +150,16 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         .build()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
         binding.mapView.onCreate(savedInstanceState)
+        super.onViewCreated(view, savedInstanceState)
     }
 
     override fun initData() {
         if (userSession.getCurrentUser() == null) {
             decodeToken(tokenManager.getAccessToken())
         }
+
+        mapViewModel.getFriendList()
 
         val hasCamera = ContextCompat.checkSelfPermission(
             requireContext(), Manifest.permission.CAMERA
@@ -157,7 +188,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 Log.d("LOCATION_UPDATE", "Lat=$currentLat, Lng=$currentLng")
 
                 updateCurrentLocationPoint()
-                moveCameraToCurrentLocation()
+                mapViewModel.sendLocation(currentLng, currentLat)
             }
         }
     }
@@ -176,6 +207,42 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         binding.mapView.getMapAsync { map ->
             mapLibreMap = map
 
+            map.addOnMapClickListener { latLng ->
+
+                val screenPoint =
+                    map.projection.toScreenLocation(latLng)
+
+                val features = map.queryRenderedFeatures(
+                    screenPoint,
+                    friendLocationLayerId
+                )
+
+                val feature = features.firstOrNull()
+
+                if (feature != null) {
+                    val friendId =
+                        feature.getStringProperty("id")
+
+                    val friendName =
+                        feature.getStringProperty("name")
+
+                    Toast.makeText(
+                        requireContext(),
+                        "Bạn vừa chọn $friendName",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    Log.d(
+                        "FRIEND_MARKER",
+                        "id=$friendId, name=$friendName"
+                    )
+
+                    true
+                } else {
+                    false
+                }
+            }
+
             map.setStyle(styleUrl) { style ->
                 loadedStyle = style
 
@@ -186,9 +253,30 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                 updateCurrentLocationPoint()
 
-                if (currentLat != null && currentLng != null) {
-                    moveCameraToCurrentLocation()
+                val defaultAvatarDrawable = AppCompatResources.getDrawable(
+                    requireContext(),
+                    R.drawable.ic_default_avatar
+                )
+
+                val defaultAvatarBitmap = defaultAvatarDrawable?.toBitmap(
+                    width = 96,
+                    height = 96,
+                    config = Bitmap.Config.ARGB_8888
+                )
+
+                if (defaultAvatarBitmap != null) {
+                    style.addImage(
+                        "friend-avatar-default",
+                        createAvatarMarkerBitmap(defaultAvatarBitmap)
+                    )
+                } else {
+                    Log.e("MAP_MARKER", "Không thể chuyển avatar mặc định thành Bitmap")
                 }
+
+                showFriendLocations(
+                    style = style,
+                    friends = DataFriendItem.data.toList()
+                )
             }
         }
         captureLocation()
@@ -210,7 +298,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         binding.btnCurrentLocation.setOnClickListener {
             if (currentLat == null && currentLng == null) {
                 captureLocation()
-                moveCameraToCurrentLocation()
             } else {
                 moveCameraToCurrentLocation()
             }
@@ -219,23 +306,70 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    mapViewModel.connectionState.collect { state ->
-                        when (state) {
+                    combine(
+                        mapViewModel.connectionState,
+                        mapViewModel.friendState,
+                        avatarViewModel.avatars
+                    ) { connectionState, friendState, avatarState ->
+                        Triple(connectionState, friendState, avatarState)
+                    }.collect { (connectionState, friendState, avatarState) ->
+                        when (connectionState) {
                             SocketConnectionState.Connecting -> {
                                 Log.d(TAG, "Đang kết nối")
                             }
 
                             SocketConnectionState.Connected -> {
                                 Log.d(TAG, "Đã kết nối")
+                                when (friendState) {
+                                    is UiState.Loading -> {}
+                                    is UiState.Success -> {
+                                        val avatarMap = avatarState
+                                        val friendList = DataFriendItem.data.toList()
+
+                                        val updatedFriendList = friendList.map { item ->
+                                            item.copy(avatarUrl = if (avatarMap.containsKey(item.id)) avatarMap[item.id] else null)
+                                        }
+
+                                        DataFriendItem.data.apply {
+                                            clear()
+                                            addAll(updatedFriendList)
+                                        }
+
+                                        mapViewModel.subscribeLocationTopic(updatedFriendList)
+                                    }
+
+                                    is UiState.Error -> {}
+                                    is UiState.Idle -> {}
+                                }
                             }
 
                             SocketConnectionState.Disconnected -> {
+                                mapViewModel.unsubscribeAllLocationTopic()
+                                mapViewModel.socketDisconnect()
                                 Log.d(TAG, "Đã ngắt kết nối")
                             }
 
                             is SocketConnectionState.Error -> {
-                                Log.e(TAG, state.message)
+                                mapViewModel.unsubscribeAllLocationTopic()
+                                mapViewModel.socketDisconnect()
+                                Log.e(TAG, connectionState.message)
                             }
+                        }
+                    }
+                }
+                launch {
+                    avatarViewModel.avatars.collect { avatars ->
+                        avatarMap = avatars
+                    }
+                }
+                launch {
+                    mapViewModel.friends.collect { friends ->
+                        avatarViewModel.loadAvatars(
+                            friends.map { it.id }
+                        )
+
+                        loadedStyle?.let { style ->
+                            showFriendLocations(style, friends)
                         }
                     }
                 }
@@ -361,6 +495,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                     currentLng = location.longitude
                     Log.d("LOCATION", "Đã lấy tọa độ: Lat=$currentLat, Lng=$currentLng")
                     updateCurrentLocationPoint()
+                    moveCameraToCurrentLocation()
                 } else {
                     Log.d("LOCATION", "Không thể lấy tọa độ (Có thể do đang ở trong nhà quá kín)")
                 }
@@ -390,10 +525,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
         if (style.getLayer(currentLocationLayerId) == null) {
             style.addLayer(
-                CircleLayer(
-                    currentLocationLayerId,
-                    currentLocationSourceId
-                ).withProperties(
+                CircleLayer(currentLocationLayerId, currentLocationSourceId).withProperties(
                     circleRadius(8f),
                     circleColor("#1976D2"),
                     circleStrokeWidth(3f),
@@ -467,8 +599,8 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
     private fun startLocationUpdates() {
         val hasLocationPermission = ContextCompat.checkSelfPermission(
-                requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+            requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
         if (!hasLocationPermission) return
 
@@ -477,5 +609,174 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             locationCallback,
             Looper.getMainLooper()
         )
+    }
+
+    private fun showFriendLocations(
+        style: Style,
+        friends: List<FriendItemModel>
+    ) {
+        val features = friends.mapNotNull { friend ->
+            val longitude = friend.longitude
+            val latitude = friend.latitude
+
+            if (longitude == null || latitude == null) return@mapNotNull null
+
+            Feature.fromGeometry(
+                Point.fromLngLat(
+                    longitude,
+                    latitude
+                )
+            ).apply {
+                addStringProperty("id", friend.id.toString())
+                addStringProperty("name", friend.name)
+                addStringProperty(
+                    "iconId",
+                    "friend-avatar-default"
+                )
+            }
+        }
+
+        val featureCollection = FeatureCollection.fromFeatures(features)
+
+        val existingSource = style.getSourceAs<GeoJsonSource>(friendLocationSourceId)
+
+        if (existingSource == null) {
+            style.addSource(GeoJsonSource(friendLocationSourceId, featureCollection))
+        } else {
+            existingSource.setGeoJson(featureCollection)
+        }
+
+        if (style.getLayer(friendLocationLayerId) == null) {
+            style.addLayer(
+                SymbolLayer(friendLocationLayerId, friendLocationSourceId)
+                    .withProperties(
+                        iconImage(get("iconId")),
+                        iconSize(0.7f),
+                        iconAnchor(ICON_ANCHOR_BOTTOM),
+                        iconAllowOverlap(true),
+                        iconIgnorePlacement(true)
+                    )
+            )
+        }
+
+        loadFriendAvatarImages(style, friends)
+    }
+
+    private fun createAvatarMarkerBitmap(
+        avatarBitmap: Bitmap
+    ): Bitmap {
+        val size = 120
+        val circleRadius = 46f
+        val circleCenterX = size / 2f
+        val circleCenterY = 50f
+
+        val result = createBitmap(size, size)
+
+        val canvas = Canvas(result)
+
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.FILL
+        }
+
+        val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = "#ED9B15".toColorInt()
+            style = Paint.Style.FILL
+        }
+
+        // Phần đuôi marker.
+        val markerPath = android.graphics.Path().apply {
+            moveTo(circleCenterX - 18f, 82f)
+            lineTo(circleCenterX + 18f, 82f)
+            lineTo(circleCenterX, 112f)
+            close()
+        }
+
+        canvas.drawPath(markerPath, markerPaint)
+
+        // Viền ngoài.
+        canvas.drawCircle(
+            circleCenterX,
+            circleCenterY,
+            circleRadius + 6f,
+            markerPaint
+        )
+
+        canvas.drawCircle(
+            circleCenterX,
+            circleCenterY,
+            circleRadius,
+            borderPaint
+        )
+
+        val scaledAvatar =
+            avatarBitmap.scale((circleRadius * 2).toInt(), (circleRadius * 2).toInt())
+
+        val avatarShader = android.graphics.BitmapShader(
+            scaledAvatar,
+            android.graphics.Shader.TileMode.CLAMP,
+            android.graphics.Shader.TileMode.CLAMP
+        )
+
+        val avatarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = avatarShader
+        }
+
+        canvas.drawCircle(
+            circleCenterX,
+            circleCenterY,
+            circleRadius - 4f,
+            avatarPaint
+        )
+
+        return result
+    }
+
+    private fun loadFriendAvatarImages(
+        style: Style,
+        friends: List<FriendItemModel>
+    ) {
+        friends.forEach { friend ->
+            val iconId = "friend-avatar-${friend.id}"
+
+            if (style.getImage(iconId) != null) {
+                return@forEach
+            }
+
+            Glide.with(this)
+                .asBitmap()
+                .load(friend.avatarUrl)
+                .placeholder(R.drawable.ic_default_avatar)
+                .error(R.drawable.ic_default_avatar)
+                .into(
+                    object : CustomTarget<Bitmap>() {
+
+                        override fun onResourceReady(
+                            resource: Bitmap,
+                            transition: Transition<in Bitmap>?
+                        ) {
+                            if (!isAdded || view == null) return
+
+                            val currentStyle = loadedStyle ?: return
+
+                            if (currentStyle !== style) return
+
+                            val markerBitmap =
+                                createAvatarMarkerBitmap(resource)
+
+                            if (currentStyle.getImage(iconId) == null) {
+                                currentStyle.addImage(
+                                    iconId,
+                                    markerBitmap
+                                )
+                            }
+                        }
+
+                        override fun onLoadCleared(
+                            placeholder: android.graphics.drawable.Drawable?
+                        ) = Unit
+                    }
+                )
+        }
     }
 }

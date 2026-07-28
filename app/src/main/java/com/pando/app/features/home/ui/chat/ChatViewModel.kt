@@ -74,9 +74,7 @@ class ChatViewModel @Inject constructor(
         messagesSocket.sendMessage(conversationId, content)
     }
 
-    fun updateMessages(
-        message: ChatMessageResponse
-    ) {
+    fun updateMessages(message: ChatMessageResponse) {
         Log.d("MessageSocket", "Dang cap nhat")
         _messages.update { currentList ->
             val newMessage = ChatMessageItemModel(
