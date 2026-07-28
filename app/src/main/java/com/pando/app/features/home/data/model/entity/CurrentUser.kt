@@ -8,5 +8,5 @@ data class CurrentUser(
     val username: String?,
     val displayName: String?,
     val mode: UserMode?,
-    val avatar: ByteArray? = null
+    val avatar: Any? = null
 )

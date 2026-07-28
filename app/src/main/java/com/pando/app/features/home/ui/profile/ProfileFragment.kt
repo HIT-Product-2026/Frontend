@@ -167,9 +167,9 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
                         }
 
                         is UiState.Success -> {
-                            val avatarBytes = selectedAvatarFile?.let(::fileToByteArray)
+                            val avatarBytes = selectedAvatarFile
                             if (avatarBytes != null) {
-                                userSession.updateAvatar(avatarBytes)
+                                userSession.updateAvatar(selectedAvatarUri)
                             }
 
                             clearSelectedAvatarFile()
@@ -265,14 +265,6 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
             tempFile
         } catch (e: Exception) {
             Log.e("ProfileFragment", "Không thể chuyển Uri thành File", e)
-            null
-        }
-    }
-
-    private fun fileToByteArray(file: File): ByteArray? {
-        return try {
-            file.readBytes()
-        } catch (e: Exception) {
             null
         }
     }

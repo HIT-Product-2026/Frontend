@@ -32,8 +32,8 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelBinding::inflate) {
-    private var avatarMap: Map<UUID, ByteArray> = emptyMap()
-    private var imageMap: Map<UUID, ByteArray> = emptyMap()
+    private var avatarMap: Map<UUID, String> = emptyMap()
+    private var imageMap: Map<UUID, String> = emptyMap()
     private val postReelViewModel: PostReelViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
 

@@ -12,14 +12,14 @@ import javax.inject.Inject
 class PostRepository @Inject constructor (
     private val postApi: PostApi
 ): BaseRepository() {
-    private val postCache = ConcurrentHashMap<UUID, ByteArray>()
+    private val postCache = ConcurrentHashMap<UUID, ApiResponse<String>>()
 
-    suspend fun getPostImage(postId: UUID): DataResult<ByteArray> {
+    suspend fun getPostImage(postId: UUID): DataResult<ApiResponse<String>> {
         postCache[postId]?.let { cachedAvatar ->
             return DataResult.Success(cachedAvatar)
         }
 
-        return when (val result = safeFileCall { postApi.getPostImage(postId) }) {
+        return when (val result = safeApiCall { postApi.getPostImage(postId) }) {
             is DataResult.Success -> {
                 postCache[postId] = result.data
                 DataResult.Success(result.data)
@@ -29,7 +29,7 @@ class PostRepository @Inject constructor (
         }
     }
 
-    fun getCachedImage(userId: UUID): ByteArray? {
+    fun getCachedImage(userId: UUID): ApiResponse<String>? {
         return postCache[userId]
     }
 

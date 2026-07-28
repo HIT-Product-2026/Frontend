@@ -45,7 +45,7 @@ import com.pando.app.features.shared.AvatarViewModel
 
 @AndroidEntryPoint
 class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding::inflate) {
-    private var avatarMap: Map<UUID, ByteArray> = emptyMap()
+    private var avatarMap: Map<UUID, String> = emptyMap()
 
     //View Model
     private val friendViewModel: FriendViewModel by viewModels()

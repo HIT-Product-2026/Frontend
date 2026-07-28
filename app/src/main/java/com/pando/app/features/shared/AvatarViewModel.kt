@@ -18,7 +18,7 @@ class AvatarViewModel @Inject constructor (
     private val userSession: UserSession
 ): ViewModel() {
 
-    private val _avatars = MutableStateFlow<Map<UUID, ByteArray>>(emptyMap())
+    private val _avatars = MutableStateFlow<Map<UUID, String>>(emptyMap())
 
     val avatars = _avatars.asStateFlow()
 
@@ -39,11 +39,11 @@ class AvatarViewModel @Inject constructor (
             when (val result = avatarRepository.getUserAvatar(userId)) {
                 is DataResult.Success -> {
                     _avatars.update { current ->
-                        current + (userId to result.data)
+                        current + (userId to result.data.data)
                     }
 
                     if (userSession.getCurrentUserId() == userId) {
-                        userSession.updateAvatar(result.data)
+                        userSession.updateAvatar(result.data.data)
                     }
                 }
 

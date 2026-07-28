@@ -39,7 +39,7 @@ class UserSession @Inject constructor() {
         return _currentUser.value
     }
 
-    fun updateAvatar(avatar: ByteArray?) {
+    fun updateAvatar(avatar: Any?) {
         updateCurrentUser { user ->
             user.copy(avatar = avatar)
         }

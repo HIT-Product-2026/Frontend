@@ -28,7 +28,7 @@ class ChatAdapter(
         private const val VIEW_TYPE_IMAGE_RECEIVED = 4
     }
 
-    private var recipientAvatar: ByteArray? = null
+    private var recipientAvatar: String? = null
 
     override fun getItemViewType(position: Int): Int {
         val item = getItem(position)
@@ -162,7 +162,7 @@ class ChatAdapter(
         }
     }
 
-    fun updateRecipientAvatar(avatar: ByteArray) {
+    fun updateRecipientAvatar(avatar: String) {
         if (recipientAvatar === avatar) return
 
         recipientAvatar = avatar

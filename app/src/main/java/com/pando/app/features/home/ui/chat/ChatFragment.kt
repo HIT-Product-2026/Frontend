@@ -34,7 +34,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
         private const val TAG = "SOCKET_CONNECTION"
     }
 
-    private var imageMap: Map<UUID, ByteArray> = emptyMap()
+    private var imageMap: Map<UUID, String> = emptyMap()
     private val args: ChatFragmentArgs by navArgs()
     private val chatViewModel: ChatViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()

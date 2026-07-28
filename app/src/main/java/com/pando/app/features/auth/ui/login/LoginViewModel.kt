@@ -74,7 +74,7 @@ class LoginViewModel @Inject constructor(
 
         when (val avatarResult = avatarRepository.getUserAvatar(user.id)) {
             is DataResult.Success -> {
-                userSession.updateAvatar(avatarResult.data)
+                userSession.updateAvatar(avatarResult.data.data)
             }
 
             is DataResult.Error -> {

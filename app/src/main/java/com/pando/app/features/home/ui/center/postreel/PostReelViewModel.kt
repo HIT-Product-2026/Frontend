@@ -24,7 +24,7 @@ class PostReelViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository
 ) : BaseVM<PostEvent>() {
     private var isLoading = false
-    private val _images = MutableStateFlow<Map<UUID, ByteArray>>(emptyMap())
+    private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
 
     val images = _images.asStateFlow()
 
@@ -40,7 +40,7 @@ class PostReelViewModel @Inject constructor(
             when (val result = postRepository.getPostImage(userId)) {
                 is DataResult.Success -> {
                     _images.update { current ->
-                        current + (userId to result.data)
+                        current + (userId to result.data.data)
                     }
                 }
 

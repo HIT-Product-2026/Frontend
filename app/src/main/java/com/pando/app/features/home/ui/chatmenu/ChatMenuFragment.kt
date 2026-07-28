@@ -31,7 +31,7 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
         private const val TAG = "SOCKET_CONNECTION"
     }
 
-    private var avatarMap: Map<UUID, ByteArray> = emptyMap()
+    private var avatarMap: Map<UUID, String> = emptyMap()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
     private val chatMenuViewModel: ChatMenuViewModel by viewModels()
     private val chatMenuAdapter: BaseAdapter<ChatMenuItemModel, ItemChatMenuRvBinding> by lazy {

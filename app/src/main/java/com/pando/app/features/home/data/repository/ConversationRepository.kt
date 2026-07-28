@@ -19,7 +19,7 @@ class ConversationRepository @Inject constructor(
     private val conversationApi: ConversationApi
 ) : BaseRepository() {
 
-    private val imageCache = ConcurrentHashMap<UUID, ByteArray>()
+    private val imageCache = ConcurrentHashMap<UUID, ApiResponse<String>>()
 
     suspend fun getConversation(): DataResult<ApiResponse<ConversationsResponse>> {
         return safeApiCall {
@@ -36,12 +36,12 @@ class ConversationRepository @Inject constructor(
         }
     }
 
-    suspend fun getImageMessage(messageId: UUID): DataResult<ByteArray> {
+    suspend fun getImageMessage(messageId: UUID): DataResult<ApiResponse<String>> {
         imageCache[messageId]?.let { cachedAvatar ->
             return DataResult.Success(cachedAvatar)
         }
 
-        return when (val result = safeFileCall { conversationApi.getImageMessage(messageId) }) {
+        return when (val result = safeApiCall { conversationApi.getImageMessage(messageId) }) {
             is DataResult.Success -> {
                 imageCache[messageId] = result.data
                 DataResult.Success(result.data)
@@ -51,7 +51,7 @@ class ConversationRepository @Inject constructor(
         }
     }
 
-    fun getCachedImage(messageId: UUID): ByteArray? {
+    fun getCachedImage(messageId: UUID): ApiResponse<String>? {
         return imageCache[messageId]
     }
 

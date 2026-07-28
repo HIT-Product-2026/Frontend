@@ -31,7 +31,7 @@ class ChatViewModel @Inject constructor(
     private val messagesSocket: MessagesSocket
 ) : BaseVM<ApiResponse<MessagePageResponse>>() {
 
-    private val _images = MutableStateFlow<Map<UUID, ByteArray>>(emptyMap())
+    private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
     val images = _images.asStateFlow()
 
     val socketConnectionState = socketConnectionManager.connectionState
@@ -110,7 +110,7 @@ class ChatViewModel @Inject constructor(
             when (val result = conversationRepository.getImageMessage(messageId)) {
                 is DataResult.Success -> {
                     _images.update { current ->
-                        current + (messageId to result.data)
+                        current + (messageId to result.data.data)
                     }
                 }
 
