@@ -44,8 +44,6 @@ import java.util.concurrent.Executors
 
 @AndroidEntryPoint
 class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding::inflate) {
-    @Inject
-    lateinit var userSession: UserSession
     private val viewModel: CameraViewModel by viewModels()
 
     private var imageCapture: ImageCapture? = null
@@ -86,13 +84,6 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun initView() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                userSession.currentUser.collect { user ->
-                    binding.profileIcon.loadAvatar(user?.avatar)
-                }
-            }
-        }
     }
 
     override fun initActionView() {
@@ -112,24 +103,12 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             }
         }
 
-        binding.chatBtn.setOnClickListener {
-            findNavController().navigate(R.id.action_centerFragment_to_chatMenuFragment)
-        }
-
         binding.btnCancel.setOnClickListener {
             binding.captionET.text?.clear()
             savedPhotoFile?.delete()
             currentLat = null
             currentLng = null
             switchToCaptureMode()
-        }
-
-        binding.friendBtn.setOnClickListener {
-            findNavController().navigate(R.id.action_centerFragment_to_friendFragment)
-        }
-
-        binding.profileIcon.setOnClickListener {
-            findNavController().navigate(R.id.action_centerFragment_to_settingFragment)
         }
 
         binding.historyBtn.setOnClickListener {

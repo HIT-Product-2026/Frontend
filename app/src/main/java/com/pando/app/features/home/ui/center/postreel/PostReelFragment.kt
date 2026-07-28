@@ -1,7 +1,10 @@
 package com.pando.app.features.home.ui.center.postreel
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
 import androidx.core.view.ViewCompat
@@ -12,6 +15,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.bumptech.glide.Glide
 import com.pando.app.core.base.BaseAdapter
@@ -24,11 +28,13 @@ import com.pando.app.databinding.FragmentPostReelBinding
 import com.pando.app.databinding.ItemPostReelBinding
 import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
+import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.math.abs
 
 @AndroidEntryPoint
 class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelBinding::inflate) {
@@ -89,8 +95,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     override fun initView() {
-        loadCurrentUser()
         setupPostReel()
+        setupNestedPagerGesture()
         setupKeyboardInsets()
 
         postReelAdapter.submitList(
@@ -99,6 +105,10 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     override fun initActionView() {
+        binding.btnCapture.setOnClickListener {
+            (parentFragment as? CenterFragment)?.openCamera()
+        }
+
         binding.SendMessageBtn.setOnClickListener {
             binding.bottomLayout.visibility = View.VISIBLE
             binding.sendMessageET.requestFocus()
@@ -171,16 +181,6 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         }
     }
 
-    private fun loadCurrentUser() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                userSession.currentUser.collect { user ->
-                    binding.profileIcon.loadAvatar(user?.avatar)
-                }
-            }
-        }
-    }
-
     override fun onDestroyView() {
         binding.postReelViewPager
             .unregisterOnPageChangeCallback(pageChangeCallback)
@@ -208,5 +208,67 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         }
 
         ViewCompat.requestApplyInsets(binding.root)
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupNestedPagerGesture() {
+        val reelRecyclerView =
+            binding.postReelViewPager.getChildAt(0) as RecyclerView
+
+        val touchSlop =
+            ViewConfiguration.get(requireContext()).scaledTouchSlop
+
+        var startX = 0f
+        var startY = 0f
+
+        reelRecyclerView.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startX = event.x
+                    startY = event.y
+
+                    // Ban đầu ưu tiên pager Reel.
+                    binding.postReelViewPager.parent
+                        .requestDisallowInterceptTouchEvent(true)
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = event.x - startX
+                    val deltaY = event.y - startY
+
+                    val isVerticalGesture =
+                        abs(deltaY) > abs(deltaX) &&
+                                abs(deltaY) > touchSlop
+
+                    if (isVerticalGesture) {
+                        val isSwipingDown = deltaY > 0
+                        val isAtFirstReel =
+                            binding.postReelViewPager.currentItem == 0
+
+                        val shouldParentHandle =
+                            isSwipingDown && isAtFirstReel
+
+                        binding.postReelViewPager.parent
+                            .requestDisallowInterceptTouchEvent(
+                                !shouldParentHandle
+                            )
+                    }
+                }
+
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL -> {
+                    binding.postReelViewPager.parent
+                        .requestDisallowInterceptTouchEvent(false)
+                }
+            }
+
+            // Không tự tiêu thụ touch, RecyclerView vẫn xử lý swipe.
+            false
+        }
+    }
+
+    override fun onPause() {
+        binding.postReelViewPager.setCurrentItem(0, false)
+        super.onPause()
     }
 }
