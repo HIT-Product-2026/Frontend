@@ -2,6 +2,7 @@ package com.pando.app.features.home.ui.center.postreel
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -142,6 +143,11 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
                 postReelViewModel.sendImagePost(conversationId, postImageUrl)
                 postReelViewModel.sendMessage(conversationId, message)
+
+                binding.sendMessageET.clearFocus()
+                ViewCompat.getWindowInsetsController(binding.root)
+                    ?.hide(WindowInsetsCompat.Type.ime())
+                binding.bottomLayout.visibility = View.GONE
             }
         }
 

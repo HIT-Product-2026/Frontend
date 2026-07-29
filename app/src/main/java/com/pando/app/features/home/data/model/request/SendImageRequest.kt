@@ -4,6 +4,6 @@ import java.util.UUID
 
 data class SendImageRequest(
     val conversationId: UUID,
-    val postImageUrl: String,
+    val imageUrl: String,
     val isRead: Boolean = false
 )

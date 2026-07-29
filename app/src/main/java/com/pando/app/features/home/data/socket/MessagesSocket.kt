@@ -2,6 +2,7 @@ package com.pando.app.features.home.data.socket
 
 import android.util.Log
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.network.socket.SocketConstants
 import com.pando.app.features.home.data.model.request.SendImageRequest
@@ -124,7 +125,7 @@ class MessagesSocket @Inject constructor(
 
         val request = SendImageRequest(
             conversationId = conversationId,
-            postImageUrl = postImageUrl
+            imageUrl = postImageUrl
         )
 
         val payload = gson.toJson(request)
