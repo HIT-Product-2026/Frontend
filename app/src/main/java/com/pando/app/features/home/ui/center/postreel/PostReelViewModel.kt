@@ -3,13 +3,13 @@ package com.pando.app.features.home.ui.center.postreel
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.base.BaseVM
 import com.pando.app.core.network.api.ApiResponse
+import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
-import com.pando.app.features.home.data.model.response.ChatMessageResponse
 import com.pando.app.features.home.data.model.response.PostsResponse
-import com.pando.app.features.home.data.repository.ConversationRepository
 import com.pando.app.features.home.data.repository.PostRepository
+import com.pando.app.features.home.data.socket.MessagesSocket
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,26 +21,28 @@ import javax.inject.Inject
 @HiltViewModel
 class PostReelViewModel @Inject constructor(
     private val postRepository: PostRepository,
-    private val conversationRepository: ConversationRepository
-) : BaseVM<PostEvent>() {
+    private val messagesSocket: MessagesSocket,
+    private val socketConnectionManager: SocketConnectionManager,
+) : BaseVM<ApiResponse<PostsResponse>>() {
+    val connectionState = socketConnectionManager.connectionState
     private var isLoading = false
-    private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
 
+    private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
     val images = _images.asStateFlow()
 
     private val loadingIds = mutableSetOf<UUID>()
 
-    fun loadPost(userId: UUID) {
-        if (_images.value.containsKey(userId)) {
+    fun loadPost(postId: UUID) {
+        if (_images.value.containsKey(postId)) {
             return
         }
-        if (!loadingIds.add(userId)) return
+        if (!loadingIds.add(postId)) return
 
         viewModelScope.launch {
-            when (val result = postRepository.getPostImage(userId)) {
+            when (val result = postRepository.getPostImage(postId)) {
                 is DataResult.Success -> {
                     _images.update { current ->
-                        current + (userId to result.data.data)
+                        current + (postId to result.data.data)
                     }
                 }
 
@@ -49,7 +51,7 @@ class PostReelViewModel @Inject constructor(
                 }
             }
 
-            loadingIds.remove(userId)
+            loadingIds.remove(postId)
         }
     }
 
@@ -89,7 +91,8 @@ class PostReelViewModel @Inject constructor(
                             caption = post.caption,
                             latitude = post.latitude,
                             longitude = post.longitude,
-                            modeLocation = post.modeLocation
+                            modeLocation = post.modeLocation,
+                            conversationId = post.conversation?.id
                         )
                     }
 
@@ -100,24 +103,15 @@ class PostReelViewModel @Inject constructor(
 
             isLoading = false
 
-            when (result) {
-                is DataResult.Success -> DataResult.Success(PostEvent.GetPostEvent(result.data))
-                is DataResult.Error -> result
-            }
+            result
         }
     }
 
-    fun sendImagePost(conversationId: UUID, image: ByteArray) {
-        getData {
-            when (val result = conversationRepository.sendImageMessage(conversationId, image)) {
-                is DataResult.Success -> DataResult.Success(PostEvent.SendImagePost(result.data))
-                is DataResult.Error -> result
-            }
-        }
+    fun sendImagePost(conversationId: UUID, postImageUrl: String) {
+        messagesSocket.sendImageMessage(conversationId, postImageUrl)
     }
-}
 
-sealed interface PostEvent {
-    data class GetPostEvent(val response : ApiResponse<PostsResponse>) : PostEvent
-    data class SendImagePost(val response: ApiResponse<ChatMessageResponse>) : PostEvent
+    fun sendMessage(conversationId: UUID, message: String) {
+        messagesSocket.sendMessage(conversationId, message)
+    }
 }

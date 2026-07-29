@@ -9,5 +9,6 @@ object SocketConstants {
         const val USER_QUEUE_CONVERSATIONS = "/user/queue/conversation"
         const val TOPIC_LOCATION = "/topic/location"
         const val SEND_LOCATION_DESTINATION = "/app/share.location"
+        const val SEND_IMAGE_DESTINATION = "/app/chat.sendImage"
     }
 }

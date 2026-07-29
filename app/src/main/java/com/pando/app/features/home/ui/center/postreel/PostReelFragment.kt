@@ -9,6 +9,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -23,6 +24,7 @@ import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.session.UserSession
+import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentPostReelBinding
 import com.pando.app.databinding.ItemPostReelBinding
@@ -31,6 +33,7 @@ import com.pando.app.features.home.data.model.entity.PostReelItemModel
 import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -45,6 +48,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
     @Inject
     lateinit var userSession: UserSession
+    private var isSocketConnected = false
     private val postReelAdapter: BaseAdapter<PostReelItemModel, ItemPostReelBinding> by lazy {
         BaseAdapter(
             ItemPostReelBinding::inflate,
@@ -53,13 +57,13 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
             val image = imageMap[item.id]
 
-            Glide.with(this)
-                .load(image)
-                .into(itemBinding.imgCaptured)
-
             if (image == null) {
                 postReelViewModel.loadPost(item.id)
             }
+
+            Glide.with(this)
+                .load(image)
+                .into(itemBinding.imgCaptured)
 
             bindAvatar(itemBinding.profileIcon, item.user.id)
 
@@ -67,7 +71,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
             itemBinding.captionTV.apply {
                 text = item.caption
-                visibility = if (item.caption?.isBlank() == true) View.GONE else View.VISIBLE
+                isVisible = item.caption.orEmpty().isNotBlank()
             }
         }
     }
@@ -78,8 +82,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             override fun onPageSelected(position: Int) {
                 val itemCount = postReelAdapter.itemCount
 
-                val shouldLoadNextPage =
-                    itemCount > 0 && position >= itemCount - 3
+                val shouldLoadNextPage = itemCount > 0 && position >= itemCount - 3
 
                 if (shouldLoadNextPage) {
                     postReelViewModel.getPosts()
@@ -122,12 +125,51 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             )
         }
 
+        binding.sendBtn.setOnClickListener {
+            if (isSocketConnected) {
+                val message = binding.sendMessageET.text.toString().trim()
+                val currentPosition = binding.postReelViewPager.currentItem
+
+                val currentReel = postReelAdapter.currentList
+                    .getOrNull(currentPosition)
+                    ?: return@setOnClickListener
+
+                val conversationId = currentReel.conversationId
+                    ?: return@setOnClickListener
+
+                val postImageUrl = imageMap[currentReel.id]
+                    ?: return@setOnClickListener
+
+                postReelViewModel.sendImagePost(conversationId, postImageUrl)
+                postReelViewModel.sendMessage(conversationId, message)
+            }
+        }
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    postReelViewModel.images.collect { images ->
+                    combine(
+                        postReelViewModel.images,
+                        postReelViewModel.connectionState
+                    ) { images, connectionState ->
+                        images to connectionState
+                    }.collect { (images, connectionState) ->
                         imageMap = images
+
                         postReelAdapter.notifyDataSetChanged()
+
+                        when (connectionState) {
+                            is SocketConnectionState.Connecting -> {}
+                            is SocketConnectionState.Connected -> {
+                                isSocketConnected = true
+                            }
+
+                            is SocketConnectionState.Disconnected -> {
+                                isSocketConnected = false
+                            }
+                            is SocketConnectionState.Error -> {
+                            }
+                        }
                     }
                 }
 
@@ -142,15 +184,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                     postReelViewModel.uiState.collect { state ->
                         when (state) {
                             is UiState.Success -> {
-                                when (val result = state.data) {
-                                    is PostEvent.GetPostEvent -> {
-                                        postReelAdapter.submitList(DataPostReelItem.data.toList())
-                                    }
-
-                                    is PostEvent.SendImagePost -> {
-
-                                    }
-                                }
+                                val result = state.data.data
+                                postReelAdapter.submitList(DataPostReelItem.data.toList())
                             }
 
                             is UiState.Error -> {}
@@ -182,8 +217,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     override fun onDestroyView() {
-        binding.postReelViewPager
-            .unregisterOnPageChangeCallback(pageChangeCallback)
+        binding.postReelViewPager.unregisterOnPageChangeCallback(pageChangeCallback)
 
         super.onDestroyView()
     }
@@ -212,11 +246,9 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupNestedPagerGesture() {
-        val reelRecyclerView =
-            binding.postReelViewPager.getChildAt(0) as RecyclerView
+        val reelRecyclerView = binding.postReelViewPager.getChildAt(0) as RecyclerView
 
-        val touchSlop =
-            ViewConfiguration.get(requireContext()).scaledTouchSlop
+        val touchSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
 
         var startX = 0f
         var startY = 0f
@@ -228,37 +260,28 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                     startY = event.y
 
                     // Ban đầu ưu tiên pager Reel.
-                    binding.postReelViewPager.parent
-                        .requestDisallowInterceptTouchEvent(true)
+                    binding.postReelViewPager.parent.requestDisallowInterceptTouchEvent(true)
                 }
 
                 MotionEvent.ACTION_MOVE -> {
                     val deltaX = event.x - startX
                     val deltaY = event.y - startY
 
-                    val isVerticalGesture =
-                        abs(deltaY) > abs(deltaX) &&
-                                abs(deltaY) > touchSlop
+                    val isVerticalGesture = abs(deltaY) > abs(deltaX) && abs(deltaY) > touchSlop
 
                     if (isVerticalGesture) {
                         val isSwipingDown = deltaY > 0
-                        val isAtFirstReel =
-                            binding.postReelViewPager.currentItem == 0
+                        val isAtFirstReel = binding.postReelViewPager.currentItem == 0
 
-                        val shouldParentHandle =
-                            isSwipingDown && isAtFirstReel
+                        val shouldParentHandle = isSwipingDown && isAtFirstReel
 
-                        binding.postReelViewPager.parent
-                            .requestDisallowInterceptTouchEvent(
-                                !shouldParentHandle
-                            )
+                        binding.postReelViewPager.parent.requestDisallowInterceptTouchEvent(!shouldParentHandle)
                     }
                 }
 
                 MotionEvent.ACTION_UP,
                 MotionEvent.ACTION_CANCEL -> {
-                    binding.postReelViewPager.parent
-                        .requestDisallowInterceptTouchEvent(false)
+                    binding.postReelViewPager.parent.requestDisallowInterceptTouchEvent(false)
                 }
             }
 

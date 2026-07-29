@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.gson.Gson
 import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.network.socket.SocketConstants
+import com.pando.app.features.home.data.model.request.SendImageRequest
 import com.pando.app.features.home.data.model.request.SendMessageRequest
 import com.pando.app.features.home.data.model.response.ChatMessageResponse
 import io.reactivex.disposables.Disposable
@@ -99,6 +100,37 @@ class MessagesSocket @Inject constructor(
 
         client.send(
             SocketConstants.Chat.SEND_TEXT_DESTINATION,
+            payload
+        ).subscribe(
+            {
+                Log.d(TAG, "Đã gửi message lên STOMP")
+            },
+            { throwable ->
+                Log.e(TAG, "Không thể gửi message", throwable)
+            }
+        )
+    }
+
+    fun sendImageMessage(conversationId: UUID, postImageUrl: String) {
+        val client = connectionManager.getConnectedClient() ?: run {
+            Log.e(TAG, "Chưa kết nối")
+            return
+        }
+
+        if (postImageUrl.isBlank()) {
+            Log.e(TAG, "Không có link ảnh")
+            return
+        }
+
+        val request = SendImageRequest(
+            conversationId = conversationId,
+            postImageUrl = postImageUrl
+        )
+
+        val payload = gson.toJson(request)
+
+        client.send(
+            SocketConstants.Chat.SEND_IMAGE_DESTINATION,
             payload
         ).subscribe(
             {
