@@ -49,27 +49,27 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
         ) { itemBinding, item ->
             when (itemBinding) {
                 is ItemImageMessageReceivedBinding -> {
-                    val image = imageMap[item.id]
+//                    val image = imageMap[item.id]
 
                     Glide.with(this)
-                        .load(image)
+                        .load(item.imageUrl)
                         .into(itemBinding.imageMessage)
 
-                    if (image == null) {
-                        chatViewModel.loadImageMessage(item.id)
-                    }
+//                    if (image == null) {
+//                        chatViewModel.loadImageMessage(item.id)
+//                    }
                 }
 
                 is ItemImageMessageSentBinding -> {
-                    val image = imageMap[item.id]
+//                    val image = imageMap[item.id]
 
                     Glide.with(this)
-                        .load(image)
+                        .load(item.imageUrl)
                         .into(itemBinding.imageMessage)
-
-                    if (image == null) {
-                        chatViewModel.loadImageMessage(item.id)
-                    }
+//
+//                    if (image == null) {
+//                        chatViewModel.loadImageMessage(item.id)
+//                    }
                 }
             }
         }
@@ -120,12 +120,12 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                         }
                     }
                 }
-                launch {
-                    chatViewModel.images.collect { images ->
-                        imageMap = images
-                        chatAdapter.notifyDataSetChanged()
-                    }
-                }
+//                launch {
+//                    chatViewModel.images.collect { images ->
+//                        imageMap = images
+//                        chatAdapter.notifyDataSetChanged()
+//                    }
+//                }
                 launch {
                     chatViewModel.messages.collect { messages ->
                         chatAdapter.submitList(messages) {

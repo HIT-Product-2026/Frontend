@@ -31,8 +31,8 @@ class ChatViewModel @Inject constructor(
     private val messagesSocket: MessagesSocket
 ) : BaseVM<ApiResponse<MessagePageResponse>>() {
 
-    private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
-    val images = _images.asStateFlow()
+//    private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
+//    val images = _images.asStateFlow()
 
     val socketConnectionState = socketConnectionManager.connectionState
 
@@ -77,15 +77,31 @@ class ChatViewModel @Inject constructor(
     fun updateMessages(message: ChatMessageResponse) {
         Log.d("MessageSocket", "Dang cap nhat")
         _messages.update { currentList ->
-            val newMessage = ChatMessageItemModel(
-                id = message.id,
-                senderId = message.sender.id,
-                content = message.content,
-                createdAt = message.createdAt.toLocalDateTime(),
-                type = message.type,
-                conversationId = currentConversationId,
-                recipientId = currentRecipientId
-            )
+            val newMessage = when (message.type) {
+                MessageType.TEXT -> {
+                    ChatMessageItemModel(
+                        id = message.id,
+                        conversationId = currentConversationId,
+                        senderId = message.sender.id,
+                        recipientId = currentRecipientId,
+                        content = message.content,
+                        type = message.type,
+                        createdAt = message.createdAt.toLocalDateTime()
+                    )
+                }
+
+                MessageType.IMAGE -> {
+                    ChatMessageItemModel(
+                        id = message.id,
+                        senderId = message.sender.id,
+                        conversationId = currentConversationId,
+                        content = message.imageUrl,
+                        createdAt = message.createdAt.toLocalDateTime(),
+                        type = message.type,
+                        recipientId = currentRecipientId,
+                    )
+                }
+            }
 
             val list = (currentList + newMessage)
                 .associateBy { it.id }
@@ -98,32 +114,32 @@ class ChatViewModel @Inject constructor(
         Log.d("MessageSocket", "Cập nhật thành công lên data")
     }
 
-    fun loadImageMessage(messageId: UUID) {
-        if (_images.value.containsKey(messageId)) {
-            return
-        }
-        if (!loadingIds.add(messageId)) return
+//    fun loadImageMessage(messageId: UUID) {
+//        if (_images.value.containsKey(messageId)) {
+//            return
+//        }
+//        if (!loadingIds.add(messageId)) return
+//
+//        viewModelScope.launch {
+//            when (val result = conversationRepository.getImageMessage(messageId)) {
+//                is DataResult.Success -> {
+//                    _images.update { current ->
+//                        current + (messageId to result.data.data)
+//                    }
+//                }
+//
+//                is DataResult.Error -> {
+//                    // Emit event
+//                }
+//            }
+//
+//            loadingIds.remove(messageId)
+//        }
+//    }
 
-        viewModelScope.launch {
-            when (val result = conversationRepository.getImageMessage(messageId)) {
-                is DataResult.Success -> {
-                    _images.update { current ->
-                        current + (messageId to result.data.data)
-                    }
-                }
-
-                is DataResult.Error -> {
-                    // Emit event
-                }
-            }
-
-            loadingIds.remove(messageId)
-        }
-    }
-
-    fun loadImageMessages(messageIds: Collection<UUID>) {
-        messageIds.distinct().forEach(::loadImageMessage)
-    }
+//    fun loadImageMessages(messageIds: Collection<UUID>) {
+//        messageIds.distinct().forEach(::loadImageMessage)
+//    }
 
     fun getMessageList(conversationId: UUID, recipientId: UUID) {
         if (isLoading) {
@@ -175,6 +191,7 @@ class ChatViewModel @Inject constructor(
                                     conversationId = conversationId,
                                     senderId = message.sender.id,
                                     recipientId = recipientId,
+                                    imageUrl = message.imageUrl,
                                     type = MessageType.IMAGE,
                                     createdAt = message.createdAt.toLocalDateTime()
                                 )
@@ -192,11 +209,11 @@ class ChatViewModel @Inject constructor(
                         )
                 }
 
-                loadImageMessages(
-                    newMessages
-                        .filter { it.type == MessageType.IMAGE }
-                        .map { it.id }
-                )
+//                loadImageMessages(
+//                    newMessages
+//                        .filter { it.type == MessageType.IMAGE }
+//                        .map { it.id }
+//                )
 
                 DataChatMessageItem.hasLoadedFirstPage = true
                 DataChatMessageItem.nextCursor = result.data.data.cursor

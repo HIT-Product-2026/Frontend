@@ -10,7 +10,8 @@ data class ChatMessageItemModel(
     val conversationId: UUID,
     val senderId: UUID? = null,
     val recipientId: UUID? = null,
-    val content: String?=null,
+    val imageUrl: String? = null,
+    val content: String? = null,
     val type: MessageType,
     val createdAt: LocalDateTime
 ) : BaseItemModel

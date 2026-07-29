@@ -46,7 +46,6 @@ object ApiConstants {
     object Message {
         const val SEND_TEXT_MESSAGE = "message/text"
         const val SEND_IMAGE_MESSAGE = "message/image"
-        const val GET_IMAGE_MESSAGE = "message/{message_id}/image"
     }
 
     object Profile {

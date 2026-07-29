@@ -27,9 +27,6 @@ interface ConversationApi {
         @Query("conversation_id") conversationId: UUID,
         @Query("cursor") cursor: String?): Response<ApiResponse<MessagePageResponse>>
 
-    @GET(ApiConstants.Message.GET_IMAGE_MESSAGE)
-    suspend fun getImageMessage(@Path("message_id") messageId: UUID) : Response<ApiResponse<String>>
-
     @POST(ApiConstants.Message.SEND_TEXT_MESSAGE)
     suspend fun sendTextMessage(@Body request: SendMessageRequest) : Response<ApiResponse<ChatMessageResponse>>
 

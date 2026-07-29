@@ -9,6 +9,10 @@
         <item name="cornerSize">25%</item>
     </style>
 
+    <style name="rectangled_cornering">
+        <item name="cornerSize">10%</item>
+    </style>
+
     <style name="CustomBottomSheetDialogTheme" parent="Theme.Design.BottomSheetDialog">
         <item name="android:windowIsFloating">false</item>
         <item name="android:windowSoftInputMode">adjustResize</item>

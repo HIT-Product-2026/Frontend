@@ -173,6 +173,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                             is SocketConnectionState.Disconnected -> {
                                 isSocketConnected = false
                             }
+
                             is SocketConnectionState.Error -> {
                             }
                         }
