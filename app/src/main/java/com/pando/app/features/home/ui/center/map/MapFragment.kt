@@ -5,11 +5,13 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import com.bumptech.glide.load.resource.bitmap.CenterCrop
+import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 import android.graphics.Paint
 import android.os.Bundle
 import android.os.Looper
-import android.provider.ContactsContract
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -46,6 +48,7 @@ import com.pando.app.core.session.UserSession
 import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentMapBinding
+import com.pando.app.databinding.LayoutMarkerBinding
 import com.pando.app.features.home.data.model.entity.CurrentUser
 import com.pando.app.features.home.data.model.entity.DataFriendItem
 import com.pando.app.features.home.data.model.entity.FriendItemModel
@@ -253,30 +256,28 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                 updateCurrentLocationPoint()
 
-                val defaultAvatarDrawable = AppCompatResources.getDrawable(
-                    requireContext(),
-                    R.drawable.ic_default_avatar
-                )
+                showFriendLocations(style, mapViewModel.friends.value)
 
-                val defaultAvatarBitmap = defaultAvatarDrawable?.toBitmap(
-                    width = 96,
-                    height = 96,
-                    config = Bitmap.Config.ARGB_8888
-                )
-
-                if (defaultAvatarBitmap != null) {
-                    style.addImage(
-                        "friend-avatar-default",
-                        createAvatarMarkerBitmap(defaultAvatarBitmap)
-                    )
-                } else {
-                    Log.e("MAP_MARKER", "Không thể chuyển avatar mặc định thành Bitmap")
-                }
-
-                showFriendLocations(
-                    style = style,
-                    friends = DataFriendItem.data.toList()
-                )
+//                val defaultAvatarDrawable = AppCompatResources.getDrawable(
+//                    requireContext(),
+//                    R.drawable.ic_default_avatar
+//                )
+//
+//                val defaultAvatarBitmap = defaultAvatarDrawable?.toBitmap(
+//                    width = 96,
+//                    height = 96,
+//                    config = Bitmap.Config.ARGB_8888
+//                )
+//
+//                if (defaultAvatarBitmap != null) {
+//                    style.addImage(
+//                        "friend-avatar-default",
+//                        createAvatarMarkerBitmap(defaultAvatarBitmap)
+//                    )
+//                } else {
+//                    Log.e("MAP_MARKER", "Không thể chuyển avatar mặc định thành Bitmap")
+//                }
+//
             }
         }
         captureLocation()
@@ -357,9 +358,21 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                         }
                     }
                 }
-                launch {
-                    avatarViewModel.avatars.collect { avatars ->
+                launch{
+                    combine(
+                        avatarViewModel.avatars,
+                        mapViewModel.friends
+                    ) { avatars, friends ->
                         avatarMap = avatars
+                        friends.map { friend ->
+                            friend.copy(
+                                avatarUrl = avatars[friend.id]
+                            )
+                        }
+                    }.collect { synchronizedFriends ->
+                        loadedStyle?.let { style ->
+                            showFriendLocations(style, synchronizedFriends)
+                        }
                     }
                 }
                 launch {
@@ -367,10 +380,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                         avatarViewModel.loadAvatars(
                             friends.map { it.id }
                         )
-
-                        loadedStyle?.let { style ->
-                            showFriendLocations(style, friends)
-                        }
                     }
                 }
             }
@@ -629,12 +638,10 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             ).apply {
                 addStringProperty("id", friend.id.toString())
                 addStringProperty("name", friend.name)
-                addStringProperty(
-                    "iconId",
-                    "friend-avatar-default"
-                )
+                addStringProperty("iconId", "friend-avatar-${friend.id}")
             }
         }
+        Log.d("MAP_MARKER", "friends=${friends.size}, features=${features.size}")
 
         val featureCollection = FeatureCollection.fromFeatures(features)
 
@@ -651,7 +658,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 SymbolLayer(friendLocationLayerId, friendLocationSourceId)
                     .withProperties(
                         iconImage(get("iconId")),
-                        iconSize(0.7f),
+                        iconSize(0.38f),
                         iconAnchor(ICON_ANCHOR_BOTTOM),
                         iconAllowOverlap(true),
                         iconIgnorePlacement(true)
@@ -660,76 +667,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         }
 
         loadFriendAvatarImages(style, friends)
-    }
-
-    private fun createAvatarMarkerBitmap(
-        avatarBitmap: Bitmap
-    ): Bitmap {
-        val size = 120
-        val circleRadius = 46f
-        val circleCenterX = size / 2f
-        val circleCenterY = 50f
-
-        val result = createBitmap(size, size)
-
-        val canvas = Canvas(result)
-
-        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            style = Paint.Style.FILL
-        }
-
-        val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = "#ED9B15".toColorInt()
-            style = Paint.Style.FILL
-        }
-
-        // Phần đuôi marker.
-        val markerPath = android.graphics.Path().apply {
-            moveTo(circleCenterX - 18f, 82f)
-            lineTo(circleCenterX + 18f, 82f)
-            lineTo(circleCenterX, 112f)
-            close()
-        }
-
-        canvas.drawPath(markerPath, markerPaint)
-
-        // Viền ngoài.
-        canvas.drawCircle(
-            circleCenterX,
-            circleCenterY,
-            circleRadius + 6f,
-            markerPaint
-        )
-
-        canvas.drawCircle(
-            circleCenterX,
-            circleCenterY,
-            circleRadius,
-            borderPaint
-        )
-
-        val scaledAvatar =
-            avatarBitmap.scale((circleRadius * 2).toInt(), (circleRadius * 2).toInt())
-
-        val avatarShader = android.graphics.BitmapShader(
-            scaledAvatar,
-            android.graphics.Shader.TileMode.CLAMP,
-            android.graphics.Shader.TileMode.CLAMP
-        )
-
-        val avatarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = avatarShader
-        }
-
-        canvas.drawCircle(
-            circleCenterX,
-            circleCenterY,
-            circleRadius - 4f,
-            avatarPaint
-        )
-
-        return result
     }
 
     private fun loadFriendAvatarImages(
@@ -743,40 +680,88 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 return@forEach
             }
 
+            Log.d("MAP_MARKER", "loading icon=$iconId url=${friend.avatarUrl}")
+
+            val avatarSize = 60.dpToPx()
+            val cornerRadius = 15.dpToPx()
+
             Glide.with(this)
                 .asBitmap()
                 .load(friend.avatarUrl)
+                .override(avatarSize, avatarSize)
+                .transform(
+                    CenterCrop(),
+                    RoundedCorners(cornerRadius)
+                )
                 .placeholder(R.drawable.ic_default_avatar)
                 .error(R.drawable.ic_default_avatar)
-                .into(
-                    object : CustomTarget<Bitmap>() {
+                .fallback(R.drawable.ic_default_avatar)
+                .into(object : CustomTarget<Bitmap>() {
 
-                        override fun onResourceReady(
-                            resource: Bitmap,
-                            transition: Transition<in Bitmap>?
-                        ) {
-                            if (!isAdded || view == null) return
+                    override fun onResourceReady(
+                        resource: Bitmap,
+                        transition: Transition<in Bitmap>?
+                    ) {
+                        if (!isAdded || view == null) return
 
-                            val currentStyle = loadedStyle ?: return
+                        val currentStyle = loadedStyle ?: return
 
-                            if (currentStyle !== style) return
+                        if (currentStyle !== style) return
 
-                            val markerBitmap =
-                                createAvatarMarkerBitmap(resource)
+                        val markerBitmap = createFriendMarkerBitmap(resource)
 
-                            if (currentStyle.getImage(iconId) == null) {
-                                currentStyle.addImage(
-                                    iconId,
-                                    markerBitmap
-                                )
-                            }
-                        }
+                        Log.d(
+                            "MAP_MARKER",
+                            "bitmap=${markerBitmap.width}x${markerBitmap.height}"
+                        )
 
-                        override fun onLoadCleared(
-                            placeholder: android.graphics.drawable.Drawable?
-                        ) = Unit
+                        currentStyle.addImage(iconId, markerBitmap)
+                        Log.d(
+                            "MAP_MARKER",
+                            "added=$iconId, exists=${currentStyle.getImage(iconId) != null}"
+                        )
                     }
-                )
+
+                    override fun onLoadCleared(
+                        placeholder: android.graphics.drawable.Drawable?
+                    ) = Unit
+                })
         }
+    }
+
+    private fun createFriendMarkerBitmap(
+        avatarBitmap: Bitmap
+    ): Bitmap {
+        val markerBinding =
+            LayoutMarkerBinding.inflate(LayoutInflater.from(requireContext()))
+
+        markerBinding.avatar.setImageBitmap(avatarBitmap)
+
+        val markerView = markerBinding.root
+
+        val width = 76.dpToPx()
+        val height = 88.dpToPx()
+
+        markerView.measure(
+            View.MeasureSpec.makeMeasureSpec(
+                width,
+                View.MeasureSpec.EXACTLY
+            ),
+            View.MeasureSpec.makeMeasureSpec(
+                height,
+                View.MeasureSpec.EXACTLY
+            )
+        )
+
+        markerView.layout(0, 0, markerView.measuredWidth, markerView.measuredHeight)
+
+        return createBitmap(markerView.measuredWidth, markerView.measuredHeight)
+            .also { bitmap ->
+                markerView.draw(Canvas(bitmap))
+            }
+    }
+
+    private fun Int.dpToPx(): Int {
+        return (this * resources.displayMetrics.density).toInt()
     }
 }
