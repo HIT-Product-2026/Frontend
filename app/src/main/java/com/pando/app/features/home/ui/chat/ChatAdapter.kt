@@ -156,7 +156,7 @@ class ChatAdapter(
     inner class ImageReceivedViewHolder(private val binding: ItemImageMessageReceivedBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(item: ChatMessageItemModel) {
-            binding.imgAvatar.loadAvatar(recipientAvatar)
+//            binding.imgAvatar.loadAvatar(recipientAvatar)
 
             onBind(binding, item)
         }

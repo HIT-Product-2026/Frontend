@@ -23,6 +23,7 @@ import com.bumptech.glide.Glide
 import com.pando.app.core.base.BaseAdapter
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
+import com.pando.app.core.extensions.formatDateTime
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.session.UserSession
 import com.pando.app.core.state.SocketConnectionState
@@ -74,6 +75,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 text = item.caption
                 isVisible = item.caption.orEmpty().isNotBlank()
             }
+
+            itemBinding.timeTV.text = item.createdAt.formatDateTime()
         }
     }
 

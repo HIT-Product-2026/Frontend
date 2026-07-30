@@ -21,20 +21,15 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
-import com.pando.app.core.extensions.loadAvatar
-import com.pando.app.core.session.UserSession
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentCameraBinding
 import com.pando.app.features.home.ui.center.CenterFragment
 import dagger.hilt.android.AndroidEntryPoint
-import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -57,6 +52,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private var currentLng: Double? = null
 
     private var orientationEventListener: OrientationEventListener? = null
+    private var rotation = Surface.ROTATION_0
 
     override fun initData() {
         startCamera()
@@ -174,11 +170,15 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
 
-            val preview = Preview.Builder().build().also {
-                it.surfaceProvider = binding.viewFinder.surfaceProvider
-            }
+            val preview = Preview.Builder()
+                .setTargetRotation(Surface.ROTATION_0)
+                .build().also {
+                    it.surfaceProvider = binding.viewFinder.surfaceProvider
+                }
 
-            imageCapture = ImageCapture.Builder().build()
+            imageCapture = ImageCapture.Builder()
+                .setTargetRotation(rotation)
+                .build()
 
             val cameraSelector = CameraSelector.Builder()
                 .requireLensFacing(lensFacing)
@@ -189,7 +189,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
                 val viewPort = ViewPort.Builder(
                     Rational(1, 1),
-                    binding.viewFinder.display.rotation
+                    Surface.ROTATION_0
                 ).build()
 
                 val useCaseGroup = UseCaseGroup.Builder()
@@ -210,6 +210,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
     private fun takePhoto() {
         val imageCapture = imageCapture ?: return
+
+        imageCapture.targetRotation = rotation
 
         val photoFile = File(
             requireContext().cacheDir,
@@ -300,7 +302,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             override fun onOrientationChanged(orientation: Int) {
                 if (orientation == ORIENTATION_UNKNOWN) return
 
-                val rotation = when (orientation) {
+                rotation = when (orientation) {
                     in 45..134 -> Surface.ROTATION_270
                     in 135..224 -> Surface.ROTATION_180
                     in 225..314 -> Surface.ROTATION_90

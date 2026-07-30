@@ -3,6 +3,7 @@ package com.pando.app.features.home.data.model.entity
 import com.pando.app.core.base.BaseItemModel
 import com.pando.app.features.home.data.model.dto.UserDto
 import com.pando.app.features.home.data.model.entity.enumEntity.PostModeLocation
+import java.time.LocalDateTime
 import java.util.UUID
 
 data class PostReelItemModel(
@@ -12,7 +13,8 @@ data class PostReelItemModel(
     val caption: String?,
     val latitude: Double,
     val longitude: Double,
-    val modeLocation: PostModeLocation
+    val modeLocation: PostModeLocation,
+    val createdAt: LocalDateTime
 ) : BaseItemModel
 
 class DataPostReelItem {

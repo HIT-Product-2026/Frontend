@@ -3,6 +3,7 @@ package com.pando.app.features.home.ui.center.postreel
 import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.base.BaseVM
+import com.pando.app.core.extensions.toLocalDateTime
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.utils.DataResult
@@ -93,7 +94,8 @@ class PostReelViewModel @Inject constructor(
                             latitude = post.latitude,
                             longitude = post.longitude,
                             modeLocation = post.modeLocation,
-                            conversationId = post.conversation?.id
+                            conversationId = post.conversation?.id,
+                            createdAt = post.createAt.toLocalDateTime()
                         )
                     }
 

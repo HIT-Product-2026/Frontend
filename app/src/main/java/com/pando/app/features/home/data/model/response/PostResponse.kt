@@ -12,5 +12,6 @@ data class PostResponse (
     val latitude: Double,
     val longitude: Double,
     val modeLocation: PostModeLocation,
-    val conversation: Conversation?
+    val conversation: Conversation?,
+    val createAt: String
 )

@@ -77,10 +77,10 @@
             android:layout_marginBottom="40dp"
             android:background="@drawable/bg_btn"
             android:src="@drawable/_2user"
-            android:tint="@color/white"
             android:layout_below="@+id/notificationBtn"
             android:layout_alignParentEnd="true"
-            android:layout_marginEnd="@dimen/_20sdp" />
+            android:layout_marginEnd="@dimen/_20sdp"
+            app:tint="@color/white" />
     </RelativeLayout>
 
     <com.google.android.material.button.MaterialButton

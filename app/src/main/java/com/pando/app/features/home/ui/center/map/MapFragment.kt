@@ -1,6 +1,7 @@
 package com.pando.app.features.home.ui.center.map
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -8,6 +9,10 @@ import android.graphics.Color
 import com.bumptech.glide.load.resource.bitmap.CenterCrop
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 import android.graphics.Paint
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
@@ -68,6 +73,7 @@ import org.maplibre.android.style.expressions.Expression.literal
 import org.maplibre.android.style.expressions.Expression.match
 import org.maplibre.android.style.expressions.Expression.stop
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.Property.ICON_ANCHOR_BOTTOM
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
@@ -77,6 +83,8 @@ import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconAnchor
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconRotate
+import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.textField
 import org.maplibre.android.style.layers.SymbolLayer
@@ -88,7 +96,8 @@ import java.util.UUID
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate) {
+class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate),
+    SensorEventListener {
     companion object {
         private const val TAG = "SOCKET_CONNECTION"
     }
@@ -128,6 +137,17 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     private val friendLocationSourceId = "friend-location-source"
     private val friendLocationLayerId = "friend-location-layer"
 
+    private val currentDirectionIconId = "current-location-direction-icon"
+    private val currentDirectionLayerId = "current-location-direction-layer"
+
+    private lateinit var sensorManager: SensorManager
+    private var rotationVectorSensor: Sensor? = null
+
+    private val rotationMatrix = FloatArray(9)
+    private val orientationAngles = FloatArray(3)
+
+    private var currentBearing = 0f
+
     private val multiplePermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -158,12 +178,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     }
 
     override fun initData() {
-        if (userSession.getCurrentUser() == null) {
-            decodeToken(tokenManager.getAccessToken())
-        }
-
-        mapViewModel.getFriendList()
-
         val hasCamera = ContextCompat.checkSelfPermission(
             requireContext(), Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
@@ -185,15 +199,33 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             ) {
                 val location = locationResult.lastLocation ?: return
 
+                val latitude = location.latitude
+                val longitude = location.longitude
+
+                if (currentLat == latitude && currentLng == longitude) return
+
                 currentLat = location.latitude
                 currentLng = location.longitude
 
                 Log.d("LOCATION_UPDATE", "Lat=$currentLat, Lng=$currentLng")
-
-                updateCurrentLocationPoint()
-                mapViewModel.sendLocation(currentLng, currentLat)
             }
         }
+
+        if (userSession.getCurrentUser() == null) {
+            decodeToken(tokenManager.getAccessToken())
+        }
+
+        mapViewModel.getFriendList()
+
+        sensorManager =
+            requireContext().getSystemService(
+                Context.SENSOR_SERVICE
+            ) as SensorManager
+
+        rotationVectorSensor =
+            sensorManager.getDefaultSensor(
+                Sensor.TYPE_ROTATION_VECTOR
+            )
     }
 
     override fun initView() {
@@ -254,6 +286,26 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                 setVietnameseLabels(style)
 
+                val directionDrawable =
+                    AppCompatResources.getDrawable(
+                        requireContext(),
+                        R.drawable.ic_location_direction
+                    )
+
+                val directionBitmap =
+                    directionDrawable?.toBitmap(
+                        width = 300,
+                        height = 300,
+                        config = Bitmap.Config.ARGB_8888
+                    )
+
+                if (directionBitmap != null) {
+                    style.addImage(
+                        currentDirectionIconId,
+                        directionBitmap
+                    )
+                }
+
                 updateCurrentLocationPoint()
 
                 showFriendLocations(style, mapViewModel.friends.value)
@@ -302,6 +354,10 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             } else {
                 moveCameraToCurrentLocation()
             }
+        }
+
+        binding.friendBtn.setOnClickListener {
+            findNavController().navigate(R.id.action_centerFragment_to_friendFragment)
         }
 
         lifecycleScope.launch {
@@ -398,11 +454,23 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         if (::locationCallback.isInitialized) {
             startLocationUpdates()
         }
+
+        rotationVectorSensor?.let { sensor ->
+            sensorManager.registerListener(
+                this,
+                sensor,
+                SensorManager.SENSOR_DELAY_UI
+            )
+        }
     }
 
     override fun onPause() {
         if (::locationCallback.isInitialized) {
             fusedLocationClient.removeLocationUpdates(locationCallback)
+        }
+
+        if (::sensorManager.isInitialized) {
+            sensorManager.unregisterListener(this)
         }
 
         binding.mapView.onPause()
@@ -532,6 +600,23 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             source.setGeoJson(feature)
         }
 
+        if (style.getLayer(currentDirectionLayerId) == null) {
+            style.addLayer(
+                SymbolLayer(
+                    currentDirectionLayerId,
+                    currentLocationSourceId
+                ).withProperties(
+                    iconImage(currentDirectionIconId),
+                    iconSize(1f),
+                    iconAnchor(Property.ICON_ANCHOR_CENTER),
+                    iconRotate(currentBearing),
+                    iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
+                    iconAllowOverlap(true),
+                    iconIgnorePlacement(true)
+                )
+            )
+        }
+
         if (style.getLayer(currentLocationLayerId) == null) {
             style.addLayer(
                 CircleLayer(currentLocationLayerId, currentLocationSourceId).withProperties(
@@ -641,7 +726,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 addStringProperty("iconId", "friend-avatar-${friend.id}")
             }
         }
-        Log.d("MAP_MARKER", "friends=${friends.size}, features=${features.size}")
 
         val featureCollection = FeatureCollection.fromFeatures(features)
 
@@ -658,7 +742,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 SymbolLayer(friendLocationLayerId, friendLocationSourceId)
                     .withProperties(
                         iconImage(get("iconId")),
-                        iconSize(0.38f),
+                        iconSize(0.6f),
                         iconAnchor(ICON_ANCHOR_BOTTOM),
                         iconAllowOverlap(true),
                         iconIgnorePlacement(true)
@@ -679,8 +763,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             if (style.getImage(iconId) != null) {
                 return@forEach
             }
-
-            Log.d("MAP_MARKER", "loading icon=$iconId url=${friend.avatarUrl}")
 
             val avatarSize = 60.dpToPx()
             val cornerRadius = 15.dpToPx()
@@ -710,16 +792,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                         val markerBitmap = createFriendMarkerBitmap(resource)
 
-                        Log.d(
-                            "MAP_MARKER",
-                            "bitmap=${markerBitmap.width}x${markerBitmap.height}"
-                        )
-
                         currentStyle.addImage(iconId, markerBitmap)
-                        Log.d(
-                            "MAP_MARKER",
-                            "added=$iconId, exists=${currentStyle.getImage(iconId) != null}"
-                        )
                     }
 
                     override fun onLoadCleared(
@@ -763,5 +836,29 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
     private fun Int.dpToPx(): Int {
         return (this * resources.displayMetrics.density).toInt()
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event?.sensor?.type != Sensor.TYPE_ROTATION_VECTOR) {
+            return
+        }
+
+        SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+
+        SensorManager.getOrientation(rotationMatrix, orientationAngles)
+
+        var bearing = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
+
+        if (bearing < 0f) {
+            bearing += 360f
+        }
+
+        currentBearing = bearing
+
+        loadedStyle
+            ?.getLayerAs<SymbolLayer>(currentDirectionLayerId)
+            ?.setProperties(iconRotate(currentBearing))
     }
 }
