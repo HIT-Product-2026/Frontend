@@ -33,8 +33,11 @@
             app:destination="@id/registerBottomSheet"
             app:popUpTo="@id/startFragment" />
         <action
-            android:id="@+id/action_loginBottomSheet_to_cameraFragment"
-            app:destination="@id/cameraFragment" />
+            android:id="@+id/action_loginBottomSheet_to_mapFragment"
+            app:destination="@id/mapFragment" />
+        <action
+            android:id="@+id/action_loginBottomSheet_to_centerFragment"
+            app:destination="@id/centerFragment" />
     </dialog>
 
     <dialog
@@ -82,7 +85,7 @@
         android:id="@+id/resetPasswordFragment"
         android:name="com.pando.app.features.auth.ui.resetpassword.ResetPasswordFragment"
         android:label="fragment_reset_password"
-        tools:layout="@layout/fragment_reset_password" >
+        tools:layout="@layout/fragment_reset_password">
         <argument
             android:name="receiveEmail"
             android:defaultValue=""
@@ -90,8 +93,110 @@
     </fragment>
     <fragment
         android:id="@+id/cameraFragment"
-        android:name="com.pando.app.features.home.ui.camera.CameraFragment"
+        android:name="com.pando.app.features.home.ui.center.camera.CameraFragment"
         android:label="fragment_camera"
-        tools:layout="@layout/fragment_camera" />
+        tools:layout="@layout/fragment_camera">
+        <action
+            android:id="@+id/action_cameraFragment_to_friendFragment"
+            app:destination="@id/friendFragment" />
+        <action
+            android:id="@+id/action_cameraFragment_to_settingFragment"
+            app:destination="@id/settingFragment" />
+        <action
+            android:id="@+id/action_cameraFragment_to_chatMenuFragment"
+            app:destination="@id/chatMenuFragment" />
+        <action
+            android:id="@+id/action_cameraFragment_to_postReelFragment"
+            app:destination="@id/postReelFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/friendFragment"
+        android:name="com.pando.app.features.home.ui.friend.FriendFragment"
+        android:label="fragment_friend"
+        tools:layout="@layout/fragment_friend" />
+    <fragment
+        android:id="@+id/settingFragment"
+        android:name="com.pando.app.features.home.ui.setting.SettingFragment"
+        android:label="fragment_setting"
+        tools:layout="@layout/fragment_setting">
+        <action
+            android:id="@+id/action_settingFragment_to_profileFragment"
+            app:destination="@id/profileFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/chatMenuFragment"
+        android:name="com.pando.app.features.home.ui.chatmenu.ChatMenuFragment"
+        android:label="fragment_chat_menu"
+        tools:layout="@layout/fragment_chat_menu">
+        <action
+            android:id="@+id/action_chatMenuFragment_to_chatFragment"
+            app:destination="@id/chatFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.pando.app.features.home.ui.profile.ProfileFragment"
+        android:label="fragment_profile"
+        tools:layout="@layout/fragment_profile">
+        <action
+            android:id="@+id/action_profileFragment_to_bottomSheetEditAvatarFragment"
+            app:destination="@id/bottomSheetEditAvatarFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/chatFragment"
+        android:name="com.pando.app.features.home.ui.chat.ChatFragment"
+        android:label="fragment_chat"
+        tools:layout="@layout/fragment_chat">
+        <argument
+            android:name="conversationId"
+            app:argType="java.util.UUID" />
+        <argument
+            android:name="senderId"
+            app:argType="java.util.UUID" />
+        <argument
+            android:name="recipientId"
+            app:argType="java.util.UUID" />
+        <argument
+            android:name="name"
+            android:defaultValue=""
+            app:argType="string" />
+    </fragment>
+    <dialog
+        android:id="@+id/bottomSheetEditAvatarFragment"
+        android:name="com.pando.app.features.home.ui.profile.BottomSheetEditAvatarFragment"
+        android:label="BottomSheetEditAvatarFragment" />
+    <fragment
+        android:id="@+id/postReelFragment"
+        android:name="com.pando.app.features.home.ui.center.postreel.PostReelFragment"
+        android:label="fragment_post_reel"
+        tools:layout="@layout/fragment_post_reel" />
+    <fragment
+        android:id="@+id/mapFragment"
+        android:name="com.pando.app.features.home.ui.center.map.MapFragment"
+        android:label="MapFragment">
+        <action
+            android:id="@+id/action_mapFragment_to_cameraFragment"
+            app:destination="@id/cameraFragment" />
+        <action
+            android:id="@+id/action_mapFragment_to_settingFragment"
+            app:destination="@id/settingFragment" />
+        <action
+            android:id="@+id/action_mapFragment_to_chatMenuFragment"
+            app:destination="@id/chatMenuFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/centerFragment"
+        android:name="com.pando.app.features.home.ui.center.CenterFragment"
+        android:label="fragment_center"
+        tools:layout="@layout/fragment_center" >
+        <action
+            android:id="@+id/action_centerFragment_to_settingFragment"
+            app:destination="@id/settingFragment" />
+        <action
+            android:id="@+id/action_centerFragment_to_chatMenuFragment"
+            app:destination="@id/chatMenuFragment" />
+        <action
+            android:id="@+id/action_centerFragment_to_friendFragment"
+            app:destination="@id/friendFragment" />
+    </fragment>
 
 </navigation>

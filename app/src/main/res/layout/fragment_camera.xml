@@ -5,69 +5,18 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/primary1"
-    tools:context=".features.home.ui.camera.CameraFragment">
+    tools:context=".features.home.ui.center.camera.CameraFragment">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
-
-        <RelativeLayout
-            android:id="@+id/topBar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/_24sdp"
-            app:layout_constraintBottom_toTopOf="@+id/cameraContainer"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_chainStyle="spread_inside">
-
-            <com.google.android.material.imageview.ShapeableImageView
-                android:id="@+id/profileIcon"
-                android:layout_width="55dp"
-                android:layout_height="55dp"
-                android:layout_alignParentStart="true"
-                android:layout_centerVertical="true"
-                android:layout_marginStart="@dimen/_16sdp"
-                android:layout_marginTop="@dimen/_16sdp"
-                android:layout_marginBottom="@dimen/_16sdp"
-                android:padding="2dp"
-                android:scaleType="centerCrop"
-                android:src="@android:color/darker_gray"
-                app:shapeAppearanceOverlay="@style/circle"
-                app:strokeColor="@color/accent6"
-                app:strokeWidth="2dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/friendBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerHorizontal="true"
-                android:layout_centerVertical="true"
-                android:text="Bạn bè"
-                android:textColor="@color/white"
-                android:textSize="@dimen/_12sdp"
-                app:backgroundTint="@color/accent6"
-                app:cornerRadius="50dp"
-                app:icon="@drawable/user_profile_group"
-                app:iconSize="@dimen/_16sdp"
-                app:iconTint="@color/white" />
-
-            <ImageButton
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:layout_marginEnd="@dimen/_20sdp"
-                android:background="@drawable/message_icon" />
-        </RelativeLayout>
 
         <androidx.cardview.widget.CardView
             android:id="@+id/cameraContainer"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_marginHorizontal="@dimen/_16sdp"
-            android:layout_marginTop="@dimen/_20sdp"
+            android:layout_marginTop="@dimen/_110sdp"
             app:cardBackgroundColor="@color/black"
             app:cardCornerRadius="@dimen/_24sdp"
             app:cardElevation="0dp"
@@ -75,7 +24,7 @@
             app:layout_constraintDimensionRatio="1:1"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/topBar">
+            app:layout_constraintTop_toTopOf="parent">
 
             <androidx.camera.view.PreviewView
                 android:id="@+id/viewFinder"

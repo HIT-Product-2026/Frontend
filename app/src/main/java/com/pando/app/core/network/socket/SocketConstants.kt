@@ -1,0 +1,14 @@
+package com.pando.app.core.network.socket
+
+object SocketConstants {
+    const val BASE_URL = "wss://lockly-api.duckdns.org/ws"
+
+    object Chat {
+        const val SEND_TEXT_DESTINATION = "/app/chat.sendText"
+        const val TOPIC_CONVERSATION = "/topic/conversation"
+        const val USER_QUEUE_CONVERSATIONS = "/user/queue/conversation"
+        const val TOPIC_LOCATION = "/topic/location"
+        const val SEND_LOCATION_DESTINATION = "/app/share.location"
+        const val SEND_IMAGE_DESTINATION = "/app/chat.sendImage"
+    }
+}

@@ -1,8 +1,8 @@
 package com.pando.app.features.auth.ui.resetpassword
 
 import com.pando.app.core.base.BaseVM
-import com.pando.app.core.network.ApiResponse
-import com.pando.app.core.ui.UiState
+import com.pando.app.core.network.api.ApiResponse
+import com.pando.app.core.state.UiState
 import com.pando.app.features.auth.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject

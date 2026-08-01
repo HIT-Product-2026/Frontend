@@ -12,7 +12,7 @@ import androidx.navigation.fragment.navArgs
 import com.google.android.material.snackbar.Snackbar
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
-import com.pando.app.core.ui.UiState
+import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentVerifyOtpBinding
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch

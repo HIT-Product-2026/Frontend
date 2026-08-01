@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/_8sdp"
+    android:paddingTop="@dimen/_3sdp"
+    android:paddingEnd="@dimen/_48sdp">
+<!--    <ImageView-->
+<!--        android:id="@+id/imgAvatar"-->
+<!--        android:layout_width="@dimen/_32sdp"-->
+<!--        android:layout_height="@dimen/_32sdp"-->
+<!--        android:scaleType="centerCrop"-->
+<!--        android:src="@drawable/ic_default_avatar"-->
+<!--        app:layout_constraintBottom_toBottomOf="@+id/imageMessage"-->
+<!--        app:layout_constraintStart_toStartOf="parent" />-->
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/imageMessage"
+        android:layout_width="@dimen/_200sdp"
+        android:layout_height="@dimen/_200sdp"
+        android:layout_marginStart="@dimen/_40sdp"
+        android:adjustViewBounds="true"
+        android:scaleType="centerCrop"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:shapeAppearanceOverlay="@style/rectangled_cornering" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

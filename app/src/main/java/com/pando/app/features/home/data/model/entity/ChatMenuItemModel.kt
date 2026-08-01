@@ -1,0 +1,21 @@
+package com.pando.app.features.home.data.model.entity
+
+import com.pando.app.core.base.BaseItemModel
+import java.time.LocalDateTime
+import java.util.UUID
+
+data class ChatMenuItemModel (
+    override val id: UUID,
+    val senderId: UUID,
+    val recipientId: UUID,
+    val name: String?,
+    val previewChat : String?,
+    val time : LocalDateTime?
+) : BaseItemModel
+
+class DataChatMenuItem {
+    companion object {
+        var total : Int? = null
+        val data : MutableList<ChatMenuItemModel> = mutableListOf()
+    }
+}
