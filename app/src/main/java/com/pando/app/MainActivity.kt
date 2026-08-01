@@ -1,9 +1,12 @@
 package com.pando.app
 
+import android.app.ComponentCaller
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -18,6 +21,8 @@ import com.pando.app.core.session.SessionState
 import com.pando.app.core.session.StartupSessionResult
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.ActivityMainBinding
+import com.pando.app.features.widget.WidgetNavigationViewModel
+import com.pando.app.features.widget.WidgetPendingIntentFactory
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -26,11 +31,16 @@ import javax.inject.Inject
 class MainActivity : AppCompatActivity() {
     @Inject
     lateinit var userSession: UserSession
+
     @Inject
     lateinit var sessionStartupManager: SessionStartupManager
+
     @Inject
     lateinit var socketConnectionManager: SocketConnectionManager
+
     private lateinit var binding: ActivityMainBinding
+
+    private val widgetNavigationViewModel: WidgetNavigationViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,10 +48,12 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        val navHostFragment = supportFragmentManager.findFragmentById(R.id.FragmentContainer) as NavHostFragment
+        val navHostFragment =
+            supportFragmentManager.findFragmentById(R.id.FragmentContainer) as NavHostFragment
         val navController = navHostFragment.navController
 
         sendFCMToken()
+        handleWidgetIntent(intent)
 
         if (savedInstanceState == null) {
             lifecycleScope.launch {
@@ -117,6 +129,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+
+        handleWidgetIntent(intent)
+    }
+
     @Suppress("DEPRECATION")
     private fun sendFCMToken() {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
@@ -127,6 +147,14 @@ class MainActivity : AppCompatActivity() {
 
             val token = task.result
             Log.d("FCM_INIT", "FCM Token của tui là: $token")
+        }
+    }
+
+    private fun handleWidgetIntent(intent: Intent?) {
+        if (intent?.action ==
+            WidgetPendingIntentFactory.ACTION_OPEN_POST_REEL
+        ) {
+            widgetNavigationViewModel.goToTarget()
         }
     }
 }

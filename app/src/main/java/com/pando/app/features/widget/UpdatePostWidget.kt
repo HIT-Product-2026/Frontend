@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
+import android.view.View
 import android.widget.RemoteViews
 import com.pando.app.MainActivity
 import com.pando.app.R
@@ -41,6 +42,14 @@ internal fun updateAppWidget(
 
     if (isLargeWidget) {
         bindLargeData(views, post)
+        views.setOnClickPendingIntent(
+            R.id.btnDirection,
+            WidgetPendingIntentFactory.createDirection(context, post.latitude, post.longitude)
+        )
+        views.setOnClickPendingIntent(
+            R.id.btnReply,
+            WidgetPendingIntentFactory.createReply(context)
+        )
     }
 
     val openAppIntent = Intent(context, MainActivity::class.java).apply {
@@ -64,9 +73,11 @@ internal fun updateAppWidget(
 
 private fun bindCommonData(views: RemoteViews, post: FcmPostPayload) {
     views.setTextViewText(R.id.tvCaption, post.caption)
-    views.setTextViewText(R.id.tvLocation, post.provinceName)
+    views.setViewVisibility(R.id.background, if (post.caption.isBlank()) View.GONE else View.VISIBLE)
+    views.setTextViewText(R.id.tvLocation, post.wardName.ifBlank { post.provinceName })
 }
 
 private fun bindLargeData(views: RemoteViews, post: FcmPostPayload) {
     views.setTextViewText(R.id.tvUserName, post.displayName)
+    views.setViewVisibility(R.id.tvCaption, if (post.caption.isBlank()) View.GONE else View.VISIBLE)
 }

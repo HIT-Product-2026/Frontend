@@ -14,6 +14,7 @@ class WidgetStorage(context: Context) {
         private const val KEY_AVATAR_URL = "avatar_url"
         private const val KEY_SENDER_NAME = "sender_name"
         private const val KEY_PROVINCE_NAME = "province_name"
+        private const val KEY_WARD_NAME = "ward_name"
         private const val KEY_LONGITUDE = "longitude"
         private const val KEY_LATITUDE = "latitude"
         private const val KEY_TYPE = "type"
@@ -31,6 +32,7 @@ class WidgetStorage(context: Context) {
             putString(KEY_IMAGE_URL, payload.imageUrl)
             putString(KEY_PROVINCE_NAME, payload.provinceName)
             putString(KEY_CONTENT, payload.caption)
+            putString(KEY_WARD_NAME, payload.wardName)
             putString(KEY_LATITUDE, payload.latitude?.toString().orEmpty())
             putString(KEY_LONGITUDE, payload.longitude?.toString().orEmpty())
         }
@@ -56,7 +58,8 @@ class WidgetStorage(context: Context) {
             latitude = pref.getString(KEY_LATITUDE, null)?.toDoubleOrNull(),
             longitude = pref.getString(KEY_LONGITUDE, null)?.toDoubleOrNull(),
             provinceName = pref.getString(KEY_PROVINCE_NAME, "").orEmpty(),
-            caption = pref.getString(KEY_CONTENT, "") .orEmpty()
+            caption = pref.getString(KEY_CONTENT, "") .orEmpty(),
+            wardName = pref.getString(KEY_WARD_NAME, "").orEmpty()
         )
     }
 

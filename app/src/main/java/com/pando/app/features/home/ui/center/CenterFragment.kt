@@ -3,6 +3,7 @@ package com.pando.app.features.home.ui.center
 import android.os.Bundle
 import android.view.View
 import androidx.core.view.isVisible
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -13,6 +14,7 @@ import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentCenterBinding
+import com.pando.app.features.widget.WidgetNavigationViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -27,6 +29,8 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
 
     @Inject
     lateinit var userSession: UserSession
+
+    private val widgetNavigationViewModel: WidgetNavigationViewModel by activityViewModels()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -72,6 +76,17 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
 
         binding.profileIcon.setOnClickListener {
             findNavController().navigate(R.id.action_centerFragment_to_settingFragment)
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                widgetNavigationViewModel.replyTarget.collect { shouldOpen ->
+                    if (shouldOpen) {
+                        binding.verticalViewPager.setCurrentItem(PAGE_POST_REEL, false)
+                        widgetNavigationViewModel.handledTarget()
+                    }
+                }
+            }
         }
     }
 

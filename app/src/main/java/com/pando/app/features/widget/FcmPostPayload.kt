@@ -12,6 +12,7 @@ data class FcmPostPayload(
     val latitude: Double?,
     val longitude: Double?,
     val provinceName: String,
+    val wardName: String,
     val caption: String
 ) {
     companion object {
@@ -30,7 +31,8 @@ data class FcmPostPayload(
                 latitude = data["latitude"]?.toDoubleOrNull(),
                 longitude = data["longitude"]?.toDoubleOrNull(),
                 provinceName = data["province_name"].orEmpty(),
-                caption = data["caption"].orEmpty()
+                caption = data["caption"].orEmpty(),
+                wardName = data["ward_name"].orEmpty()
             )
         }
     }
