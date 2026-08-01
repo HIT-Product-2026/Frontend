@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/primary1"
+    android:fillViewport="true"
+    tools:context=".features.home.ui.setting.SettingFragment">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/_15sdp">
+
+        <ImageView
+            android:id="@+id/backButton"
+            android:layout_width="@dimen/_48sdp"
+            android:layout_height="@dimen/_48sdp"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentTop="true"
+            android:layout_marginTop="@dimen/_9sdp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="@dimen/_12sdp"
+            android:scaleType="centerInside"
+            android:src="@drawable/baseline_chevron_left_24" />
+
+        <RelativeLayout
+            android:id="@+id/layoutProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/backButton"
+            android:layout_marginTop="@dimen/_5sdp"
+            android:background="@drawable/bg_profile_card"
+            android:padding="@dimen/_13sdp">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/imgAvatar"
+                android:layout_width="@dimen/_45sdp"
+                android:layout_height="@dimen/_45sdp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="@dimen/_12sdp"
+                android:padding="@dimen/_2sdp"
+                android:scaleType="centerCrop"
+                android:src="@android:color/darker_gray"
+                app:shapeAppearanceOverlay="@style/circle"
+                app:strokeColor="@color/accent6"
+                app:strokeWidth="2dp" />
+
+            <LinearLayout
+                android:id="@+id/infoLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toStartOf="@+id/editBtn"
+                android:layout_toEndOf="@+id/imgAvatar"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/displayNameTV"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/_5sdp"
+                    android:text="Name"
+                    android:textColor="@color/accent5"
+                    android:textSize="@dimen/_16sdp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ID: "
+                        android:textSize="@dimen/_13sdp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/usernameTV"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="1234567890"
+                        android:textSize="@dimen/_13sdp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/editBtn"
+                android:layout_width="@dimen/_40sdp"
+                android:layout_height="@dimen/_40sdp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="@dimen/_10sdp"
+                android:padding="@dimen/_10sdp"
+                android:paddingStart="@dimen/_13sdp"
+                android:src="@drawable/edit" />
+
+        </RelativeLayout>
+
+        <TextView
+            android:id="@+id/tvTitleSetting"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/layoutProfile"
+            android:layout_marginStart="@dimen/_5sdp"
+            android:layout_marginTop="@dimen/_20sdp"
+            android:text="Cài đặt"
+            android:textColor="@color/white"
+            android:textSize="@dimen/_20sdp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/groupSetting"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/tvTitleSetting"
+            android:layout_marginTop="@dimen/_5sdp"
+            android:background="@drawable/bg_menu_group"
+            android:orientation="vertical"
+            android:padding="@dimen/_10sdp">
+
+            <TextView
+                style="@style/MenuTextStyle"
+                android:text="Quyền riêng tư" />
+
+            <TextView
+                style="@style/MenuTextStyle"
+                android:text="Tài khoản đã chặn" />
+
+            <TextView
+                style="@style/MenuTextStyle"
+                android:layout_marginBottom="0dp"
+                android:text="Chia sẻ hồ sơ" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvTitleSupport"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/groupSetting"
+            android:layout_marginStart="@dimen/_5sdp"
+            android:layout_marginTop="@dimen/_20sdp"
+            android:text="Hỗ trợ"
+            android:textColor="@color/white"
+            android:textSize="@dimen/_20sdp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/groupSupport"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/tvTitleSupport"
+            android:layout_marginTop="@dimen/_5sdp"
+            android:background="@drawable/bg_menu_group"
+            android:orientation="vertical"
+            android:padding="@dimen/_10sdp">
+
+            <TextView
+                style="@style/MenuTextStyle"
+                android:text="Giới thiệu" />
+
+            <TextView
+                style="@style/MenuTextStyle"
+                android:text="Đánh giá" />
+
+            <TextView
+                style="@style/MenuTextStyle"
+                android:text="Báo cáo sự cố" />
+
+            <TextView
+                style="@style/MenuTextStyle"
+                android:layout_marginBottom="0dp"
+                android:text="Chính sách quyền riêng tư" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/groupAccountAction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/groupSupport"
+            android:layout_marginTop="@dimen/_20sdp"
+            android:layout_marginBottom="@dimen/_10sdp"
+            android:background="@drawable/bg_menu_group"
+            android:orientation="vertical"
+            android:padding="@dimen/_10sdp">
+
+            <TextView
+                style="@style/MenuTextStyle"
+                android:text="Xóa tài khoản"
+                android:textColor="@android:color/holo_red_light" />
+
+            <TextView
+                android:id="@+id/logoutBtn"
+                style="@style/MenuTextStyle"
+                android:layout_marginBottom="0dp"
+                android:text="Đăng xuất" />
+
+        </LinearLayout>
+
+    </RelativeLayout>
+
+</ScrollView>

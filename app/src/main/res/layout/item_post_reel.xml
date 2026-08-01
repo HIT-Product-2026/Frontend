@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.cardview.widget.CardView
+            android:id="@+id/imageContainer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginHorizontal="@dimen/_16sdp"
+            android:layout_marginTop="@dimen/_20sdp"
+            app:cardBackgroundColor="@color/black"
+            app:cardCornerRadius="@dimen/_24sdp"
+            app:cardElevation="0dp"
+            app:cardPreventCornerOverlap="false"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.35">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/imgCaptured"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"/>
+
+            <TextView
+                android:id="@+id/captionTV"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center|bottom"
+                android:layout_marginBottom="@dimen/_10sdp"
+                android:background="@drawable/bg_caption"
+                android:includeFontPadding="false"
+                android:maxWidth="@dimen/_175sdp"
+                android:maxLength="35"
+                android:paddingStart="@dimen/_10sdp"
+                android:paddingTop="@dimen/_8sdp"
+                android:paddingEnd="@dimen/_10sdp"
+                android:paddingBottom="@dimen/_8sdp"
+                android:textColor="@color/white"
+                android:textSize="@dimen/_10sdp"
+                android:visibility="gone" />
+
+        </androidx.cardview.widget.CardView>
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="@drawable/bg_border_camera"
+            android:elevation="1dp"
+            app:layout_constraintBottom_toBottomOf="@id/imageContainer"
+            app:layout_constraintEnd_toEndOf="@id/imageContainer"
+            app:layout_constraintStart_toStartOf="@id/imageContainer"
+            app:layout_constraintTop_toTopOf="@id/imageContainer" />
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@+id/imageContainer"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginTop="@dimen/_10sdp"
+            app:layout_constraintStart_toStartOf="parent">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/profileIcon"
+                android:layout_width="@dimen/_30sdp"
+                android:layout_height="@dimen/_30sdp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:padding="2dp"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_default_avatar"
+                app:shapeAppearanceOverlay="@style/circle"
+                app:strokeColor="@color/accent6"
+                app:strokeWidth="2dp" />
+
+            <TextView
+                android:id="@+id/nameTV"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/_5sdp"
+                android:text="Name"
+                android:layout_toEndOf="@+id/profileIcon"
+                android:textStyle="bold"
+                android:textColor="@color/white"
+                android:textSize="@dimen/_12sdp"
+                android:layout_centerVertical="true"/>
+
+            <TextView
+                android:id="@+id/timeTV"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/_6sdp"
+                android:text="Time"
+                android:textColor="@color/neutral4"
+                android:layout_toEndOf="@+id/nameTV"
+                android:textSize="@dimen/_11sdp"
+                android:layout_centerVertical="true"/>
+
+        </RelativeLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</FrameLayout>
