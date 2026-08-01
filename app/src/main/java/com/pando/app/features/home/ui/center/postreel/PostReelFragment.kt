@@ -1,13 +1,17 @@
 package com.pando.app.features.home.ui.center.postreel
 
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
+import android.widget.Toast
+import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
@@ -152,6 +156,16 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                     ?.hide(WindowInsetsCompat.Type.ime())
                 binding.bottomLayout.visibility = View.GONE
             }
+        }
+
+        binding.btnGoThere.setOnClickListener {
+            val currentPosition = binding.postReelViewPager.currentItem
+
+            val currentReel = postReelAdapter.currentList
+                .getOrNull(currentPosition)
+                ?: return@setOnClickListener
+
+            openMap(latitude = currentReel.latitude, longitude = currentReel.longitude)
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -307,6 +321,18 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             if (recyclerView.isAttachedToWindow) {
                 postReelAdapter.notifyDataSetChanged()
             }
+        }
+    }
+
+    private fun openMap(latitude: Double, longitude: Double) {
+        val uri = "geo:$latitude,$longitude?q=$latitude,$longitude".toUri()
+
+        val intent = Intent(Intent.ACTION_VIEW, uri)
+
+        try {
+            startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(requireContext(), "Thiết bị chưa có ứng dụng bản đồ", Toast.LENGTH_SHORT).show()
         }
     }
 
