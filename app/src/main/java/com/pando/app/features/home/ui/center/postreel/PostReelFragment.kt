@@ -165,7 +165,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                     }.collect { (images, connectionState) ->
                         imageMap = images
 
-                        postReelAdapter.notifyDataSetChanged()
+                        refreshPostReelAdapter()
 
                         when (connectionState) {
                             is SocketConnectionState.Connecting -> {}
@@ -186,7 +186,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 launch {
                     avatarViewModel.avatars.collect { avatars ->
                         avatarMap = avatars
-                        postReelAdapter.notifyDataSetChanged()
+                        refreshPostReelAdapter()
                     }
                 }
 
@@ -297,6 +297,16 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
             // Không tự tiêu thụ touch, RecyclerView vẫn xử lý swipe.
             false
+        }
+    }
+
+    private fun refreshPostReelAdapter() {
+        val recyclerView = binding.postReelViewPager.getChildAt(0) as RecyclerView
+
+        recyclerView.post {
+            if (recyclerView.isAttachedToWindow) {
+                postReelAdapter.notifyDataSetChanged()
+            }
         }
     }
 

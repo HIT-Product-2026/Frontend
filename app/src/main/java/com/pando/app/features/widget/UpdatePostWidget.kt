@@ -24,6 +24,8 @@ internal fun updateAppWidget(
     }
 
     val views = RemoteViews(context.packageName, layoutId)
+    openApp(views, context, appWidgetId)
+
     val storage = WidgetStorage(context)
 
     val post = storage.getPost()
@@ -39,19 +41,18 @@ internal fun updateAppWidget(
     }
 
     bindCommonData(views, post)
-
     if (isLargeWidget) {
         bindLargeData(views, post)
-        views.setOnClickPendingIntent(
-            R.id.btnDirection,
-            WidgetPendingIntentFactory.createDirection(context, post.latitude, post.longitude)
-        )
-        views.setOnClickPendingIntent(
-            R.id.btnReply,
-            WidgetPendingIntentFactory.createReply(context)
-        )
     }
+    handleClickBtn(context, views, post)
 
+    appWidgetManager.updateAppWidget(appWidgetId, views)
+
+    WidgetImageLoader.loadPostImage(context, views, appWidgetId, post.imageUrl)
+    WidgetImageLoader.loadAvatar(context, views, appWidgetId, post.avatarUrl)
+}
+
+private fun openApp(views: RemoteViews, context: Context, appWidgetId: Int) {
     val openAppIntent = Intent(context, MainActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
     }
@@ -64,20 +65,35 @@ internal fun updateAppWidget(
     )
 
     views.setOnClickPendingIntent(R.id.widgetRoot, openAppPendingIntent)
+}
 
-    appWidgetManager.updateAppWidget(appWidgetId, views)
-
-    WidgetImageLoader.loadPostImage(context, views, appWidgetId, post.imageUrl)
-    WidgetImageLoader.loadAvatar(context, views, appWidgetId, post.avatarUrl)
+private fun handleClickBtn(context: Context, views: RemoteViews, post: FcmPostPayload) {
+    views.setOnClickPendingIntent(
+        R.id.btnDirection,
+        WidgetPendingIntentFactory.createDirection(context, post.latitude, post.longitude)
+    )
+    views.setOnClickPendingIntent(
+        R.id.btnReply,
+        WidgetPendingIntentFactory.createReply(context)
+    )
 }
 
 private fun bindCommonData(views: RemoteViews, post: FcmPostPayload) {
     views.setTextViewText(R.id.tvCaption, post.caption)
-    views.setViewVisibility(R.id.background, if (post.caption.isBlank()) View.GONE else View.VISIBLE)
-    views.setTextViewText(R.id.tvLocation, post.wardName.ifBlank { post.provinceName })
+    views.setViewVisibility(
+        R.id.background,
+        if (post.caption.isBlank()) View.GONE else View.VISIBLE
+    )
+    views.setTextViewText(
+        R.id.tvLocation,
+        post.wardName.ifBlank { post.provinceName }
+    )
 }
 
 private fun bindLargeData(views: RemoteViews, post: FcmPostPayload) {
     views.setTextViewText(R.id.tvUserName, post.displayName)
-    views.setViewVisibility(R.id.tvCaption, if (post.caption.isBlank()) View.GONE else View.VISIBLE)
+    views.setViewVisibility(
+        R.id.tvCaption,
+        if (post.caption.isBlank()) View.GONE else View.VISIBLE
+    )
 }
