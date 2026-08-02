@@ -48,6 +48,7 @@ import kotlin.math.abs
 class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelBinding::inflate) {
     private var avatarMap: Map<UUID, String> = emptyMap()
     private var imageMap: Map<UUID, String> = emptyMap()
+    private var provinceMap: Map<UUID, String> = emptyMap()
     private val postReelViewModel: PostReelViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
 
@@ -62,11 +63,16 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         ) { itemBinding, item ->
 
             val image = imageMap[item.id]
+            val province = provinceMap[item.id]
 
-            if (image == null &&
+            if ((image == null || province == null) &&
                 lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
             ) {
-                postReelViewModel.loadPost(item.id)
+                postReelViewModel.loadPost(
+                    postId = item.id,
+                    longitude = item.longitude,
+                    latitude = item.latitude
+                )
             }
 
             Glide.with(this)
@@ -81,6 +87,9 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 text = item.caption
                 isVisible = item.caption.orEmpty().isNotBlank()
             }
+
+            itemBinding.tvLocation.text = province
+            itemBinding.locationLayout.isVisible = !province.isNullOrBlank()
 
             itemBinding.timeTV.text = item.createdAt?.formatDateTime()
         }
@@ -172,11 +181,13 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 launch {
                     combine(
                         postReelViewModel.images,
+                        postReelViewModel.provinceNames,
                         postReelViewModel.connectionState
-                    ) { images, connectionState ->
-                        images to connectionState
-                    }.collect { (images, connectionState) ->
+                    ) { images, provinces, connectionState ->
+                        Triple(images, provinces, connectionState)
+                    }.collect { (images, provinces, connectionState) ->
                         imageMap = images
+                        provinceMap = provinces
 
                         refreshPostReelAdapter()
 

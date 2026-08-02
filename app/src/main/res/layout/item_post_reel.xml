@@ -2,7 +2,8 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -29,7 +30,7 @@
                 android:id="@+id/imgCaptured"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scaleType="centerCrop"/>
+                android:scaleType="centerCrop" />
 
             <TextView
                 android:id="@+id/captionTV"
@@ -62,12 +63,13 @@
             app:layout_constraintTop_toTopOf="@id/imageContainer" />
 
         <RelativeLayout
+            android:id="@+id/senderContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:layout_constraintTop_toBottomOf="@+id/imageContainer"
-            app:layout_constraintEnd_toEndOf="parent"
             android:layout_marginTop="@dimen/_10sdp"
-            app:layout_constraintStart_toStartOf="parent">
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/imageContainer">
 
             <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/profileIcon"
@@ -86,26 +88,60 @@
                 android:id="@+id/nameTV"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
                 android:layout_marginStart="@dimen/_5sdp"
-                android:text="Name"
                 android:layout_toEndOf="@+id/profileIcon"
-                android:textStyle="bold"
+                android:text="Name"
                 android:textColor="@color/white"
                 android:textSize="@dimen/_12sdp"
-                android:layout_centerVertical="true"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/timeTV"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
                 android:layout_marginStart="@dimen/_6sdp"
+                android:layout_toEndOf="@+id/nameTV"
                 android:text="Time"
                 android:textColor="@color/neutral4"
-                android:layout_toEndOf="@+id/nameTV"
-                android:textSize="@dimen/_11sdp"
-                android:layout_centerVertical="true"/>
+                android:textSize="@dimen/_11sdp" />
 
         </RelativeLayout>
+
+        <LinearLayout
+            android:id="@+id/locationLayout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="8dp"
+            android:maxWidth="@dimen/_200sdp"
+            android:clipToOutline="true"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:gravity="center"
+            android:paddingVertical="4dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/senderContainer">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:text="📍"
+                android:textSize="16sp"/>
+
+            <TextView
+                android:id="@+id/tvLocation"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                tools:text="Hồ Tây, Hà Nội"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+        </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </FrameLayout>

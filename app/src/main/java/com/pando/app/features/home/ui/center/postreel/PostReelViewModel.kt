@@ -10,6 +10,7 @@ import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
 import com.pando.app.features.home.data.model.response.PostsResponse
+import com.pando.app.features.home.data.repository.LocationRepository
 import com.pando.app.features.home.data.repository.PostRepository
 import com.pando.app.features.home.data.socket.MessagesSocket
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,20 +26,37 @@ class PostReelViewModel @Inject constructor(
     private val postRepository: PostRepository,
     private val messagesSocket: MessagesSocket,
     private val socketConnectionManager: SocketConnectionManager,
+    private val locationRepository: LocationRepository
 ) : BaseVM<ApiResponse<PostsResponse>>() {
     val connectionState = socketConnectionManager.connectionState
     private var isLoading = false
 
     private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
     val images = _images.asStateFlow()
+    private val _provinceNames = MutableStateFlow<Map<UUID, String>>(emptyMap())
+    val provinceNames = _provinceNames.asStateFlow()
 
-    private val loadingIds = mutableSetOf<UUID>()
+    private val loadingImageIds = mutableSetOf<UUID>()
+    private val loadingProvinceIds = mutableSetOf<UUID>()
 
-    fun loadPost(postId: UUID) {
-        if (_images.value.containsKey(postId)) {
-            return
+    fun loadPost(postId: UUID, longitude: Double, latitude: Double) {
+        loadPostImage(postId)
+        loadProvince(postId, latitude, longitude)
+    }
+
+    fun loadPosts(posts: Collection<PostReelItemModel>) {
+        posts.distinctBy { it.id }.forEach { post ->
+            loadPost(
+                postId = post.id,
+                longitude = post.longitude,
+                latitude = post.latitude
+            )
         }
-        if (!loadingIds.add(postId)) return
+    }
+
+    fun loadPostImage(postId: UUID) {
+        if (_images.value.containsKey(postId)) return
+        if (!loadingImageIds.add(postId)) return
 
         viewModelScope.launch {
             when (val result = postRepository.getPostImage(postId)) {
@@ -53,12 +71,29 @@ class PostReelViewModel @Inject constructor(
                 }
             }
 
-            loadingIds.remove(postId)
+            loadingImageIds.remove(postId)
         }
     }
 
-    fun loadPosts(postIds: Collection<UUID>) {
-        postIds.distinct().forEach(::loadPost)
+    private fun loadProvince(postId: UUID, latitude: Double, longitude: Double) {
+        if (_provinceNames.value.containsKey(postId)) return
+        if (!loadingProvinceIds.add(postId)) return
+
+        viewModelScope.launch {
+            try {
+                when (val result = locationRepository.getProvince(latitude, longitude)) {
+                    is DataResult.Success -> {
+                        _provinceNames.update { current ->
+                            current + (postId to result.data.data)
+                        }
+                    }
+
+                    is DataResult.Error -> {}
+                }
+            } finally {
+                loadingProvinceIds.remove(postId)
+            }
+        }
     }
 
     fun getPosts() {

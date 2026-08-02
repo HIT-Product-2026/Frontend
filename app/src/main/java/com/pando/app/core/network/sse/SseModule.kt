@@ -6,6 +6,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -15,7 +16,7 @@ object SseModule {
     @Provides
     @Singleton
     @SseOkHttpClient
-    fun provideSseOkHttpClient(okHttpClient: OkHttpClient): OkHttpClient {
+    fun provideSseOkHttpClient(@Named("AuthenticatedClient") okHttpClient: OkHttpClient): OkHttpClient {
         return okHttpClient
             .newBuilder()
             .readTimeout(0, TimeUnit.MILLISECONDS)
