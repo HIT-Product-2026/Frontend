@@ -106,6 +106,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.4.0")
+    implementation("com.squareup.okhttp3:okhttp-sse:5.4.0")
 
     val nav_version = "2.9.8"
     implementation("androidx.navigation:navigation-fragment-ktx:$nav_version")

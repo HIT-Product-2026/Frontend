@@ -95,7 +95,7 @@ class PostReelViewModel @Inject constructor(
                             longitude = post.longitude,
                             modeLocation = post.modeLocation,
                             conversationId = post.conversation?.id,
-                            createdAt = post.createAt.toLocalDateTime()
+                            createdAt = post.createAt?.toLocalDateTime()
                         )
                     }
 

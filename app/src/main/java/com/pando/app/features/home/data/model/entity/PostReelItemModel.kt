@@ -14,7 +14,7 @@ data class PostReelItemModel(
     val latitude: Double,
     val longitude: Double,
     val modeLocation: PostModeLocation,
-    val createdAt: LocalDateTime
+    val createdAt: LocalDateTime?
 ) : BaseItemModel
 
 class DataPostReelItem {

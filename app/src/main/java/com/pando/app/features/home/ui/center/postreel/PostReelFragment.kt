@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -55,6 +54,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     @Inject
     lateinit var userSession: UserSession
     private var isSocketConnected = false
+    private var hasLoadedInitialData = false
     private val postReelAdapter: BaseAdapter<PostReelItemModel, ItemPostReelBinding> by lazy {
         BaseAdapter(
             ItemPostReelBinding::inflate,
@@ -63,7 +63,9 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
             val image = imageMap[item.id]
 
-            if (image == null) {
+            if (image == null &&
+                lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+            ) {
                 postReelViewModel.loadPost(item.id)
             }
 
@@ -80,7 +82,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 isVisible = item.caption.orEmpty().isNotBlank()
             }
 
-            itemBinding.timeTV.text = item.createdAt.formatDateTime()
+            itemBinding.timeTV.text = item.createdAt?.formatDateTime()
         }
     }
 
@@ -88,6 +90,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         object : ViewPager2.OnPageChangeCallback() {
 
             override fun onPageSelected(position: Int) {
+                if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
                 val itemCount = postReelAdapter.itemCount
 
                 val shouldLoadNextPage = itemCount > 0 && position >= itemCount - 3
@@ -99,10 +102,6 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         }
 
     override fun initData() {
-        DataPostReelItem.reset()
-        if (DataPostReelItem.data.isEmpty()) {
-            postReelViewModel.getPosts()
-        }
     }
 
     override fun initView() {
@@ -222,6 +221,17 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+
+        if (!hasLoadedInitialData) {
+            hasLoadedInitialData = true
+
+            DataPostReelItem.reset()
+            postReelViewModel.getPosts()
+        }
+    }
+
     private fun setupPostReel() {
         binding.postReelViewPager.apply {
             orientation = ViewPager2.ORIENTATION_VERTICAL
@@ -332,7 +342,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         try {
             startActivity(intent)
         } catch (_: ActivityNotFoundException) {
-            Toast.makeText(requireContext(), "Thiết bị chưa có ứng dụng bản đồ", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Thiết bị chưa có ứng dụng bản đồ", Toast.LENGTH_SHORT)
+                .show()
         }
     }
 

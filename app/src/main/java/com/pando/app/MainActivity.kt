@@ -1,6 +1,5 @@
 package com.pando.app
 
-import android.app.ComponentCaller
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -14,8 +13,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.messaging.FirebaseMessaging
-import com.pando.app.core.network.socket.SocketConnectionManager
+import com.pando.app.core.network.sse.SseManager
 import com.pando.app.core.session.SessionStartupManager
 import com.pando.app.core.session.SessionState
 import com.pando.app.core.session.StartupSessionResult
@@ -36,7 +36,9 @@ class MainActivity : AppCompatActivity() {
     lateinit var sessionStartupManager: SessionStartupManager
 
     @Inject
-    lateinit var socketConnectionManager: SocketConnectionManager
+    lateinit var sseManager: SseManager
+
+    private val viewModel: MainViewModel by viewModels()
 
     private lateinit var binding: ActivityMainBinding
 
@@ -64,12 +66,16 @@ class MainActivity : AppCompatActivity() {
 
                 val startDestination = when (result) {
                     StartupSessionResult.AUTHENTICATED -> {
+                        viewModel.socketConnect()
+                        sseManager.connect()
                         R.id.centerFragment
                     }
 
                     StartupSessionResult.NO_SESSION,
                     StartupSessionResult.SESSION_EXPIRED,
                     StartupSessionResult.NETWORK_ERROR -> {
+                        viewModel.socketDisconnect()
+                        sseManager.disconnect()
                         R.id.startFragment
                     }
                 }
@@ -102,33 +108,65 @@ class MainActivity : AppCompatActivity() {
         } else {
             observeSessionState(navController)
         }
+        observeUiEvents()
     }
 
     private fun observeSessionState(navController: NavController) {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                userSession.sessionState.collect { state ->
-                    if (state == SessionState.EXPIRED) {
-                        socketConnectionManager.disconnect()
-                        userSession.markSessionActive()
+                launch {
+                    userSession.sessionState.collect { state ->
+                        if (state == SessionState.EXPIRED) {
+                            viewModel.socketDisconnect()
+                            sseManager.disconnect()
+                            userSession.markSessionActive()
 
-                        val navOptions = NavOptions.Builder()
-                            .setPopUpTo(R.id.nav_graph, true)
-                            .build()
+                            val navOptions = NavOptions.Builder()
+                                .setPopUpTo(R.id.nav_graph, true)
+                                .build()
 
-                        navController.navigate(R.id.startFragment, null, navOptions)
+                            navController.navigate(R.id.startFragment, null, navOptions)
 
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                            Toast.LENGTH_LONG
-                        ).show()
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+                launch {
+                    userSession.currentUser.collect { user ->
+                        if (user != null) {
+                            viewModel.socketConnect()
+                            sseManager.connect()
+                        }
                     }
                 }
             }
         }
     }
 
+    private fun observeUiEvents() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiEvents.collect { event ->
+                    when (event) {
+                        is MainEvent.DetectedNsfw -> {
+                            MaterialAlertDialogBuilder(this@MainActivity)
+                                .setTitle("Bài viết vi phạm")
+                                .setMessage(
+                                    "Ảnh bạn vừa đăng có thể chứa nội dung nhạy cảm " +
+                                            "và không phù hợp với tiêu chuẩn cộng đồng."
+                                )
+                                .setPositiveButton("Tôi đã hiểu", null)
+                                .show()
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
