@@ -43,6 +43,8 @@ import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.Period
@@ -62,6 +64,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     lateinit var userSession: UserSession
     private var isSocketConnected = false
     private var hasLoadedInitialData = false
+    private var activeNsfwDialogPostId: UUID? = null
     private val postReelAdapter: BaseAdapter<PostReelItemModel, ItemPostReelBinding> by lazy {
         BaseAdapter(
             ItemPostReelBinding::inflate,
@@ -130,9 +133,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         setupNestedPagerGesture()
         setupKeyboardInsets()
 
-        postReelAdapter.submitList(
-            DataPostReelItem.data.toList()
-        )
+        submitPostReelsAndCheckCurrent()
     }
 
     override fun initActionView() {
@@ -151,6 +152,20 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 binding.sendMessageET,
                 InputMethodManager.SHOW_IMPLICIT
             )
+        }
+
+        binding.btnMore.setOnClickListener {
+            val position = binding.postReelViewPager.currentItem
+
+            val currentReel = postReelAdapter.currentList
+                .getOrNull(position)
+                ?: return@setOnClickListener
+
+            val imageUrl = imageMap[currentReel.id] ?: return@setOnClickListener
+
+            BottomSheetMorePostReelFragment
+                .newInstance(currentReel.id, imageUrl)
+                .show(childFragmentManager, "MorePostReel")
         }
 
         binding.sendBtn.setOnClickListener {
@@ -238,7 +253,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                         when (state) {
                             is UiState.Success -> {
                                 syncNsfwStatuses(mainViewModel.nsfwStatuses.value)
-                                postReelAdapter.submitList(DataPostReelItem.data.toList())
+                                submitPostReelsAndCheckCurrent()
                             }
 
                             is UiState.Error -> {}
@@ -250,8 +265,18 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 launch {
                     mainViewModel.nsfwStatuses.collect { statuses ->
                         syncNsfwStatuses(statuses)
-                        postReelAdapter.submitList(DataPostReelItem.data.toList())
+                        submitPostReelsAndCheckCurrent()
                     }
+                }
+                launch {
+                    userSession.currentUser
+                        .map { it?.profile }
+                        .distinctUntilChanged()
+                        .collect { profile ->
+                            if (profile != null) {
+                                checkCurrentNsfwReel()
+                            }
+                        }
                 }
             }
         }
@@ -402,7 +427,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     private fun getCurrentUserAge(): Int? {
-        val birthdayText = userSession.getCurrentUser()?.birthday ?: return null
+        val birthdayText = userSession.getCurrentUser()?.profile?.birthday ?: return null
 
         val birthday = runCatching {
             LocalDate.parse(birthdayText)
@@ -418,13 +443,23 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     private fun handleNsfwReel(post: PostReelItemModel, position: Int) {
+        if (post.nsfw != NsfwStatus.TRUE) return
+
         val decision = postReelViewModel.nsfwDecisions.value[post.id] ?: NsfwViewDecision.UNDECIDED
 
         if (decision != NsfwViewDecision.UNDECIDED) {
             return
         }
 
-        val age = getCurrentUserAge() ?: return
+        if (activeNsfwDialogPostId == post.id) return
+
+        val profile = userSession.getCurrentUser()?.profile ?: return
+        val age = getCurrentUserAge()
+
+        if (age == null) {
+            showUnverifiedAgeWarning(post.id)
+            return
+        }
 
         if (age < 18) {
             showUnderageWarning(post.id, position)
@@ -434,7 +469,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     private fun showUnderageWarning(id: UUID, position: Int) {
-        MaterialAlertDialogBuilder(requireContext())
+        activeNsfwDialogPostId = id
+        val dialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle("Nội dung bị giới hạn")
             .setMessage("Bạn chưa đủ 18 tuổi để xem nội dung này.")
             .setPositiveButton("Tôi đã hiểu") { _, _ ->
@@ -442,11 +478,19 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 postReelAdapter.notifyItemChanged(position)
             }
             .setCancelable(false)
-            .show()
+            .create()
+
+        dialog.setOnDismissListener {
+            if (activeNsfwDialogPostId == id) {
+                activeNsfwDialogPostId = null
+            }
+        }
+        dialog.show()
     }
 
     private fun showAdultNsfwWarning(id: UUID, position: Int) {
-        MaterialAlertDialogBuilder(requireContext())
+        activeNsfwDialogPostId = id
+        val dialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle("Nội dung nhạy cảm")
             .setMessage(
                 "Ảnh này có thể chứa nội dung NSFW. " +
@@ -461,6 +505,45 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 postReelAdapter.notifyItemChanged(position)
             }
             .setCancelable(false)
-            .show()
+            .create()
+
+        dialog.setOnDismissListener {
+            if (activeNsfwDialogPostId == id) {
+                activeNsfwDialogPostId = null
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showUnverifiedAgeWarning(id: UUID) {
+        activeNsfwDialogPostId = id
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Chưa xác minh độ tuổi")
+            .setMessage("Bạn cần cập nhật ngày sinh trong hồ sơ trước khi xem nội dung này.")
+            .setPositiveButton("Tôi đã hiểu", null)
+            .setCancelable(false)
+            .create()
+
+        dialog.setOnDismissListener {
+            if (activeNsfwDialogPostId == id) {
+                activeNsfwDialogPostId = null
+            }
+        }
+        dialog.show()
+    }
+
+    private fun submitPostReelsAndCheckCurrent() {
+        postReelAdapter.submitList(DataPostReelItem.data.toList()) {
+            checkCurrentNsfwReel()
+        }
+    }
+
+    private fun checkCurrentNsfwReel() {
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
+
+        val position = binding.postReelViewPager.currentItem
+        val currentReel = postReelAdapter.currentList.getOrNull(position) ?: return
+
+        handleNsfwReel(currentReel, position)
     }
 }

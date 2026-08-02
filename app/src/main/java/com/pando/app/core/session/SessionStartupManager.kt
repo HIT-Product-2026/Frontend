@@ -76,13 +76,17 @@ class SessionStartupManager @Inject constructor(
                 )
 
                 val refreshedUser = tokens.user
+                val previousUser = userSession.getCurrentUser()
+                    ?.takeIf { it.id == refreshedUser.id }
 
                 userSession.setCurrentUser(
                     CurrentUser(
                         id = refreshedUser.id,
                         username = refreshedUser.username,
                         displayName = refreshedUser.displayName,
-                        mode = refreshedUser.mode
+                        mode = refreshedUser.mode,
+                        avatar = previousUser?.avatar,
+                        profile = previousUser?.profile
                     )
                 )
 
@@ -129,9 +133,8 @@ class SessionStartupManager @Inject constructor(
                 null
             }
 
-            val currentAvatar = userSession.getCurrentUser()
+            val previousUser = userSession.getCurrentUser()
                 ?.takeIf { it.id == id }
-                ?.avatar
 
             userSession.setCurrentUser(
                 CurrentUser(
@@ -139,7 +142,8 @@ class SessionStartupManager @Inject constructor(
                     username = userName,
                     displayName = displayName,
                     mode = mode,
-                    avatar = currentAvatar
+                    avatar = previousUser?.avatar,
+                    profile = previousUser?.profile
                 )
             )
             Log.d("JWT_DECODE", "Cập nhật User thành công")
