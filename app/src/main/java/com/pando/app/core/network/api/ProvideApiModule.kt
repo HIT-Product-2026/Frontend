@@ -3,6 +3,7 @@ package com.pando.app.core.network.api
 import com.pando.app.core.data.api.AuthApi
 import com.pando.app.core.data.api.ConversationApi
 import com.pando.app.core.data.api.FriendshipApi
+import com.pando.app.core.data.api.LocationApi
 import com.pando.app.core.data.api.PostApi
 import com.pando.app.core.data.api.ProfileApi
 import com.pando.app.core.data.api.UserApi
@@ -52,5 +53,11 @@ object ProvideApiModule {
     @Singleton
     fun provideProfileApi(@Named("MainRetrofit") retrofit: Retrofit): ProfileApi {
         return retrofit.create(ProfileApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideLocationApi(@Named("MainRetrofit") retrofit: Retrofit): LocationApi {
+        return retrofit.create(LocationApi::class.java)
     }
 }

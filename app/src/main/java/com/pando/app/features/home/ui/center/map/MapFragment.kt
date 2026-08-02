@@ -5,10 +5,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
-import com.bumptech.glide.load.resource.bitmap.CenterCrop
-import com.bumptech.glide.load.resource.bitmap.RoundedCorners
-import android.graphics.Paint
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -24,17 +20,15 @@ import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
-import androidx.core.graphics.scale
-import androidx.core.graphics.toColorInt
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
-import com.auth0.android.jwt.DecodeException
-import com.auth0.android.jwt.JWT
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.bitmap.CenterCrop
+import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -48,19 +42,15 @@ import com.pando.app.BuildConfig
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
-import com.pando.app.core.network.api.TokenManager
 import com.pando.app.core.session.UserSession
 import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentMapBinding
 import com.pando.app.databinding.LayoutMarkerBinding
-import com.pando.app.features.home.data.model.entity.CurrentUser
 import com.pando.app.features.home.data.model.entity.DataFriendItem
 import com.pando.app.features.home.data.model.entity.FriendItemModel
-import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
 import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
-import com.pando.app.features.widget.WidgetUpdater
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -102,9 +92,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     companion object {
         private const val TAG = "SOCKET_CONNECTION"
     }
-
-    @Inject
-    lateinit var tokenManager: TokenManager
 
     @Inject
     lateinit var userSession: UserSession
@@ -149,6 +136,8 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
     private var currentBearing = 0f
 
+    private var hasLoadedInitialData = false
+
     private val multiplePermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -185,10 +174,17 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         val hasLocation = ContextCompat.checkSelfPermission(
             requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+        val hasNotification = ContextCompat.checkSelfPermission(
+            requireContext(), Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
 
-        if (!(hasCamera && hasLocation)) {
+        if (!(hasCamera && hasLocation && hasNotification)) {
             multiplePermissionsLauncher.launch(
-                arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
+                arrayOf(
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
             )
         }
 
@@ -212,12 +208,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             }
         }
 
-        if (userSession.getCurrentUser() == null) {
-            decodeToken(tokenManager.getAccessToken())
-        }
-
-        mapViewModel.getFriendList()
-
         sensorManager =
             requireContext().getSystemService(
                 Context.SENSOR_SERVICE
@@ -230,8 +220,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     }
 
     override fun initView() {
-        mapViewModel.socketConnect()
-
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 userSession.currentUser.collect { user ->
@@ -403,19 +391,17 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                             SocketConnectionState.Disconnected -> {
                                 mapViewModel.unsubscribeAllLocationTopic()
-                                mapViewModel.socketDisconnect()
                                 Log.d(TAG, "Đã ngắt kết nối")
                             }
 
                             is SocketConnectionState.Error -> {
                                 mapViewModel.unsubscribeAllLocationTopic()
-                                mapViewModel.socketDisconnect()
                                 Log.e(TAG, connectionState.message)
                             }
                         }
                     }
                 }
-                launch{
+                launch {
                     combine(
                         avatarViewModel.avatars,
                         mapViewModel.friends
@@ -462,6 +448,12 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 sensor,
                 SensorManager.SENSOR_DELAY_UI
             )
+        }
+
+        if (!hasLoadedInitialData) {
+            hasLoadedInitialData = true
+
+            mapViewModel.getFriendList()
         }
     }
 
@@ -627,68 +619,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                     circleStrokeColor("#FFFFFF")
                 )
             )
-        }
-    }
-
-    fun decodeToken(token: String?) {
-        if (token.isNullOrEmpty()) {
-            Log.e("JWT_DECODE", "Token null")
-            return
-        }
-
-        try {
-            val jwt = JWT(token)
-
-            val isTokenExpired = jwt.isExpired(10)
-            if (isTokenExpired) {
-                Log.e("JWT_DECODE", "Token đã hết hạn sử dụng. Vui lòng đăng nhập lại")
-                return
-            }
-
-            val id = jwt.getClaim("id").asString()
-            val userName = jwt.getClaim("username").asString()
-            val displayName = jwt.getClaim("displayName").asString()
-            val userMode = jwt.getClaim("mode").asString()
-
-            val uuid = try {
-                UUID.fromString(id)
-            } catch (e: IllegalArgumentException) {
-                Log.e("JWT_DECODE", "ID từ Token không đúng định dạng UUID: $id")
-                return
-            }
-
-            val mode: UserMode? = try {
-                if (userMode != null) {
-                    UserMode.valueOf(userMode.uppercase())
-                } else {
-                    null
-                }
-            } catch (e: IllegalArgumentException) {
-                Log.e("JWT_DECODE", "mode từ Token không đúng định dạng: $userMode")
-                null
-            }
-
-            val currentAvatar = userSession.getCurrentUser()
-                ?.takeIf { it.id == uuid }
-                ?.avatar
-
-            userSession.setCurrentUser(
-                CurrentUser(
-                    id = uuid,
-                    username = userName,
-                    displayName = displayName,
-                    mode = mode,
-                    avatar = currentAvatar
-                )
-            )
-
-            if (currentAvatar == null) {
-                avatarViewModel.loadAvatar(uuid)
-            }
-            Log.d("JWT_DECODE", "Cập nhật User thành công")
-
-        } catch (e: DecodeException) {
-            Log.e("JWT_DECODE", "Token không hợp lệ hoặc bị lỗi cấu trúc: ${e.message}")
         }
     }
 

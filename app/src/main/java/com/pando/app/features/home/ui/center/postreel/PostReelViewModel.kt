@@ -1,6 +1,5 @@
 package com.pando.app.features.home.ui.center.postreel
 
-import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.base.BaseVM
 import com.pando.app.core.extensions.toLocalDateTime
@@ -9,7 +8,10 @@ import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
+import com.pando.app.features.home.data.model.entity.enumEntity.NsfwViewDecision
+import com.pando.app.features.home.data.model.entity.enumEntity.PostModeLocation
 import com.pando.app.features.home.data.model.response.PostsResponse
+import com.pando.app.features.home.data.repository.LocationRepository
 import com.pando.app.features.home.data.repository.PostRepository
 import com.pando.app.features.home.data.socket.MessagesSocket
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,20 +27,33 @@ class PostReelViewModel @Inject constructor(
     private val postRepository: PostRepository,
     private val messagesSocket: MessagesSocket,
     private val socketConnectionManager: SocketConnectionManager,
+    private val locationRepository: LocationRepository
 ) : BaseVM<ApiResponse<PostsResponse>>() {
     val connectionState = socketConnectionManager.connectionState
     private var isLoading = false
 
     private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
     val images = _images.asStateFlow()
+    private val _provinceNames = MutableStateFlow<Map<UUID, String>>(emptyMap())
+    val provinceNames = _provinceNames.asStateFlow()
 
-    private val loadingIds = mutableSetOf<UUID>()
+    private val loadingImageIds = mutableSetOf<UUID>()
+    private val loadingProvinceIds = mutableSetOf<UUID>()
 
-    fun loadPost(postId: UUID) {
-        if (_images.value.containsKey(postId)) {
-            return
+    fun loadPost(postId: UUID, longitude: Double?, latitude: Double?) {
+        loadPostImage(postId)
+
+        if (latitude != null && longitude != null) {
+            loadProvince(postId, latitude, longitude)
         }
-        if (!loadingIds.add(postId)) return
+    }
+
+    private val _nsfwDecisions = MutableStateFlow<Map<UUID, NsfwViewDecision>>(emptyMap())
+    val nsfwDecisions = _nsfwDecisions.asStateFlow()
+
+    fun loadPostImage(postId: UUID) {
+        if (_images.value.containsKey(postId)) return
+        if (!loadingImageIds.add(postId)) return
 
         viewModelScope.launch {
             when (val result = postRepository.getPostImage(postId)) {
@@ -53,12 +68,29 @@ class PostReelViewModel @Inject constructor(
                 }
             }
 
-            loadingIds.remove(postId)
+            loadingImageIds.remove(postId)
         }
     }
 
-    fun loadPosts(postIds: Collection<UUID>) {
-        postIds.distinct().forEach(::loadPost)
+    private fun loadProvince(postId: UUID, latitude: Double, longitude: Double) {
+        if (_provinceNames.value.containsKey(postId)) return
+        if (!loadingProvinceIds.add(postId)) return
+
+        viewModelScope.launch {
+            try {
+                when (val result = locationRepository.getProvince(latitude, longitude)) {
+                    is DataResult.Success -> {
+                        _provinceNames.update { current ->
+                            current + (postId to result.data.data)
+                        }
+                    }
+
+                    is DataResult.Error -> {}
+                }
+            } finally {
+                loadingProvinceIds.remove(postId)
+            }
+        }
     }
 
     fun getPosts() {
@@ -87,16 +119,35 @@ class PostReelViewModel @Inject constructor(
                 val newPosts = response.items
                     .filter { existingIds.add(it.id) }
                     .map { post ->
-                        PostReelItemModel(
-                            id = post.id,
-                            user = post.user,
-                            caption = post.caption,
-                            latitude = post.latitude,
-                            longitude = post.longitude,
-                            modeLocation = post.modeLocation,
-                            conversationId = post.conversation?.id,
-                            createdAt = post.createAt.toLocalDateTime()
-                        )
+                        when (post.modeLocation) {
+                            PostModeLocation.PUBLIC -> {
+                                PostReelItemModel(
+                                    id = post.id,
+                                    user = post.user,
+                                    caption = post.caption,
+                                    latitude = post.latitude,
+                                    longitude = post.longitude,
+                                    modeLocation = post.modeLocation,
+                                    nsfw = post.nsfw,
+                                    conversationId = post.conversation?.id,
+                                    createdAt = post.createAt?.toLocalDateTime()
+                                )
+                            }
+
+                            PostModeLocation.PRIVATE -> {
+                                PostReelItemModel(
+                                    id = post.id,
+                                    user = post.user,
+                                    caption = post.caption,
+                                    latitude = null,
+                                    longitude = null,
+                                    nsfw = post.nsfw,
+                                    modeLocation = post.modeLocation,
+                                    conversationId = post.conversation?.id,
+                                    createdAt = post.createAt?.toLocalDateTime()
+                                )
+                            }
+                        }
                     }
 
                 DataPostReelItem.data.addAll(newPosts)
@@ -116,5 +167,11 @@ class PostReelViewModel @Inject constructor(
 
     fun sendMessage(conversationId: UUID, message: String) {
         messagesSocket.sendMessage(conversationId, message)
+    }
+
+    fun updateNsfwDecision(postId: UUID, decision: NsfwViewDecision) {
+        _nsfwDecisions.update { current ->
+            current + (postId to decision)
+        }
     }
 }

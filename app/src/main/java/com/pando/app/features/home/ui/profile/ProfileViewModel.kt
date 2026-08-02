@@ -31,18 +31,25 @@ class ProfileViewModel @Inject constructor(
     val avatarResult: StateFlow<UiState<ApiResponse<Void>>> = _avatarResult.asStateFlow()
 
     fun updateProfile(
+        displayName: String,
         birthday: String,
         gender: Gender,
         phoneNumber: String
     ) {
         getData {
-            profileRepository.updateProfile(birthday, gender, phoneNumber)
-        }
-    }
-
-    fun updateDisplayName(displayName: String) {
-        getData {
-            userRepository.updateDisplayName(displayName)
+            when (val userResult = userRepository.updateDisplayName(displayName)) {
+                is DataResult.Error -> DataResult.Error(userResult.message)
+                is DataResult.Success -> {
+                    when (val profileResult = profileRepository.updateProfile(
+                        birthday,
+                        gender,
+                        phoneNumber
+                    )) {
+                        is DataResult.Success -> DataResult.Success(profileResult.data)
+                        is DataResult.Error -> DataResult.Error(profileResult.message)
+                    }
+                }
+            }
         }
     }
 

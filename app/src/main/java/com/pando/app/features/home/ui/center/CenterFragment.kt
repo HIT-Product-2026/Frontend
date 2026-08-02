@@ -14,6 +14,7 @@ import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentCenterBinding
+import com.pando.app.features.shared.AvatarViewModel
 import com.pando.app.features.widget.WidgetNavigationViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -31,6 +32,7 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
     lateinit var userSession: UserSession
 
     private val widgetNavigationViewModel: WidgetNavigationViewModel by activityViewModels()
+    private val avatarViewModel: AvatarViewModel by activityViewModels()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -51,7 +53,6 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
     }
 
     override fun initView() {
-        loadCurrentUser()
     }
 
     override fun initActionView() {
@@ -80,10 +81,21 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                widgetNavigationViewModel.replyTarget.collect { shouldOpen ->
-                    if (shouldOpen) {
-                        binding.verticalViewPager.setCurrentItem(PAGE_POST_REEL, false)
-                        widgetNavigationViewModel.handledTarget()
+                launch {
+                    widgetNavigationViewModel.replyTarget.collect { shouldOpen ->
+                        if (shouldOpen) {
+                            binding.verticalViewPager.setCurrentItem(PAGE_POST_REEL, false)
+                            widgetNavigationViewModel.handledTarget()
+                        }
+                    }
+                }
+                launch {
+                    userSession.currentUser.collect { user ->
+                        if (user != null && user.avatar == null) {
+                            avatarViewModel.loadAvatar(user.id)
+                        }
+
+                        binding.profileIcon.loadAvatar(user?.avatar)
                     }
                 }
             }
@@ -96,15 +108,5 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
 
     fun openPostReel() {
         binding.verticalViewPager.setCurrentItem(PAGE_POST_REEL, true)
-    }
-
-    private fun loadCurrentUser() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                userSession.currentUser.collect { user ->
-                    binding.profileIcon.loadAvatar(user?.avatar)
-                }
-            }
-        }
     }
 }

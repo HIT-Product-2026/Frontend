@@ -36,14 +36,6 @@ class MapViewModel @Inject constructor(
     private val _friends = MutableStateFlow<List<FriendItemModel>>(emptyList())
     val friends = _friends.asStateFlow()
 
-    fun socketConnect() {
-        socketConnectionManager.connect()
-    }
-
-    fun socketDisconnect() {
-        socketConnectionManager.disconnect()
-    }
-
     fun subscribeLocationTopic(friendList: List<FriendItemModel>) {
         Log.d(TAG, "subscribeLocationTopic Đã gọi")
         friendList.forEach { item ->

@@ -26,8 +26,11 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.pando.app.core.base.BaseFragment
+import com.pando.app.core.extensions.toLocalDateTime
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentCameraBinding
+import com.pando.app.features.home.data.model.entity.DataPostReelItem
+import com.pando.app.features.home.data.model.entity.PostReelItemModel
 import com.pando.app.features.home.ui.center.CenterFragment
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -54,9 +57,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private var orientationEventListener: OrientationEventListener? = null
     private var rotation = Surface.ROTATION_0
 
-    override fun initData() {
-        startCamera()
+    private var cameraProvider: ProcessCameraProvider? = null
 
+    override fun initData() {
         cameraExecutor = Executors.newSingleThreadExecutor()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
@@ -130,6 +133,22 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
                             is UiState.Success -> {
                                 binding.btnSend.isEnabled = true
+
+                                val post = state.data.data
+                                val newPost = PostReelItemModel(
+                                            id = post.id,
+                                            user = post.user,
+                                            caption = post.caption,
+                                            latitude = post.latitude,
+                                            longitude = post.longitude,
+                                            modeLocation = post.modeLocation,
+                                            nsfw = post.nsfw,
+                                            conversationId = post.conversation?.id,
+                                            createdAt = post.createAt?.toLocalDateTime()
+                                        )
+
+                                DataPostReelItem.data.add(newPost)
+
                                 Toast.makeText(requireContext(), "Đã gửi!", Toast.LENGTH_SHORT)
                                     .show()
                                 switchToCaptureMode()
@@ -154,21 +173,33 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
     }
 
-    override fun onStart() {
-        super.onStart()
+    override fun onResume() {
+        super.onResume()
         orientationEventListener?.enable()
+        binding.cameraContainer.visibility = View.VISIBLE
+        startCamera()
     }
 
-    override fun onStop() {
-        super.onStop()
+    override fun onPause() {
         orientationEventListener?.disable()
+        binding.cameraContainer.visibility = View.GONE
+        cameraProvider?.unbindAll()
+        imageCapture = null
+        super.onPause()
     }
 
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
 
         cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
+            if (!isAdded ||
+                view == null ||
+                !viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+            ) {
+                return@addListener
+            }
+            val provider = cameraProviderFuture.get()
+            cameraProvider = provider
 
             val preview = Preview.Builder()
                 .setTargetRotation(Surface.ROTATION_0)
@@ -185,7 +216,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                 .build()
 
             try {
-                cameraProvider.unbindAll()
+                provider.unbindAll()
 
                 val viewPort = ViewPort.Builder(
                     Rational(1, 1),
@@ -198,7 +229,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                     .setViewPort(viewPort)
                     .build()
 
-                cameraProvider.bindToLifecycle(
+                provider.bindToLifecycle(
                     viewLifecycleOwner, cameraSelector, useCaseGroup
                 )
             } catch (exc: Exception) {
@@ -315,6 +346,12 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun onDestroyView() {
+        orientationEventListener?.disable()
+        orientationEventListener = null
+
+        cameraProvider?.unbindAll()
+        cameraProvider = null
+        imageCapture = null
         cameraExecutor.shutdown()
 //        viewModel.socketDisconnect()
 

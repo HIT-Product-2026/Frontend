@@ -1,15 +1,16 @@
 package com.pando.app.features.home.ui.setting
 
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
+import com.pando.app.MainViewModel
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.network.api.TokenManager
-import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentSettingBinding
 import com.pando.app.features.home.data.model.entity.DataChatMenuItem
@@ -29,8 +30,7 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
     lateinit var tokenManager: TokenManager
     @Inject
     lateinit var userSession: UserSession
-    @Inject
-    lateinit var socketConnectionManager: SocketConnectionManager
+    private val mainViewModel: MainViewModel by activityViewModels()
 
     override fun initData() {
     }
@@ -47,7 +47,7 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
         binding.logoutBtn.setOnClickListener {
             tokenManager.clear()
             userSession.clearCurrentUser()
-            socketConnectionManager.disconnect()
+            mainViewModel.socketDisconnect()
 
             DataPostReelItem.apply {
                 data.clear()
