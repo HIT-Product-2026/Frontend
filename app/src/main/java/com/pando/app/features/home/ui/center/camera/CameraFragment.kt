@@ -142,6 +142,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                                             latitude = post.latitude,
                                             longitude = post.longitude,
                                             modeLocation = post.modeLocation,
+                                            nsfw = post.nsfw,
                                             conversationId = post.conversation?.id,
                                             createdAt = post.createAt?.toLocalDateTime()
                                         )

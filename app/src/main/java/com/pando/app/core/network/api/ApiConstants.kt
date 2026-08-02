@@ -50,6 +50,7 @@ object ApiConstants {
 
     object Profile {
         const val UPDATE_PROFILE = "profile"
+        const val GET_PROFILE = "profile/{user_id}"
     }
 
     object Location {

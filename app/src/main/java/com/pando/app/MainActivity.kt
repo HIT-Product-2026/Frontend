@@ -140,6 +140,7 @@ class MainActivity : AppCompatActivity() {
                         if (user != null) {
                             viewModel.socketConnect()
                             sseManager.connect()
+                            viewModel.loadCurrentUserProfile(user.id)
                         }
                     }
                 }
