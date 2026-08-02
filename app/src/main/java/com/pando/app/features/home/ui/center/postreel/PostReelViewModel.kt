@@ -1,6 +1,5 @@
 package com.pando.app.features.home.ui.center.postreel
 
-import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.base.BaseVM
 import com.pando.app.core.extensions.toLocalDateTime
@@ -9,6 +8,8 @@ import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
+import com.pando.app.features.home.data.model.entity.enumEntity.NsfwViewDecision
+import com.pando.app.features.home.data.model.entity.enumEntity.PostModeLocation
 import com.pando.app.features.home.data.model.response.PostsResponse
 import com.pando.app.features.home.data.repository.PostRepository
 import com.pando.app.features.home.data.socket.MessagesSocket
@@ -33,6 +34,9 @@ class PostReelViewModel @Inject constructor(
     val images = _images.asStateFlow()
 
     private val loadingIds = mutableSetOf<UUID>()
+
+    private val _nsfwDecisions = MutableStateFlow<Map<UUID, NsfwViewDecision>>(emptyMap())
+    val nsfwDecisions = _nsfwDecisions.asStateFlow()
 
     fun loadPost(postId: UUID) {
         if (_images.value.containsKey(postId)) {
@@ -87,16 +91,35 @@ class PostReelViewModel @Inject constructor(
                 val newPosts = response.items
                     .filter { existingIds.add(it.id) }
                     .map { post ->
-                        PostReelItemModel(
-                            id = post.id,
-                            user = post.user,
-                            caption = post.caption,
-                            latitude = post.latitude,
-                            longitude = post.longitude,
-                            modeLocation = post.modeLocation,
-                            conversationId = post.conversation?.id,
-                            createdAt = post.createAt?.toLocalDateTime()
-                        )
+                        when (post.modeLocation) {
+                            PostModeLocation.PUBLIC -> {
+                                PostReelItemModel(
+                                    id = post.id,
+                                    user = post.user,
+                                    caption = post.caption,
+                                    latitude = post.latitude,
+                                    longitude = post.longitude,
+                                    modeLocation = post.modeLocation,
+                                    nsfw = post.nsfw,
+                                    conversationId = post.conversation?.id,
+                                    createdAt = post.createAt?.toLocalDateTime()
+                                )
+                            }
+
+                            PostModeLocation.PRIVATE -> {
+                                PostReelItemModel(
+                                    id = post.id,
+                                    user = post.user,
+                                    caption = post.caption,
+                                    latitude = null,
+                                    longitude = null,
+                                    nsfw = post.nsfw,
+                                    modeLocation = post.modeLocation,
+                                    conversationId = post.conversation?.id,
+                                    createdAt = post.createAt?.toLocalDateTime()
+                                )
+                            }
+                        }
                     }
 
                 DataPostReelItem.data.addAll(newPosts)
@@ -116,5 +139,11 @@ class PostReelViewModel @Inject constructor(
 
     fun sendMessage(conversationId: UUID, message: String) {
         messagesSocket.sendMessage(conversationId, message)
+    }
+
+    fun updateNsfwDecision(postId: UUID, decision: NsfwViewDecision) {
+        _nsfwDecisions.update { current ->
+            current + (postId to decision)
+        }
     }
 }

@@ -8,5 +8,6 @@ data class CurrentUser(
     val username: String?,
     val displayName: String?,
     val mode: UserMode?,
-    val avatar: Any? = null
+    val avatar: Any? = null,
+    val birthday: String?
 )
