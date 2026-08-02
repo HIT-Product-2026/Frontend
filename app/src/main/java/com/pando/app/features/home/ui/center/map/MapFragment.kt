@@ -43,11 +43,8 @@ import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.session.UserSession
-import com.pando.app.core.state.SocketConnectionState
-import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentMapBinding
 import com.pando.app.databinding.LayoutMarkerBinding
-import com.pando.app.features.home.data.model.entity.DataFriendItem
 import com.pando.app.features.home.data.model.entity.FriendItemModel
 import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
@@ -203,7 +200,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                 currentLat = location.latitude
                 currentLng = location.longitude
-
+                mapViewModel.sendLocation(currentLng, currentLat)
                 Log.d("LOCATION_UPDATE", "Lat=$currentLat, Lng=$currentLng")
             }
         }
@@ -351,56 +348,34 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch {
-                    combine(
-                        mapViewModel.connectionState,
-                        mapViewModel.friendState,
-                        avatarViewModel.avatars
-                    ) { connectionState, friendState, avatarState ->
-                        Triple(connectionState, friendState, avatarState)
-                    }.collect { (connectionState, friendState, avatarState) ->
-                        when (connectionState) {
-                            SocketConnectionState.Connecting -> {
-                                Log.d(TAG, "Đang kết nối")
-                            }
-
-                            SocketConnectionState.Connected -> {
-                                Log.d(TAG, "Đã kết nối")
-                                when (friendState) {
-                                    is UiState.Loading -> {}
-                                    is UiState.Success -> {
-                                        val avatarMap = avatarState
-                                        val friendList = DataFriendItem.data.toList()
-
-                                        val updatedFriendList = friendList.map { item ->
-                                            item.copy(avatarUrl = if (avatarMap.containsKey(item.id)) avatarMap[item.id] else null)
-                                        }
-
-                                        DataFriendItem.data.apply {
-                                            clear()
-                                            addAll(updatedFriendList)
-                                        }
-
-                                        mapViewModel.subscribeLocationTopic(updatedFriendList)
-                                    }
-
-                                    is UiState.Error -> {}
-                                    is UiState.Idle -> {}
-                                }
-                            }
-
-                            SocketConnectionState.Disconnected -> {
-                                mapViewModel.unsubscribeAllLocationTopic()
-                                Log.d(TAG, "Đã ngắt kết nối")
-                            }
-
-                            is SocketConnectionState.Error -> {
-                                mapViewModel.unsubscribeAllLocationTopic()
-                                Log.e(TAG, connectionState.message)
-                            }
-                        }
-                    }
-                }
+//                launch {
+//                    combine(
+//                        mapViewModel.friendState,
+//                        avatarViewModel.avatars
+//                    ) { friendState, avatarState ->
+//                        friendState to avatarState
+//                    }.collect { (friendState, avatarState) ->
+//                        when (friendState) {
+//                            is UiState.Loading -> {}
+//                            is UiState.Success -> {
+//                                val avatarMap = avatarState
+//                                val friendList = DataFriendItem.data.toList()
+//
+//                                val updatedFriendList = friendList.map { item ->
+//                                    item.copy(avatarUrl = if (avatarMap.containsKey(item.id)) avatarMap[item.id] else null)
+//                                }
+//
+//                                DataFriendItem.data.apply {
+//                                    clear()
+//                                    addAll(updatedFriendList)
+//                                }
+//                            }
+//
+//                            is UiState.Error -> {}
+//                            is UiState.Idle -> {}
+//                        }
+//                    }
+//                }
                 launch {
                     combine(
                         avatarViewModel.avatars,

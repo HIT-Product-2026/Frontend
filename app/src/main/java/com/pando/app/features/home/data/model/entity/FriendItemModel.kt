@@ -8,7 +8,8 @@ data class FriendItemModel (
     val name: String,
     val avatarUrl: String?=null,
     val longitude: Double?=null,
-    val latitude: Double?=null
+    val latitude: Double?=null,
+    val lastActiveAt: String? = null
 ) : BaseItemModel
 
 class DataFriendItem {
