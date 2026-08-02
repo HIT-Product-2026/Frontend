@@ -145,9 +145,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             Snackbar.make(binding.root, "Cần cấp quyền Camera!", Snackbar.LENGTH_SHORT).show()
         }
 
-        if (locationGranted) {
-            captureLocation()
-        } else {
+        if (!locationGranted) {
             Toast.makeText(
                 requireContext(), "Hãy cấp quyền Vị trí để ghim tọa độ ảnh!", Toast.LENGTH_SHORT
             ).show()
@@ -417,6 +415,11 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             startLocationUpdates()
         }
 
+        val hasLocation = ContextCompat.checkSelfPermission(
+            requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasLocation) captureLocation()
         rotationVectorSensor?.let { sensor ->
             sensorManager.registerListener(
                 this,
