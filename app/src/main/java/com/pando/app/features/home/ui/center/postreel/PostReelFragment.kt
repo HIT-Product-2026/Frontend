@@ -77,10 +77,13 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             val shouldHideImage =
                 item.nsfw == NsfwStatus.TRUE && decision != NsfwViewDecision.ALLOWED
             itemBinding.imgCaptured.isVisible = !shouldHideImage
+
             val image = imageMap[item.id]
             val province = provinceMap[item.id]
 
-            if ((image == null || province == null) &&
+            val shouldLoadProvince =
+                item.latitude != null && item.longitude != null && province == null
+            if ((image == null || shouldLoadProvince) &&
                 lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
             ) {
                 postReelViewModel.loadPost(

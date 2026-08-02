@@ -40,23 +40,16 @@ class PostReelViewModel @Inject constructor(
     private val loadingImageIds = mutableSetOf<UUID>()
     private val loadingProvinceIds = mutableSetOf<UUID>()
 
-    fun loadPost(postId: UUID, longitude: Double, latitude: Double) {
+    fun loadPost(postId: UUID, longitude: Double?, latitude: Double?) {
         loadPostImage(postId)
-        loadProvince(postId, latitude, longitude)
+
+        if (latitude != null && longitude != null) {
+            loadProvince(postId, latitude, longitude)
+        }
     }
 
     private val _nsfwDecisions = MutableStateFlow<Map<UUID, NsfwViewDecision>>(emptyMap())
     val nsfwDecisions = _nsfwDecisions.asStateFlow()
-
-    fun loadPosts(posts: Collection<PostReelItemModel>) {
-        posts.distinctBy { it.id }.forEach { post ->
-            loadPost(
-                postId = post.id,
-                longitude = post.longitude,
-                latitude = post.latitude
-            )
-        }
-    }
 
     fun loadPostImage(postId: UUID) {
         if (_images.value.containsKey(postId)) return
