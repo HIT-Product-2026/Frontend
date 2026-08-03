@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -21,6 +22,7 @@ import com.pando.app.core.session.SessionState
 import com.pando.app.core.session.StartupSessionResult
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.ActivityMainBinding
+import com.pando.app.features.onboarding.OnboardingPreferences
 import com.pando.app.features.widget.WidgetNavigationViewModel
 import com.pando.app.features.widget.WidgetPendingIntentFactory
 import dagger.hilt.android.AndroidEntryPoint
@@ -44,30 +46,119 @@ class MainActivity : AppCompatActivity() {
 
     private val widgetNavigationViewModel: WidgetNavigationViewModel by viewModels()
 
+    //    override fun onCreate(savedInstanceState: Bundle?) {
+//        installSplashScreen()
+//
+//        super.onCreate(savedInstanceState)
+//        enableEdgeToEdge()
+//        binding = ActivityMainBinding.inflate(layoutInflater)
+//        setContentView(binding.root)
+//
+//        val navHostFragment =
+//            supportFragmentManager.findFragmentById(R.id.FragmentContainer) as NavHostFragment
+//        val navController = navHostFragment.navController
+//
+//        sendFCMToken()
+//        handleWidgetIntent(intent)
+//
+//        if (savedInstanceState == null) {
+//            lifecycleScope.launch {
+//                val result = sessionStartupManager.resolveSession()
+//
+//                val navGraph = navController.navInflater
+//                    .inflate(R.navigation.nav_graph)
+//
+//                val startDestination = when (result) {
+//                    StartupSessionResult.AUTHENTICATED -> {
+//                        viewModel.socketConnect()
+//                        sseManager.connect()
+//                        R.id.centerFragment
+//                    }
+//
+//                    StartupSessionResult.NO_SESSION,
+//                    StartupSessionResult.SESSION_EXPIRED,
+//                    StartupSessionResult.NETWORK_ERROR -> {
+//                        viewModel.socketDisconnect()
+//                        sseManager.disconnect()
+//                        R.id.startFragment
+//                    }
+//                }
+//
+//                navGraph.setStartDestination(startDestination)
+//                navController.graph = navGraph
+//
+//                when (result) {
+//                    StartupSessionResult.SESSION_EXPIRED -> {
+//                        Toast.makeText(
+//                            this@MainActivity,
+//                            "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+//                            Toast.LENGTH_LONG
+//                        ).show()
+//                    }
+//
+//                    StartupSessionResult.NETWORK_ERROR -> {
+//                        Toast.makeText(
+//                            this@MainActivity,
+//                            "Không thể kiểm tra phiên đăng nhập. Vui lòng kiểm tra kết nối mạng.",
+//                            Toast.LENGTH_LONG
+//                        ).show()
+//                    }
+//
+//                    else -> Unit
+//                }
+//
+//                observeSessionState(navController)
+//            }
+//        } else {
+//            observeSessionState(navController)
+//        }
+//        observeUiEvents()
+//    }
     override fun onCreate(savedInstanceState: Bundle?) {
+        var startupCompleted = false
+
+        val splashScreen = installSplashScreen()
+        splashScreen.setKeepOnScreenCondition {
+            !startupCompleted
+        }
+
         super.onCreate(savedInstanceState)
+
         enableEdgeToEdge()
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        val navHostFragment =
-            supportFragmentManager.findFragmentById(R.id.FragmentContainer) as NavHostFragment
+        val navHostFragment = supportFragmentManager.findFragmentById(R.id.FragmentContainer) as NavHostFragment
+
         val navController = navHostFragment.navController
 
         sendFCMToken()
-        handleWidgetIntent(intent)
+        observeUiEvents()
 
         if (savedInstanceState == null) {
             lifecycleScope.launch {
-                val result = sessionStartupManager.resolveSession()
+                val onboardingCompleted = OnboardingPreferences.isCompleted(this@MainActivity)
 
-                val navGraph = navController.navInflater
-                    .inflate(R.navigation.nav_graph)
+                if (!onboardingCompleted) {
+                    setupStartDestination(
+                        navController = navController,
+                        startDestination = R.id.onboardingFragment
+                    )
 
-                val startDestination = when (result) {
+                    startupCompleted = true
+
+                    observeSessionState(navController)
+                    return@launch
+                }
+
+                val sessionResult = sessionStartupManager.resolveSession()
+
+                val startDestination = when (sessionResult) {
                     StartupSessionResult.AUTHENTICATED -> {
                         viewModel.socketConnect()
                         sseManager.connect()
+
                         R.id.centerFragment
                     }
 
@@ -76,68 +167,113 @@ class MainActivity : AppCompatActivity() {
                     StartupSessionResult.NETWORK_ERROR -> {
                         viewModel.socketDisconnect()
                         sseManager.disconnect()
+
                         R.id.startFragment
                     }
                 }
 
-                navGraph.setStartDestination(startDestination)
-                navController.graph = navGraph
+                setupStartDestination(
+                    navController = navController,
+                    startDestination = startDestination
+                )
 
-                when (result) {
-                    StartupSessionResult.SESSION_EXPIRED -> {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-
-                    StartupSessionResult.NETWORK_ERROR -> {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Không thể kiểm tra phiên đăng nhập. Vui lòng kiểm tra kết nối mạng.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-
-                    else -> Unit
-                }
-
+                showStartupMessage(sessionResult)
                 observeSessionState(navController)
+
+                startupCompleted = true
+                handleWidgetIntent(intent)
             }
         } else {
+            startupCompleted = true
+
             observeSessionState(navController)
+            handleWidgetIntent(intent)
         }
-        observeUiEvents()
     }
+
+    private fun setupStartDestination(navController: NavController, startDestination: Int) {
+        val navGraph = navController.navInflater.inflate(R.navigation.nav_graph)
+
+        navGraph.setStartDestination(startDestination)
+        navController.graph = navGraph
+    }
+
+    private fun showStartupMessage(result: StartupSessionResult) {
+        when (result) {
+            StartupSessionResult.SESSION_EXPIRED -> {
+                Toast.makeText(
+                    this,
+                    "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+
+            StartupSessionResult.NETWORK_ERROR -> {
+                Toast.makeText(
+                    this,
+                    "Không thể kiểm tra phiên đăng nhập. Vui lòng kiểm tra kết nối mạng.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+
+            else -> Unit
+        }
+    }
+
+//    private fun observeSessionState(navController: NavController) {
+//        lifecycleScope.launch {
+//            repeatOnLifecycle(Lifecycle.State.STARTED) {
+//                launch {
+//                    userSession.sessionState.collect { state ->
+//                        if (state == SessionState.EXPIRED) {
+//                            viewModel.socketDisconnect()
+//                            sseManager.disconnect()
+//                            userSession.markSessionActive()
+//
+//                            val navOptions = NavOptions.Builder()
+//                                .setPopUpTo(R.id.nav_graph, true)
+//                                .build()
+//
+//                            navController.navigate(R.id.startFragment, null, navOptions)
+//
+//                            Toast.makeText(
+//                                this@MainActivity,
+//                                "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+//                                Toast.LENGTH_LONG
+//                            ).show()
+//                        }
+//                    }
+//                }
+//                launch {
+//                    userSession.currentUser.collect { user ->
+//                        if (user != null) {
+//                            viewModel.socketConnect()
+//                            sseManager.connect()
+//                            viewModel.loadCurrentUserProfile(user.id)
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     private fun observeSessionState(navController: NavController) {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     userSession.sessionState.collect { state ->
-                        if (state == SessionState.EXPIRED) {
-                            viewModel.socketDisconnect()
-                            sseManager.disconnect()
-                            userSession.markSessionActive()
+                        val onboardingCompleted = OnboardingPreferences.isCompleted(this@MainActivity)
 
-                            val navOptions = NavOptions.Builder()
-                                .setPopUpTo(R.id.nav_graph, true)
-                                .build()
-
-                            navController.navigate(R.id.startFragment, null, navOptions)
-
-                            Toast.makeText(
-                                this@MainActivity,
-                                "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                                Toast.LENGTH_LONG
-                            ).show()
+                        if (state == SessionState.EXPIRED && onboardingCompleted) {
+                            handleExpiredSession(navController)
                         }
                     }
                 }
                 launch {
                     userSession.currentUser.collect { user ->
-                        if (user != null) {
+                        val onboardingCompleted = OnboardingPreferences.isCompleted(this@MainActivity)
+
+                        if (user != null && onboardingCompleted) {
                             viewModel.socketConnect()
                             sseManager.connect()
                             viewModel.loadCurrentUserProfile(user.id)
@@ -146,6 +282,35 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun handleExpiredSession(navController: NavController) {
+        viewModel.socketDisconnect()
+        sseManager.disconnect()
+
+        /*
+         * Đặt lại trạng thái để collector không xử lý liên tục.
+         */
+        userSession.markSessionActive()
+
+        val navOptions = NavOptions.Builder()
+            .setPopUpTo(
+                R.id.nav_graph,
+                inclusive = true
+            )
+            .build()
+
+        navController.navigate(
+            R.id.startFragment,
+            null,
+            navOptions
+        )
+
+        Toast.makeText(
+            this,
+            "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     private fun observeUiEvents() {
@@ -190,9 +355,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleWidgetIntent(intent: Intent?) {
-        if (intent?.action ==
-            WidgetPendingIntentFactory.ACTION_OPEN_POST_REEL
-        ) {
+        if (intent?.action == WidgetPendingIntentFactory.ACTION_OPEN_POST_REEL) {
             widgetNavigationViewModel.goToTarget()
         }
     }

@@ -199,4 +199,17 @@
             app:destination="@id/friendFragment" />
     </fragment>
 
+    <fragment
+        android:id="@+id/onboardingFragment"
+        android:name="com.pando.app.features.onboarding.OnboardingFragment"
+        android:label="Onboarding">
+
+        <action
+            android:id="@+id/action_onboardingFragment_to_startFragment"
+            app:destination="@id/startFragment"
+            app:popUpTo="@id/onboardingFragment"
+            app:popUpToInclusive="true" />
+
+    </fragment>
+
 </navigation>
