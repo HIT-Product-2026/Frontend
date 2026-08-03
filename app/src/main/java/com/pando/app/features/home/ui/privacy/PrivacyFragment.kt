@@ -1,4 +1,4 @@
-package com.pando.app
+package com.pando.app.features.home.ui.privacy
 
 import android.widget.Toast
 import androidx.fragment.app.viewModels
@@ -11,7 +11,6 @@ import com.pando.app.core.session.UserSession
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentPrivacyBinding
 import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
-import com.pando.app.features.home.ui.setting.PrivacyViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject

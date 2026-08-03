@@ -1,4 +1,4 @@
-package com.pando.app.features.home.ui.setting
+package com.pando.app.features.home.ui.privacy
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

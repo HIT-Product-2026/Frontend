@@ -128,7 +128,7 @@
     </fragment>
     <fragment
         android:id="@+id/privacyFragment"
-        android:name="com.pando.app.PrivacyFragment"
+        android:name="com.pando.app.features.home.ui.privacy.PrivacyFragment"
         android:label="fragment_privacy"
         tools:layout="@layout/fragment_privacy" />
     <fragment
