@@ -20,7 +20,7 @@ import javax.inject.Singleton
 
 @Singleton
 class SseManager @Inject constructor(
-    @SseOkHttpClient
+    @param:SseOkHttpClient
     private val okHttpClient: OkHttpClient,
     private val tokenManager: TokenManager
 ) {
@@ -66,18 +66,8 @@ class SseManager @Inject constructor(
         val request = Request.Builder()
             .url(url)
             .get()
-            .header(
-                "Authorization",
-                "Bearer $accessToken"
-            )
-            .header(
-                "Accept",
-                "text/event-stream"
-            )
-            .header(
-                "Cache-Control",
-                "no-cache"
-            )
+            .header("Accept","text/event-stream")
+            .header("Cache-Control", "no-cache")
             .build()
 
         val factory = EventSources.createFactory(okHttpClient)
