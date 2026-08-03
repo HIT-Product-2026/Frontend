@@ -2,7 +2,6 @@ package com.pando.app.features.home.data.socket
 
 import android.util.Log
 import com.google.gson.Gson
-import com.google.gson.GsonBuilder
 import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.network.socket.SocketConstants
 import com.pando.app.features.home.data.model.request.SendImageRequest
@@ -12,6 +11,7 @@ import io.reactivex.disposables.Disposable
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import ua.naiksoftware.stomp.StompClient
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,7 +25,7 @@ class MessagesSocket @Inject constructor(
         private const val TAG = "MessageSocket"
     }
 
-    private val conversationSubscriptions = mutableMapOf<UUID, Disposable>()
+    private val conversationSubscriptions = mutableMapOf<UUID, ActiveSubscription>()
 
     private val _message = MutableSharedFlow<ChatMessageResponse>(
         extraBufferCapacity = 64,
@@ -39,10 +39,15 @@ class MessagesSocket @Inject constructor(
             return
         }
 
-        if (conversationSubscriptions.containsKey(conversationId)) {
-            Log.d(TAG, "Conversation $conversationId đã subscribe")
+        val existing = conversationSubscriptions[conversationId]
+
+        if (existing?.client === client && !existing.disposable.isDisposed) {
+            Log.d(TAG, "Conversation đã subscribe trên client hiện tại")
             return
         }
+
+        existing?.disposable?.dispose()
+        conversationSubscriptions.remove(conversationId)
 
         val destination = "${SocketConstants.Chat.TOPIC_CONVERSATION}/$conversationId"
         Log.d(TAG, "Subscribe destination: $destination")
@@ -69,16 +74,25 @@ class MessagesSocket @Inject constructor(
                 }
             )
 
-        conversationSubscriptions[conversationId] = disposable
+        conversationSubscriptions[conversationId] = ActiveSubscription(
+                client = client,
+                disposable = disposable
+            )
     }
 
     fun unsubscribeConversation(conversationId: UUID) {
-        conversationSubscriptions.values.forEach { disposable ->
-            disposable.dispose()
+        conversationSubscriptions.remove(conversationId)?.disposable?.dispose()
+
+        Log.d(TAG, "Đã unsubscribe conversation $conversationId")
+    }
+
+    fun unsubscribeAllConversation() {
+        conversationSubscriptions.values.forEach {
+            it.disposable.dispose()
         }
         conversationSubscriptions.clear()
 
-        Log.d(TAG, "Đã unsubscribe conversation $conversationId")
+        Log.d(TAG, "Đã unsubscribe tất cả conversation")
     }
 
     fun sendMessage(conversationId: UUID, content: String) {
@@ -142,4 +156,9 @@ class MessagesSocket @Inject constructor(
             }
         )
     }
+
+    private data class ActiveSubscription(
+        val client: StompClient,
+        val disposable: Disposable
+    )
 }

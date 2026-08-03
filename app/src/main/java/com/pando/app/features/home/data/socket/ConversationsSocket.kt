@@ -9,6 +9,7 @@ import io.reactivex.disposables.Disposable
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import ua.naiksoftware.stomp.StompClient
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,6 +21,8 @@ class ConversationsSocket @Inject constructor(
     companion object {
         private const val TAG = "ConversationSocket"
     }
+
+    private var subscribedClient: StompClient? = null
 
     private val _conversationUpdates = MutableSharedFlow<ConversationDto>(
         extraBufferCapacity = 64,
@@ -35,10 +38,12 @@ class ConversationsSocket @Inject constructor(
             return
         }
 
-        if (subscription != null) {
-            Log.d(TAG, "Đã subscribe conversation updates rồi")
+        if (subscribedClient === client && subscription?.isDisposed == false) {
+            Log.d(TAG, "Client hiện tại đã subscribe conversation")
             return
         }
+
+        unsubscribe()
 
         val destination = SocketConstants.Chat.USER_QUEUE_CONVERSATIONS
         Log.d(TAG, "Subscribe destination: $destination")
@@ -65,12 +70,14 @@ class ConversationsSocket @Inject constructor(
                 }
             )
 
+        subscribedClient = client
         Log.d(TAG, "Đã subscribe $destination")
     }
 
     fun unsubscribe() {
         subscription?.dispose()
         subscription = null
+        subscribedClient = null
 
         Log.d(TAG, "Đã unsubscribe conversation")
     }
