@@ -10,6 +10,7 @@ import io.reactivex.disposables.Disposable
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import ua.naiksoftware.stomp.StompClient
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,7 +24,7 @@ class MapSocket @Inject constructor(
         private const val TAG = "MapSocket"
     }
 
-    private val mapSubscriptions = mutableMapOf<UUID, Disposable>()
+    private val mapSubscriptions = mutableMapOf<UUID, ActiveSubscription>()
 
     private val _location = MutableSharedFlow<LocationResponse>(
         extraBufferCapacity = 64,
@@ -38,10 +39,15 @@ class MapSocket @Inject constructor(
             return
         }
 
-        if (mapSubscriptions.containsKey(friendId)) {
-            Log.d(TAG, "Friend $friendId đã subscribe")
+        val existing = mapSubscriptions[friendId]
+
+        if (existing?.client === client && !existing.disposable.isDisposed) {
+            Log.d(TAG, "Map đã subscribe trên client hiện tại")
             return
         }
+
+        existing?.disposable?.dispose()
+        mapSubscriptions.remove(friendId)
 
         val destination = "${SocketConstants.Chat.TOPIC_LOCATION}/$friendId"
         Log.d(TAG, "Subscribe destination: $destination")
@@ -68,19 +74,20 @@ class MapSocket @Inject constructor(
                 }
             )
 
-        mapSubscriptions[friendId] = disposable
+        mapSubscriptions[friendId] = ActiveSubscription(
+            client = client,
+            disposable = disposable
+        )
     }
 
-    fun unsubscribeALocation(friendId: UUID){
-        mapSubscriptions
-            .remove(friendId)
-            ?.dispose()
+    fun unsubscribeALocation(friendId: UUID) {
+        mapSubscriptions.remove(friendId)?.disposable?.dispose()
         Log.d(TAG, "Đã unsubscribe location của friend: $friendId")
     }
 
     fun unsubscribeAllLocation() {
-        mapSubscriptions.values.forEach { disposable ->
-            disposable.dispose()
+        mapSubscriptions.values.forEach {
+            it.disposable.dispose()
         }
         mapSubscriptions.clear()
 
@@ -119,4 +126,9 @@ class MapSocket @Inject constructor(
             }
         )
     }
+
+    private data class ActiveSubscription(
+        val client: StompClient,
+        val disposable: Disposable
+    )
 }
