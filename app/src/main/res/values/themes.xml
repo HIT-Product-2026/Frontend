@@ -6,4 +6,17 @@
     </style>
 
     <style name="Theme.Frontend" parent="Base.Theme.Frontend" />
+
+    <style name="Theme.PanDo.Starting" parent="Theme.SplashScreen">
+
+        <!-- Màu nền splash -->
+        <item name="windowSplashScreenBackground">@color/white</item>
+
+        <!-- Icon giữa màn hình -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_app</item>
+
+        <!-- Theme thật của app sau khi splash biến mất -->
+        <item name="postSplashScreenTheme">@style/Base.Theme.Frontend</item>
+
+    </style>
 </resources>

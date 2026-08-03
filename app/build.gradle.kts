@@ -92,6 +92,7 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
     implementation("androidx.viewpager2:viewpager2:1.1.0")
     implementation("com.auth0.android:jwtdecode:2.0.2")
+    implementation("androidx.core:core-splashscreen:1.2.0")
 
     val lifecycle_version = "2.11.0"
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version")

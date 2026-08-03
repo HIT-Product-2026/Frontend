@@ -139,15 +139,32 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
-        val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        val notificationGranted =
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                permissions[Manifest.permission.POST_NOTIFICATIONS] == true
+            } else {
+                true
+            }
 
         if (!cameraGranted) {
             Snackbar.make(binding.root, "Cần cấp quyền Camera!", Snackbar.LENGTH_SHORT).show()
         }
 
-        if (!locationGranted) {
+        if (!(fineGranted || coarseGranted)) {
             Toast.makeText(
-                requireContext(), "Hãy cấp quyền Vị trí để ghim tọa độ ảnh!", Toast.LENGTH_SHORT
+                requireContext(),
+                "Cần quyền vị trí để sử dụng bản đồ",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
+        if (!notificationGranted) {
+            Toast.makeText(
+                requireContext(),
+                "Cần quyền thông báo để chạy chia sẻ vị trí",
+                Toast.LENGTH_SHORT
             ).show()
         }
     }
@@ -178,7 +195,8 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 arrayOf(
                     Manifest.permission.CAMERA,
                     Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.POST_NOTIFICATIONS
+                    Manifest.permission.POST_NOTIFICATIONS,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
                 )
             )
         }
