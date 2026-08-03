@@ -24,4 +24,6 @@ interface UserApi {
     @Multipart
     @POST(ApiConstants.User.UPDATE_AVATAR)
     suspend fun updateAvatar(@Part file: MultipartBody.Part) : Response<ApiResponse<Void>>
+    @PUT(ApiConstants.User.UPDATE_USER_MODE)
+    suspend fun updateUserMode(@Query("mode") mode: String) : Response<ApiResponse<Void>>
 }

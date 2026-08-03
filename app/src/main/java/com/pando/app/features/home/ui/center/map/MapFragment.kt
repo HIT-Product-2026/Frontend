@@ -46,6 +46,7 @@ import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentMapBinding
 import com.pando.app.databinding.LayoutMarkerBinding
 import com.pando.app.features.home.data.model.entity.FriendItemModel
+import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
 import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -216,7 +217,9 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                 currentLat = location.latitude
                 currentLng = location.longitude
-                mapViewModel.sendLocation(currentLng, currentLat)
+                if (userSession.getCurrentUser()?.mode != UserMode.PRIVATE) {
+                    mapViewModel.sendLocation(currentLng, currentLat)
+                }
                 Log.d("LOCATION_UPDATE", "Lat=$currentLat, Lng=$currentLng")
             }
         }

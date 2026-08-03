@@ -98,6 +98,10 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
         binding.editBtn.setOnClickListener {
             findNavController().navigate(R.id.action_settingFragment_to_profileFragment)
         }
+
+        binding.privacyBtn.setOnClickListener {
+            findNavController().navigate(R.id.action_settingFragment_to_privacyFragment)
+        }
     }
 
     private fun loadCurrentUser() {

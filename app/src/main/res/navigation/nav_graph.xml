@@ -122,7 +122,15 @@
         <action
             android:id="@+id/action_settingFragment_to_profileFragment"
             app:destination="@id/profileFragment" />
+        <action
+            android:id="@+id/action_settingFragment_to_privacyFragment"
+            app:destination="@id/privacyFragment" />
     </fragment>
+    <fragment
+        android:id="@+id/privacyFragment"
+        android:name="com.pando.app.PrivacyFragment"
+        android:label="fragment_privacy"
+        tools:layout="@layout/fragment_privacy" />
     <fragment
         android:id="@+id/chatMenuFragment"
         android:name="com.pando.app.features.home.ui.chatmenu.ChatMenuFragment"

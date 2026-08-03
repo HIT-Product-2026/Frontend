@@ -26,6 +26,7 @@ object ApiConstants {
         const val GET_USER_AVATAR = "user/{user_id}/avatar"
         const val UPDATE_DISPLAY_NAME = "user/display-name"
         const val UPDATE_AVATAR = "user/avatar"
+        const val UPDATE_USER_MODE = "user/mode"
     }
 
     object FriendShip {
