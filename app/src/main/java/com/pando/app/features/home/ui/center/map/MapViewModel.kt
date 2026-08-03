@@ -5,18 +5,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.network.socket.SocketConnectionManager
+import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.entity.DataFriendItem
 import com.pando.app.features.home.data.model.entity.FriendItemModel
 import com.pando.app.features.home.data.model.response.FriendListResponse
-import com.pando.app.features.home.data.model.response.LocationUserResponseSocket
+import com.pando.app.features.home.data.model.response.LocationResponse
 import com.pando.app.features.home.data.repository.FriendshipRepository
+import com.pando.app.features.home.data.repository.LocationRepository
 import com.pando.app.features.home.data.socket.MapSocket
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -25,12 +28,14 @@ import javax.inject.Inject
 class MapViewModel @Inject constructor(
     private val socketConnectionManager: SocketConnectionManager,
     private val mapSocket: MapSocket,
-    private val friendshipRepository: FriendshipRepository
+    private val friendshipRepository: FriendshipRepository,
+    private val locationRepository: LocationRepository
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "MapService"
     }
+
     val connectionState = socketConnectionManager.connectionState
 
     private val _friends = MutableStateFlow<List<FriendItemModel>>(emptyList())
@@ -47,7 +52,7 @@ class MapViewModel @Inject constructor(
         mapSocket.unsubscribeALocation(friendId)
     }
 
-    fun unsubscribeAllLocationTopic(){
+    fun unsubscribeAllLocationTopic() {
         mapSocket.unsubscribeAllLocation()
     }
 
@@ -63,9 +68,31 @@ class MapViewModel @Inject constructor(
                 updateLocation(location)
             }
         }
+
+        viewModelScope.launch {
+            combine(
+                connectionState,
+                friends
+            ) { connectionState, friends ->
+                connectionState to friends
+            }.collect { (connectionState, friends) ->
+                when (connectionState) {
+                    SocketConnectionState.Connected -> {
+                        subscribeLocationTopic(friends)
+                    }
+
+                    SocketConnectionState.Disconnected,
+                    is SocketConnectionState.Error -> {
+                        unsubscribeAllLocationTopic()
+                    }
+
+                    SocketConnectionState.Connecting -> Unit
+                }
+            }
+        }
     }
 
-    private fun updateLocation(location: LocationUserResponseSocket) {
+    private fun updateLocation(location: LocationResponse) {
         Log.i(TAG, "Update location update location")
         val oldItem = _friends.value.firstOrNull { item ->
             item.id == location.userId
@@ -87,8 +114,10 @@ class MapViewModel @Inject constructor(
         _friends.value = updatedList
     }
 
-    private val _friendState = MutableStateFlow<UiState<ApiResponse<FriendListResponse>>>(UiState.Idle)
-    val friendState: StateFlow<UiState<ApiResponse<FriendListResponse>>> = _friendState.asStateFlow()
+    private val _friendState =
+        MutableStateFlow<UiState<ApiResponse<FriendListResponse>>>(UiState.Idle)
+    val friendState: StateFlow<UiState<ApiResponse<FriendListResponse>>> =
+        _friendState.asStateFlow()
 
     fun getFriendList() {
         viewModelScope.launch {
@@ -105,20 +134,51 @@ class MapViewModel @Inject constructor(
 
                     val data = result.data.data.items
                     if (total > 0) {
-                        data.forEach { item ->
-                            DataFriendItem.data.add(
-                                FriendItemModel(
-                                    item.id,
-                                    item.displayName.ifEmpty { item.username }
-                                )
+                        val friendList = data.map { user ->
+                            FriendItemModel(
+                                id = user.id,
+                                name = user.displayName.ifEmpty { user.username }
                             )
                         }
+
+                        val locationListByUserId = when (val locationResult = locationRepository.getFriendLocations()) {
+                                is DataResult.Success -> {
+                                    locationResult.data.data.items.associateBy {
+                                        it.userId
+                                    }
+                                }
+
+                                is DataResult.Error -> {
+                                    Log.e(TAG, "Không lấy được lịch sử vị trí: ${locationResult.message}")
+                                    emptyMap()
+                                }
+                            }
+
+                        val mergedFriendList = friendList.map { friend ->
+                            val location = locationListByUserId[friend.id]
+
+                            friend.copy(
+                                latitude = location?.latitude,
+                                longitude = location?.longitude,
+                                lastActiveAt = location?.lastActiveAt
+                            )
+                        }
+
+                        _friends.value = mergedFriendList
+
+                        DataFriendItem.data.apply {
+                            clear()
+                            addAll(mergedFriendList)
+                        }
+
+                        DataFriendItem.total = mergedFriendList.size
 
                         _friends.value = DataFriendItem.data.toList()
                     }
 
                     _friendState.value = UiState.Success(result.data)
                 }
+
                 is DataResult.Error -> _friendState.value = UiState.Error(result.message)
             }
         }

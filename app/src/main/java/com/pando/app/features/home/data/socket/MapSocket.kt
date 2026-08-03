@@ -5,7 +5,7 @@ import com.google.gson.Gson
 import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.network.socket.SocketConstants
 import com.pando.app.features.home.data.model.request.SendLocationRequest
-import com.pando.app.features.home.data.model.response.LocationUserResponseSocket
+import com.pando.app.features.home.data.model.response.LocationResponse
 import io.reactivex.disposables.Disposable
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -25,7 +25,7 @@ class MapSocket @Inject constructor(
 
     private val mapSubscriptions = mutableMapOf<UUID, Disposable>()
 
-    private val _location = MutableSharedFlow<LocationUserResponseSocket>(
+    private val _location = MutableSharedFlow<LocationResponse>(
         extraBufferCapacity = 64,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
@@ -53,7 +53,7 @@ class MapSocket @Inject constructor(
                     Log.d(TAG, "Nhận message: ${topicMessage.payload}")
 
                     val message = runCatching {
-                        gson.fromJson(topicMessage.payload, LocationUserResponseSocket::class.java)
+                        gson.fromJson(topicMessage.payload, LocationResponse::class.java)
                     }.getOrElse { throwable ->
                         Log.e(TAG, "Không parse được Friend", throwable)
                         null
