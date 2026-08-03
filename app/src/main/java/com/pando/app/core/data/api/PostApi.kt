@@ -6,6 +6,7 @@ import com.pando.app.features.home.data.model.response.PostResponse
 import com.pando.app.features.home.data.model.response.PostsResponse
 import okhttp3.MultipartBody
 import retrofit2.Response
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
@@ -26,4 +27,6 @@ interface PostApi {
     suspend fun getPosts(@Query("cursor") cursor: String?) : Response<ApiResponse<PostsResponse>>
     @GET(ApiConstants.Post.GET_POST_IMAGE)
     suspend fun getPostImage(@Path("post_id") postId: UUID) : Response<ApiResponse<String>>
+    @DELETE(ApiConstants.Post.DELETE_POST)
+    suspend fun deletePost(@Path("post_id") postId: UUID) : Response<ApiResponse<Void>>
 }

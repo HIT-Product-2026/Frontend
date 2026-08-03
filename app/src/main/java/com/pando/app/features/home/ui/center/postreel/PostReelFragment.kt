@@ -149,6 +149,24 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     override fun initActionView() {
+        childFragmentManager.setFragmentResultListener(
+            BottomSheetMorePostReelFragment.REQUEST_KEY,
+            viewLifecycleOwner
+        ) { _, bundle ->
+            val action = bundle.getString(
+                BottomSheetMorePostReelFragment.RESULT_ACTION
+            )
+
+            val postId = bundle
+                .getString(BottomSheetMorePostReelFragment.RESULT_POST_ID)
+                ?.let(UUID::fromString)
+                ?: return@setFragmentResultListener
+
+            if (action == BottomSheetMorePostReelFragment.ACTION_DELETE_POST) {
+                postReelViewModel.deletePost(postId)
+            }
+        }
+
         binding.btnCapture.setOnClickListener {
             (parentFragment as? CenterFragment)?.openCamera()
         }
@@ -174,9 +192,10 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 ?: return@setOnClickListener
 
             val imageUrl = imageMap[currentReel.id] ?: return@setOnClickListener
+            val isOwner = currentReel.user.id == userSession.getCurrentUser()?.id
 
             BottomSheetMorePostReelFragment
-                .newInstance(currentReel.id, imageUrl)
+                .newInstance(currentReel.id, imageUrl, isOwner)
                 .show(childFragmentManager, "MorePostReel")
         }
 
@@ -291,6 +310,48 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                                 checkCurrentNsfwReel()
                             }
                         }
+                }
+                launch {
+                    postReelViewModel.deletePostState.collect { state ->
+                        when (state) {
+                            is UiState.Loading -> {
+                                binding.btnMore.isEnabled = false
+                            }
+
+                            is UiState.Success -> {
+                                val postId = state.data
+
+                                DataPostReelItem.data.removeAll {
+                                    it.id == postId
+                                }
+
+                                DataPostReelItem.total =
+                                    DataPostReelItem.total
+                                        ?.minus(1)
+                                        ?.coerceAtLeast(0)
+
+                                postReelAdapter.submitList(
+                                    DataPostReelItem.data.toList()
+                                )
+
+                                binding.btnMore.isEnabled = true
+
+                                Toast.makeText(requireContext(), "Đã xóa bài viết", Toast.LENGTH_SHORT).show()
+
+                                postReelViewModel.clearDeletePostState()
+                            }
+
+                            is UiState.Error -> {
+                                binding.btnMore.isEnabled = true
+
+                                Toast.makeText(requireContext(), state.message,Toast.LENGTH_SHORT).show()
+
+                                postReelViewModel.clearDeletePostState()
+                            }
+
+                            UiState.Idle -> Unit
+                        }
+                    }
                 }
             }
         }

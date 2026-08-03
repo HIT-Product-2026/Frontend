@@ -35,7 +35,7 @@
                 android:layout_height="@dimen/_50sdp"
                 android:layout_marginBottom="@dimen/_5sdp"
                 android:gravity="center"
-                android:text="Xóa ảnh"
+                android:text="Xóa bài viết"
                 android:textColor="#FF4545"
                 android:textSize="@dimen/_17sdp"
                 android:textStyle="bold" />

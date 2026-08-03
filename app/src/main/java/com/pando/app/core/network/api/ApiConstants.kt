@@ -19,6 +19,7 @@ object ApiConstants {
         const val CREATE_POST = "post"
         const val GET_POST = "post"
         const val GET_POST_IMAGE = "post/{post_id}/image"
+        const val DELETE_POST = "post/{post_id}"
     }
     object User {
         const val SEND_FCM_TOKEN = "user/fcm-token"

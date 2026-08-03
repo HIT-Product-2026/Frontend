@@ -9,9 +9,9 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
-class PostRepository @Inject constructor (
+class PostRepository @Inject constructor(
     private val postApi: PostApi
-): BaseRepository() {
+) : BaseRepository() {
     private val postCache = ConcurrentHashMap<UUID, ApiResponse<String>>()
 
     suspend fun getPostImage(postId: UUID): DataResult<ApiResponse<String>> {
@@ -37,9 +37,24 @@ class PostRepository @Inject constructor (
         postCache.clear()
     }
 
-    suspend fun getPosts(cursor: String?) : DataResult<ApiResponse<PostsResponse>> {
+    suspend fun getPosts(cursor: String?): DataResult<ApiResponse<PostsResponse>> {
         return safeApiCall {
             postApi.getPosts(cursor)
+        }
+    }
+
+    suspend fun deletePost(postId: UUID): DataResult<ApiResponse<Void>> {
+        return when (
+            val result = safeApiCall {
+                postApi.deletePost(postId)
+            }
+        ) {
+            is DataResult.Success -> {
+                postCache.remove(postId)
+                result
+            }
+
+            is DataResult.Error -> result
         }
     }
 }

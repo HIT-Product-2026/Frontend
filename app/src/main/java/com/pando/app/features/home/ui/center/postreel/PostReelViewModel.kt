@@ -5,6 +5,7 @@ import com.pando.app.core.base.BaseVM
 import com.pando.app.core.extensions.toLocalDateTime
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.network.socket.SocketConnectionManager
+import com.pando.app.core.state.UiState
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
@@ -36,6 +37,9 @@ class PostReelViewModel @Inject constructor(
     val images = _images.asStateFlow()
     private val _provinceNames = MutableStateFlow<Map<UUID, String>>(emptyMap())
     val provinceNames = _provinceNames.asStateFlow()
+    private val _deletePostState = MutableStateFlow<UiState<UUID>>(UiState.Idle)
+
+    val deletePostState = _deletePostState.asStateFlow()
 
     private val loadingImageIds = mutableSetOf<UUID>()
     private val loadingProvinceIds = mutableSetOf<UUID>()
@@ -173,5 +177,32 @@ class PostReelViewModel @Inject constructor(
         _nsfwDecisions.update { current ->
             current + (postId to decision)
         }
+    }
+
+    fun deletePost(postId: UUID) {
+        if (_deletePostState.value is UiState.Loading) return
+
+        viewModelScope.launch {
+            _deletePostState.value = UiState.Loading
+
+            when (val result = postRepository.deletePost(postId)) {
+                is DataResult.Success -> {
+                    _images.update { it - postId }
+                    _provinceNames.update { it - postId }
+                    _nsfwDecisions.update { it - postId }
+
+                    _deletePostState.value = UiState.Success(postId)
+                }
+
+                is DataResult.Error -> {
+                    _deletePostState.value =
+                        UiState.Error(result.message)
+                }
+            }
+        }
+    }
+
+    fun clearDeletePostState() {
+        _deletePostState.value = UiState.Idle
     }
 }
