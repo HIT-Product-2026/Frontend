@@ -56,12 +56,6 @@ class MapViewModel @Inject constructor(
         mapSocket.unsubscribeAllLocation()
     }
 
-    fun sendLocation(longitude: Double?, latitude: Double?) {
-        if (longitude == null || latitude == null) return
-
-        mapSocket.sendLocation(longitude, latitude)
-    }
-
     init {
         viewModelScope.launch {
             mapSocket.location.collect { location ->

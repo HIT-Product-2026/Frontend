@@ -6,6 +6,7 @@ import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.network.socket.SocketConstants
 import com.pando.app.features.home.data.model.request.SendLocationRequest
 import com.pando.app.features.home.data.model.response.LocationResponse
+import io.reactivex.Completable
 import io.reactivex.disposables.Disposable
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -94,15 +95,18 @@ class MapSocket @Inject constructor(
         Log.d(TAG, "Đã unsubscribe tất cả location")
     }
 
-    fun sendLocation(longitude: Double?, latitude: Double?) {
+    fun createSendLocationOperation(
+        longitude: Double?,
+        latitude: Double?
+    ): Completable? {
         val client = connectionManager.getConnectedClient() ?: run {
             Log.e(TAG, "Chưa kết nối")
-            return
+            return null
         }
 
         if (longitude == null || latitude == null) {
-            Log.e(TAG, "Không có tọa độ để ")
-            return
+            Log.e(TAG, "Không có tọa độ để gửi")
+            return null
         }
 
         val request = SendLocationRequest(
@@ -114,17 +118,15 @@ class MapSocket @Inject constructor(
 
         Log.d(TAG, "Bắt đầu gửi location")
 
-        client.send(
+        return client.send(
             SocketConstants.Chat.SEND_LOCATION_DESTINATION,
             payload
-        ).subscribe(
-            {
+        ).doOnComplete {
                 Log.d(TAG, "Đã gửi message lên STOMP")
-            },
-            { throwable ->
+            }
+            .doOnError { throwable ->
                 Log.e(TAG, "Không thể gửi message", throwable)
             }
-        )
     }
 
     private data class ActiveSubscription(

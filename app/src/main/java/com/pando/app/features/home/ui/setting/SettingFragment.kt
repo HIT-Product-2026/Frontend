@@ -10,6 +10,8 @@ import com.pando.app.MainViewModel
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.location.LocationTrackingController
+import com.pando.app.core.location.TrackingPreferences
 import com.pando.app.core.network.api.TokenManager
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentSettingBinding
@@ -30,6 +32,8 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
     lateinit var tokenManager: TokenManager
     @Inject
     lateinit var userSession: UserSession
+    @Inject
+    lateinit var trackingPreferences: TrackingPreferences
     private val mainViewModel: MainViewModel by activityViewModels()
 
     override fun initData() {
@@ -45,6 +49,8 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
         }
 
         binding.logoutBtn.setOnClickListener {
+            trackingPreferences.setTrackingEnabled(false)
+            LocationTrackingController.stop(requireContext())
             tokenManager.clear()
             userSession.clearCurrentUser()
             mainViewModel.socketDisconnect()

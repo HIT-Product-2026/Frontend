@@ -82,12 +82,12 @@
                 android:resource="@xml/post_widget_small_info" />
         </receiver>
 
-<!--        <service-->
-<!--            android:name=".core.location.LocationTrackingService"-->
-<!--            android:enabled="true"-->
-<!--            android:exported="false"-->
-<!--            android:foregroundServiceType="location"-->
-<!--            android:stopWithTask="false" />-->
+        <service
+            android:name=".core.location.LocationTrackingService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="location"
+            android:stopWithTask="false" />
     </application>
 
 </manifest>

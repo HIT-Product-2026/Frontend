@@ -12,6 +12,7 @@ import androidx.viewpager2.widget.ViewPager2
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.location.LocationNavigationViewModel
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentCenterBinding
 import com.pando.app.features.shared.AvatarViewModel
@@ -32,6 +33,7 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
     lateinit var userSession: UserSession
 
     private val widgetNavigationViewModel: WidgetNavigationViewModel by activityViewModels()
+    private val locationNavigationViewModel: LocationNavigationViewModel by activityViewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -86,6 +88,13 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
                         if (shouldOpen) {
                             binding.verticalViewPager.setCurrentItem(PAGE_POST_REEL, false)
                             widgetNavigationViewModel.handledTarget()
+                        }
+                    }
+                }
+                launch {
+                    locationNavigationViewModel.focusCurrentLocation.collect { shouldFocus ->
+                        if (shouldFocus) {
+                            binding.verticalViewPager.setCurrentItem(PAGE_MAP, false)
                         }
                     }
                 }

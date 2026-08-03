@@ -42,11 +42,11 @@ import com.pando.app.BuildConfig
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.location.LocationNavigationViewModel
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentMapBinding
 import com.pando.app.databinding.LayoutMarkerBinding
 import com.pando.app.features.home.data.model.entity.FriendItemModel
-import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
 import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -96,6 +96,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
     private var avatarMap: Map<UUID, String> = emptyMap()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
+    private val locationNavigationViewModel: LocationNavigationViewModel by activityViewModels()
     private val mapViewModel: MapViewModel by viewModels()
 
     private val styleUrl: String
@@ -217,9 +218,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                 currentLat = location.latitude
                 currentLng = location.longitude
-                if (userSession.getCurrentUser()?.mode != UserMode.PRIVATE) {
-                    mapViewModel.sendLocation(currentLng, currentLat)
-                }
                 Log.d("LOCATION_UPDATE", "Lat=$currentLat, Lng=$currentLng")
             }
         }
@@ -315,6 +313,8 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                 showFriendLocations(style, mapViewModel.friends.value)
 
+                focusCurrentLocationFromNotificationIfReady()
+
 //                val defaultAvatarDrawable = AppCompatResources.getDrawable(
 //                    requireContext(),
 //                    R.drawable.ic_default_avatar
@@ -367,6 +367,13 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    locationNavigationViewModel.focusCurrentLocation.collect { shouldFocus ->
+                        if (shouldFocus) {
+                            focusCurrentLocationFromNotificationIfReady()
+                        }
+                    }
+                }
 //                launch {
 //                    combine(
 //                        mapViewModel.friendState,
@@ -549,14 +556,37 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         )
     }
 
+    private fun focusCurrentLocationFromNotificationIfReady() {
+        if (!locationNavigationViewModel.focusCurrentLocation.value) return
+        if (mapLibreMap == null || loadedStyle == null) return
+
+        if (currentLat == null || currentLng == null) {
+            captureLocation()
+        } else {
+            updateCurrentLocationPoint()
+            moveCameraToCurrentLocation()
+        }
+
+        locationNavigationViewModel.currentLocationFocused()
+    }
+
     private fun captureLocation() {
-        if (ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
+        val fineGranted = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (fineGranted || coarseGranted) {
             fusedLocationClient.getCurrentLocation(
-                Priority.PRIORITY_HIGH_ACCURACY,
+                if (fineGranted) {
+                    Priority.PRIORITY_HIGH_ACCURACY
+                } else {
+                    Priority.PRIORITY_BALANCED_POWER_ACCURACY
+                },
                 null
             ).addOnSuccessListener { location ->
                 if (location != null) {
