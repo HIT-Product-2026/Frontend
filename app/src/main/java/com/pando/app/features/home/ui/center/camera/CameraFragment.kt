@@ -107,7 +107,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             savedPhotoFile?.delete()
             currentLat = null
             currentLng = null
-            switchToCaptureMode()
+            viewModel.setCaptureMode()
         }
 
         binding.historyBtn.setOnClickListener {
@@ -275,6 +275,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     private fun switchToSendMode(imageUri: Uri) {
+        (parentFragment as? CenterFragment)?.setCameraSendMode(true)
+
         binding.viewFinder.visibility = View.INVISIBLE
         binding.imgPreviewCaptured.visibility = View.VISIBLE
 
@@ -292,6 +294,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     private fun switchToCaptureMode() {
+        (parentFragment as? CenterFragment)?.setCameraSendMode(false)
+
         binding.viewFinder.visibility = View.VISIBLE
         binding.imgPreviewCaptured.visibility = View.GONE
 

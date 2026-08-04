@@ -35,6 +35,8 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
     private val widgetNavigationViewModel: WidgetNavigationViewModel by activityViewModels()
     private val locationNavigationViewModel: LocationNavigationViewModel by activityViewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
+    private var isCameraInSendMode = false
+    private var isPostReelMessageComposerOpen = false
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -64,7 +66,7 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
 
-                binding.verticalViewPager.isUserInputEnabled = position != PAGE_MAP
+                updatePagerSwipeState(position)
                 binding.topBar.isVisible = position != PAGE_MAP
             }
         })
@@ -117,5 +119,22 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
 
     fun openPostReel() {
         binding.verticalViewPager.setCurrentItem(PAGE_POST_REEL, true)
+    }
+
+    fun setCameraSendMode(isSendMode: Boolean) {
+        isCameraInSendMode = isSendMode
+        updatePagerSwipeState(binding.verticalViewPager.currentItem)
+    }
+
+    fun setPostReelMessageComposerOpen(isOpen: Boolean) {
+        isPostReelMessageComposerOpen = isOpen
+        updatePagerSwipeState(binding.verticalViewPager.currentItem)
+    }
+
+    private fun updatePagerSwipeState(position: Int) {
+        binding.verticalViewPager.isUserInputEnabled =
+            position != PAGE_MAP &&
+                !(position == PAGE_CAMERA && isCameraInSendMode) &&
+                !(position == PAGE_POST_REEL && isPostReelMessageComposerOpen)
     }
 }

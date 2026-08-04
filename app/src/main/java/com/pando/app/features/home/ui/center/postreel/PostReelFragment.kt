@@ -172,6 +172,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         }
 
         binding.SendMessageBtn.setOnClickListener {
+            setMessageComposerOpen(true)
             binding.bottomLayout.visibility = View.VISIBLE
             binding.sendMessageET.requestFocus()
 
@@ -221,6 +222,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 ViewCompat.getWindowInsetsController(binding.root)
                     ?.hide(WindowInsetsCompat.Type.ime())
                 binding.bottomLayout.visibility = View.GONE
+                setMessageComposerOpen(false)
             }
         }
 
@@ -387,12 +389,14 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     override fun onDestroyView() {
+        (parentFragment as? CenterFragment)?.setPostReelMessageComposerOpen(false)
         binding.postReelViewPager.unregisterOnPageChangeCallback(pageChangeCallback)
 
         super.onDestroyView()
     }
 
     private fun setupKeyboardInsets() {
+        var wasKeyboardVisible = false
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
             val imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
@@ -402,16 +406,23 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             val isKeyboardVisible =
                 windowInsets.isVisible(WindowInsetsCompat.Type.ime())
 
-            if (!isKeyboardVisible) {
+            if (wasKeyboardVisible && !isKeyboardVisible) {
                 binding.sendMessageET.clearFocus()
                 binding.sendMessageET.text?.clear()
                 binding.bottomLayout.visibility = View.GONE
+                setMessageComposerOpen(false)
             }
+            wasKeyboardVisible = isKeyboardVisible
 
             windowInsets
         }
 
         ViewCompat.requestApplyInsets(binding.root)
+    }
+
+    private fun setMessageComposerOpen(isOpen: Boolean) {
+        binding.postReelViewPager.isUserInputEnabled = !isOpen
+        (parentFragment as? CenterFragment)?.setPostReelMessageComposerOpen(isOpen)
     }
 
     @SuppressLint("ClickableViewAccessibility")

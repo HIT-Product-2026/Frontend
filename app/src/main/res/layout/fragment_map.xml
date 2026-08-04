@@ -94,7 +94,7 @@
             android:foreground="?attr/selectableItemBackgroundBorderless"
             android:padding="@dimen/_14sdp"
             android:scaleType="fitCenter"
-            android:src="@drawable/message_typing"
+            android:src="@drawable/message_circle_filled"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
