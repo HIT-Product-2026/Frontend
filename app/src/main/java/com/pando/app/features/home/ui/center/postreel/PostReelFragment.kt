@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -23,6 +24,10 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.bumptech.glide.Glide
+import com.google.android.exoplayer2.ExoPlayer
+import com.google.android.exoplayer2.MediaItem
+import com.google.android.exoplayer2.Player
+import com.google.android.exoplayer2.ui.PlayerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.pando.app.MainViewModel
 import com.pando.app.core.base.BaseAdapter
@@ -39,6 +44,7 @@ import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
 import com.pando.app.features.home.data.model.entity.enumEntity.NsfwStatus
 import com.pando.app.features.home.data.model.entity.enumEntity.NsfwViewDecision
+import com.pando.app.features.home.data.model.entity.enumEntity.TypePost
 import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -66,6 +72,9 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     private var isSocketConnected = false
     private var hasLoadedInitialData = false
     private var activeNsfwDialogPostId: UUID? = null
+    private var videoPreviewPlayer: ExoPlayer? = null
+    private var activeVideoPostId: UUID? = null
+    private var activeVideoView: PlayerView? = null
     private val postReelAdapter: BaseAdapter<PostReelItemModel, ItemPostReelBinding> by lazy {
         BaseAdapter(
             ItemPostReelBinding::inflate,
@@ -74,16 +83,15 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             val decision =
                 postReelViewModel.nsfwDecisions.value[item.id] ?: NsfwViewDecision.UNDECIDED
 
-            val shouldHideImage =
+            val shouldHideMedia =
                 item.nsfw == NsfwStatus.TRUE && decision != NsfwViewDecision.ALLOWED
-            itemBinding.imgCaptured.isVisible = !shouldHideImage
 
-            val image = imageMap[item.id]
+            val mediaUrl = imageMap[item.id]
             val province = provinceMap[item.id]
 
             val shouldLoadProvince =
                 item.latitude != null && item.longitude != null && province == null
-            if ((image == null || shouldLoadProvince) &&
+            if ((mediaUrl == null || shouldLoadProvince) &&
                 lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
             ) {
                 postReelViewModel.loadPost(
@@ -92,10 +100,6 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                     latitude = item.latitude
                 )
             }
-
-            Glide.with(this)
-                .load(image)
-                .into(itemBinding.imgCaptured)
 
             bindAvatar(itemBinding.profileIcon, item.user.id)
 
@@ -110,6 +114,54 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             itemBinding.locationLayout.isVisible = !province.isNullOrBlank()
 
             itemBinding.timeTV.text = item.createdAt?.formatDateTime()
+
+            if (item.type == null ) {
+                if (activeVideoView === itemBinding.videoCaptured) {
+                    releaseVideoPreview()
+                }
+
+                itemBinding.videoCaptured.player = null
+                itemBinding.videoCaptured.isVisible = false
+                itemBinding.imgCaptured.isVisible = !shouldHideMedia
+
+                Glide.with(this)
+                    .load(mediaUrl)
+                    .into(itemBinding.imgCaptured)
+            } else {
+                when (item.type) {
+                    TypePost.IMAGE -> {
+                        if (activeVideoView === itemBinding.videoCaptured) {
+                            releaseVideoPreview()
+                        }
+
+                        itemBinding.videoCaptured.player = null
+                        itemBinding.videoCaptured.isVisible = false
+                        itemBinding.imgCaptured.isVisible = !shouldHideMedia
+
+                        Glide.with(this)
+                            .load(mediaUrl)
+                            .into(itemBinding.imgCaptured)
+                    }
+
+                    TypePost.VIDEO -> {
+                        Glide.with(this).clear(itemBinding.imgCaptured)
+                        itemBinding.imgCaptured.isVisible = false
+                        itemBinding.videoCaptured.isVisible = !shouldHideMedia
+
+                        if (shouldHideMedia) {
+                            if (activeVideoPostId == item.id) {
+                                releaseVideoPreview()
+                            } else {
+                                itemBinding.videoCaptured.player = null
+                            }
+                        } else if (isCurrentPost(item) && mediaUrl != null) {
+                            playCapturedVideo(itemBinding, mediaUrl.toUri(), item.id)
+                        } else if (activeVideoPostId != item.id) {
+                            itemBinding.videoCaptured.player = null
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -118,6 +170,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
             override fun onPageSelected(position: Int) {
                 if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
+                releaseVideoPreview()
                 val itemCount = postReelAdapter.itemCount
 
                 val currentReel = postReelAdapter.currentList
@@ -128,6 +181,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 if (shouldLoadNextPage) {
                     postReelViewModel.getPosts()
                 }
+
+                playCurrentVideo(position)
 
                 if (currentReel.nsfw != NsfwStatus.TRUE) {
                     return
@@ -368,6 +423,10 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             DataPostReelItem.reset()
             postReelViewModel.getPosts()
         }
+
+        binding.postReelViewPager.post {
+            playCurrentVideo(binding.postReelViewPager.currentItem)
+        }
     }
 
     private fun setupPostReel() {
@@ -390,6 +449,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
     override fun onDestroyView() {
         (parentFragment as? CenterFragment)?.setPostReelMessageComposerOpen(false)
+        releaseVideoPreview()
         binding.postReelViewPager.unregisterOnPageChangeCallback(pageChangeCallback)
 
         super.onDestroyView()
@@ -496,6 +556,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
     override fun onPause() {
         binding.postReelViewPager.setCurrentItem(0, false)
+        releaseVideoPreview()
         super.onPause()
     }
 
@@ -631,5 +692,86 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         val currentReel = postReelAdapter.currentList.getOrNull(position) ?: return
 
         handleNsfwReel(currentReel, position)
+    }
+
+    private fun isCurrentPost(item: PostReelItemModel): Boolean {
+        return postReelAdapter.currentList
+            .getOrNull(binding.postReelViewPager.currentItem)
+            ?.id == item.id
+    }
+
+    private fun playCurrentVideo(position: Int) {
+        val item = postReelAdapter.currentList.getOrNull(position) ?: run {
+            releaseVideoPreview()
+            return
+        }
+
+        if (item.type != TypePost.VIDEO) {
+            releaseVideoPreview()
+            return
+        }
+
+        val decision = postReelViewModel.nsfwDecisions.value[item.id]
+            ?: NsfwViewDecision.UNDECIDED
+        val shouldHideMedia =
+            item.nsfw == NsfwStatus.TRUE && decision != NsfwViewDecision.ALLOWED
+        val mediaUrl = imageMap[item.id]
+
+        if (shouldHideMedia || mediaUrl == null) {
+            releaseVideoPreview()
+            return
+        }
+
+        val recyclerView = binding.postReelViewPager.getChildAt(0) as RecyclerView
+        recyclerView.post {
+            if (binding.postReelViewPager.currentItem != position) {
+                return@post
+            }
+
+            val itemView = recyclerView
+                .findViewHolderForAdapterPosition(position)
+                ?.itemView
+                ?: return@post
+
+            playCapturedVideo(
+                itemBinding = ItemPostReelBinding.bind(itemView),
+                videoUri = mediaUrl.toUri(),
+                postId = item.id
+            )
+        }
+    }
+
+    private fun playCapturedVideo(itemBinding: ItemPostReelBinding, videoUri: Uri, postId: UUID) {
+        if (activeVideoPostId == postId && videoPreviewPlayer != null) {
+            if (activeVideoView !== itemBinding.videoCaptured) {
+                activeVideoView?.player = null
+                activeVideoView = itemBinding.videoCaptured
+                itemBinding.videoCaptured.player = videoPreviewPlayer
+            }
+            return
+        }
+
+        releaseVideoPreview()
+
+        videoPreviewPlayer = ExoPlayer.Builder(requireContext())
+            .build()
+            .also { player ->
+                itemBinding.videoCaptured.player = player
+                player.setMediaItem(MediaItem.fromUri(videoUri))
+                player.repeatMode = Player.REPEAT_MODE_ONE
+                player.prepare()
+                player.playWhenReady = true
+            }
+
+        activeVideoPostId = postId
+        activeVideoView = itemBinding.videoCaptured
+    }
+
+    private fun releaseVideoPreview() {
+        activeVideoView?.player = null
+        videoPreviewPlayer?.release()
+        videoPreviewPlayer = null
+        activeVideoView = null
+        activeVideoPostId = null
     }
 }

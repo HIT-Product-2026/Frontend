@@ -132,6 +132,7 @@ class PostReelViewModel @Inject constructor(
                                     latitude = post.latitude,
                                     longitude = post.longitude,
                                     modeLocation = post.modeLocation,
+                                    type = post.type,
                                     nsfw = post.nsfw,
                                     conversationId = post.conversation?.id,
                                     createdAt = post.createAt?.toLocalDateTime()
@@ -147,6 +148,7 @@ class PostReelViewModel @Inject constructor(
                                     longitude = null,
                                     nsfw = post.nsfw,
                                     modeLocation = post.modeLocation,
+                                    type = post.type,
                                     conversationId = post.conversation?.id,
                                     createdAt = post.createAt?.toLocalDateTime()
                                 )

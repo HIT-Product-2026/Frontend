@@ -8,6 +8,7 @@ import androidx.exifinterface.media.ExifInterface
 import com.pando.app.core.base.BaseVM
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.utils.DataResult
+import com.pando.app.features.home.data.model.entity.enumEntity.TypePost
 import com.pando.app.features.home.data.model.response.PostResponse
 import com.pando.app.features.home.data.repository.MediaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,9 +26,9 @@ import java.io.File
 import java.io.FileOutputStream
 
 sealed interface CameraViewMode {
-    object Capture : CameraViewMode                // Chế độ live preview để chụp
-    data class Send(val photoFile: File) :
-        CameraViewMode  // Chế độ hiển thị ảnh vừa chụp kèm nút Gửi
+    data object Capture : CameraViewMode
+
+    data class Send(val mediaFile: File, val type: TypePost) : CameraViewMode
 }
 
 @HiltViewModel
@@ -38,8 +39,8 @@ class CameraViewModel @Inject constructor(
     private val _cameraViewMode = MutableStateFlow<CameraViewMode>(CameraViewMode.Capture)
     val cameraViewMode: StateFlow<CameraViewMode> = _cameraViewMode.asStateFlow()
 
-    fun setSendMode(photoFile: File) {
-        _cameraViewMode.value = CameraViewMode.Send(photoFile)
+    fun setSendMode(mediaFile: File, type: TypePost) {
+        _cameraViewMode.value = CameraViewMode.Send(mediaFile, type)
     }
 
     fun setCaptureMode() {
@@ -50,41 +51,49 @@ class CameraViewModel @Inject constructor(
         val currentMode = _cameraViewMode.value
         if (currentMode !is CameraViewMode.Send) return
 
-        val originFile = currentMode.photoFile
+        val originFile = currentMode.mediaFile
 
         getData {
-            val normalizedFile = normalizeExif(originFile)
+            val normalizedFile = when (currentMode.type) {
+                    TypePost.IMAGE -> normalizeExif(originFile)
+                    TypePost.VIDEO -> originFile
+                }
 //            val normalizedFile = originFile
 
-            val uploadFile = try {
-                Compressor.compress(context, normalizedFile) {
-                    resolution(1280, 720)
-                    quality(80)
-                    format(Bitmap.CompressFormat.JPEG)
-                    size(2_097_152)
+            val uploadFile = when (currentMode.type) {
+                TypePost.IMAGE -> {
+                    try {
+                        Compressor.compress(context, normalizedFile) {
+                            resolution(1280, 720)
+                            quality(80)
+                            format(Bitmap.CompressFormat.JPEG)
+                            size(2_097_152)
+                        }
+                    } catch (_: Exception) {
+                        normalizedFile
+                    }
                 }
 
-            } catch (e: Exception) {
-                normalizedFile
+                TypePost.VIDEO -> originFile
             }
 
-            val result = mediaRepository.sendPost(caption, longitude, latitude, uploadFile)
-
-            if (originFile.exists() && originFile.absolutePath != uploadFile.absolutePath) {
-                originFile.delete()
-            }
-            if (uploadFile.exists()) {
-                uploadFile.delete()
-            }
-
-            if (
-                normalizedFile.absolutePath != originFile.absolutePath &&
-                normalizedFile.absolutePath != uploadFile.absolutePath
-            ) {
-                normalizedFile.delete()
-            }
+            val result = mediaRepository.sendPost(caption, longitude, latitude, uploadFile, currentMode.type)
 
             if (result is DataResult.Success) {
+                if (originFile.exists() && originFile.absolutePath != uploadFile.absolutePath) {
+                    originFile.delete()
+                }
+                if (uploadFile.exists()) {
+                    uploadFile.delete()
+                }
+
+                if (
+                    normalizedFile.absolutePath != originFile.absolutePath &&
+                    normalizedFile.absolutePath != uploadFile.absolutePath
+                ) {
+                    normalizedFile.delete()
+                }
+
                 setCaptureMode()
             }
 

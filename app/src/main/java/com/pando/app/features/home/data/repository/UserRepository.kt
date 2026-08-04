@@ -18,7 +18,7 @@ class UserRepository @Inject constructor(
 
     suspend fun updateUserMode(mode: UserMode): DataResult<ApiResponse<Void>> {
         return safeApiCall {
-            userApi.updateUserMode(mode.name)
+            userApi.updateUserMode(mode)
         }
     }
 }

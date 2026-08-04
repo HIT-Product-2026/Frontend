@@ -39,6 +39,14 @@
                 android:scaleType="centerCrop"
                 android:visibility="gone" />
 
+            <com.google.android.exoplayer2.ui.PlayerView
+                android:id="@+id/videoPreviewCaptured"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:resize_mode="zoom"
+                app:use_controller="false"
+                android:visibility="gone"/>
+
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/captionLayout"
                 android:layout_width="wrap_content"
@@ -73,6 +81,17 @@
             android:layout_height="0dp"
             android:background="@drawable/bg_border_camera"
             android:elevation="1dp"
+            app:layout_constraintBottom_toBottomOf="@id/cameraContainer"
+            app:layout_constraintEnd_toEndOf="@id/cameraContainer"
+            app:layout_constraintStart_toStartOf="@id/cameraContainer"
+            app:layout_constraintTop_toTopOf="@id/cameraContainer" />
+
+        <com.pando.app.features.home.ui.center.camera.RecordingBorderView
+            android:id="@+id/recordingBorderView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:elevation="2dp"
+            android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="@id/cameraContainer"
             app:layout_constraintEnd_toEndOf="@id/cameraContainer"
             app:layout_constraintStart_toStartOf="@id/cameraContainer"

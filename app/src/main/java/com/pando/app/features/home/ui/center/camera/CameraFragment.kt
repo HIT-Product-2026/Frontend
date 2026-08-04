@@ -9,29 +9,43 @@ import android.view.OrientationEventListener
 import android.view.Surface
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCase
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.ViewPort
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.FileOutputOptions
+import androidx.camera.video.Quality
+import androidx.camera.video.QualitySelector
+import androidx.camera.video.Recorder
+import androidx.camera.video.Recording
+import androidx.camera.video.VideoCapture
+import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.bumptech.glide.Glide
+import com.google.android.exoplayer2.ExoPlayer
+import com.google.android.exoplayer2.MediaItem
+import com.google.android.exoplayer2.Player
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.pando.app.core.base.BaseFragment
-import com.pando.app.core.extensions.toLocalDateTime
 import com.pando.app.core.extensions.showComingSoon
+import com.pando.app.core.extensions.toLocalDateTime
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentCameraBinding
 import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
+import com.pando.app.features.home.data.model.entity.enumEntity.TypePost
 import com.pando.app.features.home.ui.center.CenterFragment
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +63,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
     private lateinit var cameraExecutor: ExecutorService
     private var lensFacing = CameraSelector.LENS_FACING_BACK
-    private var savedPhotoFile: File? = null
+
+    private var videoPreviewPlayer: ExoPlayer? = null
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var currentLat: Double? = null
@@ -59,6 +74,18 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private var rotation = Surface.ROTATION_0
 
     private var cameraProvider: ProcessCameraProvider? = null
+
+    private var captureMode = CaptureMode.PHOTO
+
+    private var videoCapture: VideoCapture<Recorder>? = null
+    private var activeRecording: Recording? = null
+
+    private var savedMediaFile: File? = null
+
+    private val audioPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            startVideoRecording(enableAudio = granted)
+        }
 
     override fun initData() {
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -75,7 +102,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                         }
 
                         is CameraViewMode.Send -> {
-                            switchToSendMode(Uri.fromFile(mode.photoFile))
+                            switchToSendMode(Uri.fromFile(mode.mediaFile), mode.type)
                         }
                     }
                 }
@@ -87,10 +114,16 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun initActionView() {
-        listOf(binding.btnGallery, binding.btnTabVideo).forEach { view ->
-            view.setOnClickListener {
-                requireContext().showComingSoon()
-            }
+        binding.btnGallery.setOnClickListener {
+            requireContext().showComingSoon()
+        }
+
+        binding.btnTabVideo.setOnClickListener {
+            selectCaptureMode(CaptureMode.VIDEO)
+        }
+
+        binding.btnTabCamera.setOnClickListener {
+            selectCaptureMode(CaptureMode.PHOTO)
         }
 
         binding.btnSwitchCamera.setOnClickListener {
@@ -105,13 +138,25 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.btnCapture.setOnClickListener {
             viewLifecycleOwner.lifecycleScope.launch {
                 captureLocation()
-                takePhoto()
+
+                when (captureMode) {
+                    CaptureMode.PHOTO -> takePhoto()
+
+                    CaptureMode.VIDEO -> {
+                        if (activeRecording != null) {
+                            // Cho phép bấm lần hai để dừng trước 10 giây
+                            activeRecording?.stop()
+                        } else {
+                            requestAudioAndRecord()
+                        }
+                    }
+                }
             }
         }
 
         binding.btnCancel.setOnClickListener {
             binding.captionET.text?.clear()
-            savedPhotoFile?.delete()
+            savedMediaFile?.delete()
             currentLat = null
             currentLng = null
             viewModel.setCaptureMode()
@@ -143,16 +188,17 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
                                 val post = state.data.data
                                 val newPost = PostReelItemModel(
-                                            id = post.id,
-                                            user = post.user,
-                                            caption = post.caption,
-                                            latitude = post.latitude,
-                                            longitude = post.longitude,
-                                            modeLocation = post.modeLocation,
-                                            nsfw = post.nsfw,
-                                            conversationId = post.conversation?.id,
-                                            createdAt = post.createAt?.toLocalDateTime()
-                                        )
+                                    id = post.id,
+                                    user = post.user,
+                                    caption = post.caption,
+                                    latitude = post.latitude,
+                                    longitude = post.longitude,
+                                    modeLocation = post.modeLocation,
+                                    type = post.type,
+                                    nsfw = post.nsfw,
+                                    conversationId = post.conversation?.id,
+                                    createdAt = post.createAt?.toLocalDateTime()
+                                )
 
                                 DataPostReelItem.data.add(newPost)
 
@@ -188,10 +234,17 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun onPause() {
+        releaseVideoPreview()
         orientationEventListener?.disable()
         binding.cameraContainer.visibility = View.GONE
+
+        activeRecording?.stop()
+        activeRecording = null
+
         cameraProvider?.unbindAll()
         imageCapture = null
+        videoCapture = null
+
         super.onPause()
     }
 
@@ -214,9 +267,36 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                     it.surfaceProvider = binding.viewFinder.surfaceProvider
                 }
 
-            imageCapture = ImageCapture.Builder()
-                .setTargetRotation(rotation)
-                .build()
+//            imageCapture = ImageCapture.Builder()
+//                .setTargetRotation(rotation)
+//                .build()
+
+            val captureUseCase: UseCase = when (captureMode) {
+                CaptureMode.PHOTO -> {
+                    videoCapture = null
+
+                    ImageCapture.Builder()
+                        .setTargetRotation(rotation)
+                        .build()
+                        .also { imageCapture = it }
+                }
+
+                CaptureMode.VIDEO -> {
+                    imageCapture = null
+
+                    val recorder = Recorder.Builder()
+                        .setQualitySelector(QualitySelector.from(Quality.HD))
+                        .build()
+
+                    VideoCapture.Builder(recorder)
+                        .setMirrorMode(MirrorMode.MIRROR_MODE_ON_FRONT_ONLY)
+                        .setTargetRotation(rotation)
+                        .build()
+                        .also {
+                            videoCapture = it
+                        }
+                }
+            }
 
             val cameraSelector = CameraSelector.Builder()
                 .requireLensFacing(lensFacing)
@@ -232,13 +312,11 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
                 val useCaseGroup = UseCaseGroup.Builder()
                     .addUseCase(preview)
-                    .addUseCase(imageCapture!!)
+                    .addUseCase(captureUseCase)
                     .setViewPort(viewPort)
                     .build()
 
-                provider.bindToLifecycle(
-                    viewLifecycleOwner, cameraSelector, useCaseGroup
-                )
+                provider.bindToLifecycle(viewLifecycleOwner, cameraSelector, useCaseGroup)
             } catch (exc: Exception) {
                 Log.e("CameraX", "Khởi tạo camera thất bại", exc)
             }
@@ -274,22 +352,37 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                 }
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    savedPhotoFile = photoFile
-                    viewModel.setSendMode(photoFile)
+                    savedMediaFile = photoFile
+                    viewModel.setSendMode(photoFile, TypePost.IMAGE)
                 }
             }
         )
     }
 
-    private fun switchToSendMode(imageUri: Uri) {
+    private fun switchToSendMode(mediaUri: Uri, type: TypePost) {
         (parentFragment as? CenterFragment)?.setCameraSendMode(true)
 
         binding.viewFinder.visibility = View.INVISIBLE
-        binding.imgPreviewCaptured.visibility = View.VISIBLE
 
-        Glide.with(this)
-            .load(imageUri)
-            .into(binding.imgPreviewCaptured)
+        when (type) {
+            TypePost.IMAGE -> {
+                releaseVideoPreview()
+
+                binding.videoPreviewCaptured.visibility = View.GONE
+                binding.imgPreviewCaptured.visibility = View.VISIBLE
+
+                Glide.with(this)
+                    .load(mediaUri)
+                    .into(binding.imgPreviewCaptured)
+            }
+
+            TypePost.VIDEO -> {
+                binding.imgPreviewCaptured.visibility = View.GONE
+                binding.videoPreviewCaptured.visibility = View.VISIBLE
+
+                playCapturedVideo(mediaUri)
+            }
+        }
 
         binding.functionsBar.visibility = View.GONE
         binding.switchModeContainer.visibility = View.GONE
@@ -303,6 +396,14 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private fun switchToCaptureMode() {
         (parentFragment as? CenterFragment)?.setCameraSendMode(false)
 
+        releaseVideoPreview()
+
+        binding.videoPreviewCaptured.visibility = View.GONE
+        binding.imgPreviewCaptured.visibility = View.GONE
+        binding.viewFinder.visibility = View.VISIBLE
+
+        Glide.with(this).clear(binding.imgPreviewCaptured)
+
         binding.viewFinder.visibility = View.VISIBLE
         binding.imgPreviewCaptured.visibility = View.GONE
 
@@ -313,6 +414,32 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.historyBtn.visibility = View.VISIBLE
 
         binding.captionLayout.visibility = View.GONE
+    }
+
+    private fun playCapturedVideo(videoUri: Uri) {
+        // Giải phóng player cũ nếu có
+        releaseVideoPreview()
+
+        videoPreviewPlayer = ExoPlayer.Builder(requireContext())
+            .build()
+            .also { player ->
+                binding.videoPreviewCaptured.player = player
+
+                player.setMediaItem(MediaItem.fromUri(videoUri))
+
+                // Phát lặp lại video vừa quay
+                player.repeatMode = Player.REPEAT_MODE_ONE
+
+                player.prepare()
+                player.playWhenReady = true
+            }
+    }
+
+    private fun releaseVideoPreview() {
+        binding.videoPreviewCaptured.player = null
+
+        videoPreviewPlayer?.release()
+        videoPreviewPlayer = null
     }
 
     private suspend fun captureLocation() = withContext(Dispatchers.IO) {
@@ -352,13 +479,19 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                 }
 
                 imageCapture?.targetRotation = rotation
+                videoCapture?.targetRotation = rotation
             }
         }
     }
 
     override fun onDestroyView() {
+        releaseVideoPreview()
         orientationEventListener?.disable()
         orientationEventListener = null
+
+        activeRecording?.stop()
+        activeRecording = null
+        videoCapture = null
 
         cameraProvider?.unbindAll()
         cameraProvider = null
@@ -367,5 +500,137 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 //        viewModel.socketDisconnect()
 
         super.onDestroyView()
+    }
+
+    private fun selectCaptureMode(mode: CaptureMode) {
+        if (captureMode == mode || activeRecording != null) return
+
+        captureMode = mode
+
+        val thumbTranslation = if (mode == CaptureMode.VIDEO) {
+            binding.btnTabVideo.x - binding.btnTabCamera.x
+        } else {
+            0f
+        }
+
+        binding.viewThumb.animate()
+            .translationX(thumbTranslation)
+            .setDuration(200L)
+            .start()
+
+        startCamera()
+    }
+
+    private fun requestAudioAndRecord() {
+        val hasAudioPermission = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasAudioPermission) {
+            startVideoRecording(enableAudio = true)
+        } else {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun startVideoRecording(enableAudio: Boolean) {
+        val videoCapture = videoCapture ?: return
+
+        val videoFile = File(
+            requireContext().cacheDir,
+            "Pando_${System.currentTimeMillis()}.mp4"
+        )
+
+        val outputOptions = FileOutputOptions.Builder(videoFile)
+            .setDurationLimitMillis(MAX_RECORDING_DURATION_MILLIS)
+            .build()
+
+        var pendingRecording = videoCapture.output
+            .prepareRecording(requireContext(), outputOptions)
+
+        if (enableAudio) {
+            pendingRecording = pendingRecording.withAudioEnabled()
+        }
+
+        activeRecording = pendingRecording.start(
+            ContextCompat.getMainExecutor(requireContext())
+        ) { event ->
+            when (event) {
+                is VideoRecordEvent.Start -> {
+                    binding.btnTabCamera.isEnabled = false
+                    binding.btnTabVideo.isEnabled = false
+                    binding.btnSwitchCamera.isEnabled = false
+
+                    binding.recordingBorderView.setProgress(0f)
+                    binding.recordingBorderView.visibility = View.VISIBLE
+
+                    Toast.makeText(
+                        requireContext(),
+                        "Đang quay...",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+                is VideoRecordEvent.Status -> {
+                    val recordedNanos = event.recordingStats.recordedDurationNanos
+                    val recordedSeconds = recordedNanos / 1_000_000_000L
+
+                    val progress = recordedNanos.toFloat() / MAX_RECORDING_DURATION_NANOS
+                    binding.recordingBorderView.setProgress(progress)
+
+                    Log.d("CameraX", "Đã quay: ${recordedSeconds}s")
+                }
+
+                is VideoRecordEvent.Finalize -> {
+                    activeRecording = null
+
+                    binding.recordingBorderView.visibility = View.GONE
+                    binding.recordingBorderView.setProgress(0f)
+
+                    binding.btnTabCamera.isEnabled = true
+                    binding.btnTabVideo.isEnabled = true
+                    binding.btnSwitchCamera.isEnabled = true
+
+                    /*
+                     * Khi đạt giới hạn 10 giây, CameraX trả về
+                     * ERROR_DURATION_LIMIT_REACHED nhưng file MP4 vẫn hợp lệ.
+                     */
+                    val isUsableVideo =
+                        event.error == VideoRecordEvent.Finalize.ERROR_NONE ||
+                                event.error == VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED
+
+                    if (isUsableVideo && videoFile.exists() && videoFile.length() > 0L) {
+                        savedMediaFile = videoFile
+                        viewModel.setSendMode(videoFile, TypePost.VIDEO)
+                    } else {
+                        videoFile.delete()
+
+                        Toast.makeText(
+                            requireContext(),
+                            "Quay video thất bại",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        Log.e(
+                            "CameraX",
+                            "Video error=${event.error}",
+                            event.cause
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private enum class CaptureMode {
+        PHOTO,
+        VIDEO
+    }
+
+    companion object {
+        private const val MAX_RECORDING_DURATION_MILLIS = 10_000L
+        private const val MAX_RECORDING_DURATION_NANOS =
+            MAX_RECORDING_DURATION_MILLIS * 1_000_000L
     }
 }
