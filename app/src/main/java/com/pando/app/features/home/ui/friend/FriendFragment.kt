@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.PopupWindow
 import androidx.appcompat.widget.SearchView
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -40,12 +41,18 @@ import java.util.UUID
 import androidx.core.graphics.drawable.toDrawable
 import androidx.fragment.app.activityViewModels
 import androidx.viewbinding.ViewBinding
+import com.pando.app.R
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.features.shared.AvatarViewModel
 
 @AndroidEntryPoint
 class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding::inflate) {
+    private companion object {
+        const val COLLAPSED_FRIEND_COUNT = 3
+    }
+
     private var avatarMap: Map<UUID, String> = emptyMap()
+    private var isFriendListExpanded = false
 
     //View Model
     private val friendViewModel: FriendViewModel by viewModels()
@@ -93,6 +100,11 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
     override fun initActionView() {
         binding.backButton.setOnClickListener {
             findNavController().navigateUp()
+        }
+
+        binding.btnToggleList.setOnClickListener {
+            isFriendListExpanded = !isFriendListExpanded
+            updateFriendRV()
         }
 
         binding.searchView.queryHint = "Nhập email hoặc username của bạn bè"
@@ -416,17 +428,45 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         if (dataItems.isNotEmpty()) {
             binding.friendNumberText.visibility = View.VISIBLE
             binding.friendsLayout.visibility = View.VISIBLE
+            binding.btnToggleList.visibility =
+                if (dataItems.size > COLLAPSED_FRIEND_COUNT) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
+            binding.btnToggleList.text =
+                if (isFriendListExpanded) "Thu gọn" else "Xem thêm"
+            binding.btnToggleList.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                null,
+                null,
+                ContextCompat.getDrawable(
+                    requireContext(),
+                    if (isFriendListExpanded) {
+                        R.drawable.outline_arrow_drop_up_24
+                    } else {
+                        R.drawable.outline_arrow_drop_down_24
+                    }
+                ),
+                null
+            )
             binding.friendNumberText.text =
                 "${DataFriendItem.total} người bạn"
 
-            friendsItemAdapter.submitList(dataItems)
+            val displayedItems = if (isFriendListExpanded) {
+                dataItems
+            } else {
+                dataItems.take(COLLAPSED_FRIEND_COUNT)
+            }
+
+            friendsItemAdapter.submitList(displayedItems)
 
             avatarViewModel.loadAvatars(
-                dataItems.map { it.id }
+                displayedItems.map { it.id }
             )
         } else {
             binding.friendNumberText.visibility = View.GONE
             binding.friendsLayout.visibility = View.GONE
+            binding.btnToggleList.visibility = View.GONE
             friendsItemAdapter.submitList(emptyList())
         }
     }
