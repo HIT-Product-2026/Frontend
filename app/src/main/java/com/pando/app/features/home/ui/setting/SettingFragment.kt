@@ -120,7 +120,8 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
             binding.rateBtn,
             binding.reportIssueBtn,
             binding.privacyPolicyBtn,
-            binding.deleteAccountBtn
+            binding.deleteAccountBtn,
+            binding.appearanceBtn
         ).forEach { view ->
             view.setOnClickListener {
                 requireContext().showComingSoon()

@@ -132,6 +132,11 @@
                 android:text="Quyền riêng tư" />
 
             <TextView
+                android:id="@+id/appearanceBtn"
+                style="@style/MenuTextStyle"
+                android:text="Giao diện" />
+
+            <TextView
                 android:id="@+id/blockedAccountsBtn"
                 style="@style/MenuTextStyle"
                 android:text="Tài khoản đã chặn" />
