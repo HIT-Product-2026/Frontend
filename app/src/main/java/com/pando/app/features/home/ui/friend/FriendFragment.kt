@@ -43,6 +43,8 @@ import androidx.fragment.app.activityViewModels
 import androidx.viewbinding.ViewBinding
 import com.pando.app.R
 import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.extensions.showComingSoon
+import com.pando.app.core.extensions.showShortToast
 import com.pando.app.features.shared.AvatarViewModel
 
 @AndroidEntryPoint
@@ -178,6 +180,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
                                         DataFriendItem.total = DataFriendItem.total?.minus(1)
                                         updateFriendRV()
                                     }
+                                    requireContext().showShortToast(R.string.friend_removed)
                                 }
                             }
                         }
@@ -205,6 +208,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
                 friendViewModel.friendEvent.collect { event ->
                     when (event) {
                         is FriendEvent.RequestFriendSuccess -> {
+                            requireContext().showShortToast(R.string.friend_request_sent)
                             val requested = event.response.data
                             val searchUser = DataSearchItem.data.firstOrNull { item ->
                                 requested.receiver.id == item.id
@@ -242,15 +246,18 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
                                 DataReceivedRequestItem.total = DataReceivedRequestItem.total?.minus(1)
 
                                 updateReceivedRV()
+                                requireContext().showShortToast(R.string.friend_request_rejected)
                             } else if (requested != null) {
                                 DataSentRequestItem.data.remove(requested)
                                 DataSentRequestItem.total = DataSentRequestItem.total?.minus(1)
 
                                 updateSentRV()
+                                requireContext().showShortToast(R.string.friend_request_cancelled)
                             }
                         }
 
                         is FriendEvent.AcceptFriendSuccess -> {
+                            requireContext().showShortToast(R.string.friend_request_accepted)
                             val result = event.response.data
                             val requested = DataReceivedRequestItem.data.firstOrNull { item ->
                                 result.requester.id == item.id
@@ -284,6 +291,9 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
             itemBinding.appIcon.setImageResource(item.icon)
+            itemBinding.inviteCard.setOnClickListener {
+                requireContext().showComingSoon()
+            }
         }
 
         friendsItemAdapter = BaseAdapter(
@@ -537,6 +547,11 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             popupWindow.dismiss()
 
             friendViewModel.unfriend(friend.id)
+        }
+
+        popupBinding.btnBlockFriend.setOnClickListener {
+            popupWindow.dismiss()
+            requireContext().showComingSoon()
         }
 
         popupBinding.root.measure(

@@ -27,6 +27,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.toLocalDateTime
+import com.pando.app.core.extensions.showComingSoon
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentCameraBinding
 import com.pando.app.features.home.data.model.entity.DataPostReelItem
@@ -86,6 +87,12 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun initActionView() {
+        listOf(binding.btnGallery, binding.btnTabVideo).forEach { view ->
+            view.setOnClickListener {
+                requireContext().showComingSoon()
+            }
+        }
+
         binding.btnSwitchCamera.setOnClickListener {
             lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
                 CameraSelector.LENS_FACING_FRONT

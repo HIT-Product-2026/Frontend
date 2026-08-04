@@ -10,6 +10,8 @@ import com.pando.app.MainViewModel
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.extensions.showComingSoon
+import com.pando.app.core.extensions.showShortToast
 import com.pando.app.core.location.LocationTrackingController
 import com.pando.app.core.location.TrackingPreferences
 import com.pando.app.core.network.api.TokenManager
@@ -90,6 +92,8 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
                 total = 0
             }
 
+            requireContext().showShortToast(R.string.logout_success)
+
             val navOptions = NavOptions.Builder()
                 .setPopUpTo(R.id.nav_graph, true)
                 .build()
@@ -107,6 +111,20 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
 
         binding.privacyBtn.setOnClickListener {
             findNavController().navigate(R.id.action_settingFragment_to_privacyFragment)
+        }
+
+        listOf(
+            binding.blockedAccountsBtn,
+            binding.shareProfileBtn,
+            binding.aboutBtn,
+            binding.rateBtn,
+            binding.reportIssueBtn,
+            binding.privacyPolicyBtn,
+            binding.deleteAccountBtn
+        ).forEach { view ->
+            view.setOnClickListener {
+                requireContext().showComingSoon()
+            }
         }
     }
 

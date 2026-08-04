@@ -9,9 +9,10 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
-import com.google.android.material.snackbar.Snackbar
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
+import com.pando.app.core.extensions.showComingSoon
+import com.pando.app.core.extensions.showShortToast
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentVerifyOtpBinding
 import dagger.hilt.android.AndroidEntryPoint
@@ -37,6 +38,10 @@ class VerifyOtpFragment :
         val isRegister = args.isRegister
         binding.backButton.setOnClickListener {
             findNavController().popBackStack()
+        }
+
+        binding.sendEmailAgain.setOnClickListener {
+            requireContext().showComingSoon()
         }
 
         binding.pinViewOtp.doOnTextChanged { text, _, _, _ ->
@@ -84,20 +89,12 @@ class VerifyOtpFragment :
 
                         when (val result = state.data) {
                             is VerifyOtpResult.RegisterSuccess -> {
-                                Snackbar.make(
-                                    binding.root,
-                                    "Đăng ký thành công!",
-                                    Snackbar.LENGTH_SHORT
-                                ).show()
+                                requireContext().showShortToast(R.string.register_success)
                                 findNavController().popBackStack(R.id.startFragment, false)
                             }
 
                             is VerifyOtpResult.ForgotPasswordSuccess -> {
-                                Snackbar.make(
-                                    binding.root,
-                                    "Xác thực OTP thành công!",
-                                    Snackbar.LENGTH_SHORT
-                                ).show()
+                                requireContext().showShortToast(R.string.otp_verified_success)
                                 val action =
                                     VerifyOtpFragmentDirections.actionVerifyOtpFragmentToResetPasswordFragment(
                                         receiveEmail = email

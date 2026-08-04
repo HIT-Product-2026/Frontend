@@ -29,4 +29,19 @@
     <string name="location_tracking_notification_title">PanDo đang chia sẻ vị trí</string>
     <string name="location_tracking_notification_content">Vị trí của bạn đang được chia sẻ với bạn bè</string>
     <string name="stop_location_sharing">Dừng chia sẻ</string>
+    <string name="coming_soon">Coming soon...</string>
+    <string name="otp_sent_success">Đã gửi mã OTP!</string>
+    <string name="register_success">Đăng ký thành công!</string>
+    <string name="otp_verified_success">Xác thực OTP thành công!</string>
+    <string name="password_changed_success">Thay đổi mật khẩu thành công!</string>
+    <string name="profile_updated_success">Cập nhật hồ sơ thành công!</string>
+    <string name="avatar_updated_success">Cập nhật ảnh đại diện thành công!</string>
+    <string name="location_sharing_enabled">Đã bật chia sẻ vị trí!</string>
+    <string name="location_sharing_disabled">Đã tắt chia sẻ vị trí!</string>
+    <string name="friend_request_sent">Đã gửi lời mời kết bạn!</string>
+    <string name="friend_request_cancelled">Đã hủy lời mời kết bạn!</string>
+    <string name="friend_request_rejected">Đã từ chối lời mời kết bạn!</string>
+    <string name="friend_request_accepted">Đã chấp nhận lời mời kết bạn!</string>
+    <string name="friend_removed">Đã xóa bạn!</string>
+    <string name="logout_success">Đã đăng xuất!</string>
 </resources>

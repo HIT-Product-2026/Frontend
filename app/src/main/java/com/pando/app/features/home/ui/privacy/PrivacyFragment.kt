@@ -8,7 +8,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
+import com.pando.app.core.extensions.showShortToast
 import com.pando.app.core.location.LocationTrackingController
 import com.pando.app.core.location.TrackingPreferences
 import com.pando.app.core.session.UserSession
@@ -120,6 +122,11 @@ class PrivacyFragment : BaseFragment<FragmentPrivacyBinding>(FragmentPrivacyBind
                                 state.data == UserMode.PUBLIC &&
                                     trackingPreferences.isTrackingEnabled()
                             )
+                            if (state.data == UserMode.PRIVATE) {
+                                requireContext().showShortToast(R.string.location_sharing_disabled)
+                            } else if (trackingPreferences.isTrackingEnabled()) {
+                                requireContext().showShortToast(R.string.location_sharing_enabled)
+                            }
                             requestedMode = null
                             setControlsEnabled(true)
                             viewModel.clearUpdateModeState()
