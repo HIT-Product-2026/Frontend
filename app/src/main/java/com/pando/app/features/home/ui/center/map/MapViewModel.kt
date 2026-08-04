@@ -19,8 +19,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 
@@ -41,20 +42,10 @@ class MapViewModel @Inject constructor(
     private val _friends = MutableStateFlow<List<FriendItemModel>>(emptyList())
     val friends = _friends.asStateFlow()
 
-    fun subscribeLocationTopic(friendList: List<FriendItemModel>) {
-        Log.d(TAG, "subscribeLocationTopic Đã gọi")
-        friendList.forEach { item ->
-            mapSocket.subscribeLocation(item.id)
-        }
-    }
-
-    fun unsubscribeLocationTopic(friendId: UUID) {
-        mapSocket.unsubscribeALocation(friendId)
-    }
-
-    fun unsubscribeAllLocationTopic() {
-        mapSocket.unsubscribeAllLocation()
-    }
+    private var friendIds: Set<UUID> = emptySet()
+    private var subscribedFriendIds: Set<UUID> = emptySet()
+    private var hasLoadedFriendList = false
+    private var refreshLocationsJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -64,20 +55,20 @@ class MapViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            combine(
-                connectionState,
-                friends
-            ) { connectionState, friends ->
-                connectionState to friends
-            }.collect { (connectionState, friends) ->
+            connectionState.collect { connectionState ->
                 when (connectionState) {
                     SocketConnectionState.Connected -> {
-                        subscribeLocationTopic(friends)
+                        syncLocationSubscriptions(friendIds)
+
+                        // Bù những event có thể bị mất trong thời gian socket ngắt kết nối.
+                        if (hasLoadedFriendList) {
+                            requestFriendLocationRefresh()
+                        }
                     }
 
                     SocketConnectionState.Disconnected,
                     is SocketConnectionState.Error -> {
-                        unsubscribeAllLocationTopic()
+                        clearLocationSubscriptions()
                     }
 
                     SocketConnectionState.Connecting -> Unit
@@ -87,25 +78,24 @@ class MapViewModel @Inject constructor(
     }
 
     private fun updateLocation(location: LocationResponse) {
-        Log.i(TAG, "Update location update location")
+        Log.i(TAG, "Nhận cập nhật vị trí của ${location.userId}")
         val oldItem = _friends.value.firstOrNull { item ->
             item.id == location.userId
         } ?: return
 
+        if (!isNewerThan(location.lastActiveAt, oldItem.lastActiveAt)) return
+
         val updatedItem = oldItem.copy(
             latitude = location.latitude,
-            longitude = location.longitude
+            longitude = location.longitude,
+            lastActiveAt = location.lastActiveAt
         )
 
-        val updatedList = _friends.value
-            .filterNot { it.id == location.userId } + updatedItem
-
-        DataFriendItem.data.apply {
-            clear()
-            addAll(updatedList)
+        val updatedList = _friends.value.map { friend ->
+            if (friend.id == location.userId) updatedItem else friend
         }
 
-        _friends.value = updatedList
+        publishFriends(updatedList)
     }
 
     private val _friendState =
@@ -127,48 +117,33 @@ class MapViewModel @Inject constructor(
                     DataFriendItem.total = total
 
                     val data = result.data.data.items
-                    if (total > 0) {
-                        val friendList = data.map { user ->
+                    val currentFriendsById = _friends.value.associateBy(FriendItemModel::id)
+                    val friendList = if (total > 0) {
+                        data.map { user ->
+                            val currentFriend = currentFriendsById[user.id]
                             FriendItemModel(
                                 id = user.id,
-                                name = user.displayName.ifEmpty { user.username }
+                                name = user.displayName.ifEmpty { user.username },
+                                avatarUrl = currentFriend?.avatarUrl,
+                                longitude = currentFriend?.longitude,
+                                latitude = currentFriend?.latitude,
+                                lastActiveAt = currentFriend?.lastActiveAt
                             )
                         }
-
-                        val locationListByUserId = when (val locationResult = locationRepository.getFriendLocations()) {
-                                is DataResult.Success -> {
-                                    locationResult.data.data.items.associateBy {
-                                        it.userId
-                                    }
-                                }
-
-                                is DataResult.Error -> {
-                                    Log.e(TAG, "Không lấy được lịch sử vị trí: ${locationResult.message}")
-                                    emptyMap()
-                                }
-                            }
-
-                        val mergedFriendList = friendList.map { friend ->
-                            val location = locationListByUserId[friend.id]
-
-                            friend.copy(
-                                latitude = location?.latitude,
-                                longitude = location?.longitude,
-                                lastActiveAt = location?.lastActiveAt
-                            )
-                        }
-
-                        _friends.value = mergedFriendList
-
-                        DataFriendItem.data.apply {
-                            clear()
-                            addAll(mergedFriendList)
-                        }
-
-                        DataFriendItem.total = mergedFriendList.size
-
-                        _friends.value = DataFriendItem.data.toList()
+                    } else {
+                        emptyList()
                     }
+
+                    publishFriends(friendList)
+                    friendIds = friendList.mapTo(linkedSetOf(), FriendItemModel::id)
+                    hasLoadedFriendList = true
+
+                    // Subscribe trước khi lấy snapshot để thu hẹp khoảng trống mất event.
+                    if (connectionState.value == SocketConnectionState.Connected) {
+                        syncLocationSubscriptions(friendIds)
+                    }
+
+                    requestFriendLocationRefresh()
 
                     _friendState.value = UiState.Success(result.data)
                 }
@@ -176,5 +151,83 @@ class MapViewModel @Inject constructor(
                 is DataResult.Error -> _friendState.value = UiState.Error(result.message)
             }
         }
+    }
+
+    private fun syncLocationSubscriptions(friendIds: Set<UUID>) {
+        (subscribedFriendIds - friendIds).forEach(mapSocket::unsubscribeALocation)
+        (friendIds - subscribedFriendIds).forEach(mapSocket::subscribeLocation)
+        subscribedFriendIds = friendIds
+    }
+
+    private fun clearLocationSubscriptions() {
+        mapSocket.unsubscribeAllLocation()
+        subscribedFriendIds = emptySet()
+    }
+
+    private fun requestFriendLocationRefresh() {
+        if (!hasLoadedFriendList) return
+        if (friendIds.isEmpty()) return
+
+        // Reconnect phải lấy một snapshot mới. Hủy request cũ nếu nó bắt đầu
+        // trước khi kết nối được khôi phục.
+        refreshLocationsJob?.cancel()
+        refreshLocationsJob = viewModelScope.launch {
+            when (val result = locationRepository.getFriendLocations()) {
+                is DataResult.Success -> mergeLocationSnapshot(result.data.data.items)
+                is DataResult.Error -> Log.e(
+                    TAG,
+                    "Không lấy được vị trí gần nhất: ${result.message}"
+                )
+            }
+        }
+    }
+
+    private fun mergeLocationSnapshot(locations: List<LocationResponse>) {
+        val locationsByUserId = locations.associateBy(LocationResponse::userId)
+        val mergedFriends = _friends.value.map { friend ->
+            val location = locationsByUserId[friend.id] ?: return@map friend
+
+            if (!isNewerThan(location.lastActiveAt, friend.lastActiveAt)) {
+                friend
+            } else {
+                friend.copy(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    lastActiveAt = location.lastActiveAt
+                )
+            }
+        }
+
+        publishFriends(mergedFriends)
+    }
+
+    private fun isNewerThan(incoming: String, current: String?): Boolean {
+        if (current == null) return true
+
+        val incomingInstant = runCatching { Instant.parse(incoming) }.getOrNull()
+        val currentInstant = runCatching { Instant.parse(current) }.getOrNull()
+
+        return if (incomingInstant != null && currentInstant != null) {
+            incomingInstant.isAfter(currentInstant)
+        } else {
+            // ISO-8601 có thể so sánh theo chuỗi khi backend không trả về format
+            // mà Instant.parse hỗ trợ. Dữ liệu bằng nhau không cần render lại.
+            incoming > current
+        }
+    }
+
+    private fun publishFriends(friendList: List<FriendItemModel>) {
+        DataFriendItem.data.apply {
+            clear()
+            addAll(friendList)
+        }
+        DataFriendItem.total = friendList.size
+        _friends.value = friendList
+    }
+
+    override fun onCleared() {
+        refreshLocationsJob?.cancel()
+        clearLocationSubscriptions()
+        super.onCleared()
     }
 }

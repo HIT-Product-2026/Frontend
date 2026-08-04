@@ -219,6 +219,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 currentLat = location.latitude
                 currentLng = location.longitude
                 Log.d("LOCATION_UPDATE", "Lat=$currentLat, Lng=$currentLng")
+                updateCurrentLocationPoint()
             }
         }
 
