@@ -39,6 +39,7 @@ import com.google.android.exoplayer2.Player
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.showComingSoon
 import com.pando.app.core.extensions.toLocalDateTime
@@ -82,6 +83,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
+    private var isStartingRecording = false
 
     private var savedMediaFile: File? = null
 
@@ -113,6 +115,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun initView() {
+        updateCaptureButton()
     }
 
     override fun initActionView() {
@@ -149,9 +152,18 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                         if (activeRecording != null) {
                             // Cho phép bấm lần hai để dừng trước 10 giây
                             activeRecording?.stop()
-                        } else {
-                            captureLocation()
+                        } else if (!isStartingRecording) {
+                            // Không chờ lấy vị trí trước khi bắt đầu quay.
+                            // Chặn các lần bấm liên tiếp trong lúc CameraX khởi tạo.
+                            isStartingRecording = true
+                            binding.btnCapture.isEnabled = false
                             requestAudioAndRecord()
+
+                            currentLat = null
+                            currentLng = null
+                            viewLifecycleOwner.lifecycleScope.launch {
+                                captureLocation()
+                            }
                         }
                     }
                 }
@@ -236,6 +248,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         super.onResume()
         orientationEventListener?.enable()
         binding.cameraContainer.visibility = View.VISIBLE
+        updateCaptureButton()
         startCamera()
     }
 
@@ -420,6 +433,17 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.historyBtn.visibility = View.VISIBLE
 
         binding.captionLayout.visibility = View.GONE
+        updateCaptureButton()
+    }
+
+    private fun updateCaptureButton(isRecording: Boolean = activeRecording != null) {
+        val captureDrawable = when {
+            isRecording -> R.drawable.capture_recording_btn
+            captureMode == CaptureMode.VIDEO -> R.drawable.capture_video_btn
+            else -> R.drawable.capture_btn
+        }
+
+        binding.btnCapture.setImageResource(captureDrawable)
     }
 
     private fun playCapturedVideo(videoUri: Uri) {
@@ -524,6 +548,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         if (captureMode == mode || activeRecording != null) return
 
         captureMode = mode
+        updateCaptureButton()
 
         val thumbTranslation = if (mode == CaptureMode.VIDEO) {
             binding.btnTabVideo.x - binding.btnTabCamera.x
@@ -554,7 +579,11 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
     @SuppressLint("MissingPermission")
     private fun startVideoRecording(enableAudio: Boolean) {
-        val videoCapture = videoCapture ?: return
+        val videoCapture = videoCapture ?: run {
+            isStartingRecording = false
+            binding.btnCapture.isEnabled = true
+            return
+        }
         val context = requireContext()
 
         val audioGranted = ContextCompat.checkSelfPermission(
@@ -563,6 +592,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         ) == PackageManager.PERMISSION_GRANTED
 
         if (enableAudio && !audioGranted) {
+            isStartingRecording = false
+            binding.btnCapture.isEnabled = true
             Toast.makeText(
                 context,
                 "Chưa được cấp quyền micro, video sẽ không có âm thanh",
@@ -593,6 +624,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             ) { event ->
                 when (event) {
                     is VideoRecordEvent.Start -> {
+                        isStartingRecording = false
+                        binding.btnCapture.isEnabled = true
+                        updateCaptureButton(isRecording = true)
+
                         binding.btnTabCamera.isEnabled = false
                         binding.btnTabVideo.isEnabled = false
                         binding.btnSwitchCamera.isEnabled = false
@@ -616,6 +651,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
                     is VideoRecordEvent.Finalize -> {
                         activeRecording = null
+                        isStartingRecording = false
+                        binding.btnCapture.isEnabled = true
+                        updateCaptureButton()
 
                         binding.recordingBorderView.visibility = View.GONE
                         binding.recordingBorderView.setProgress(0f)
@@ -654,14 +692,31 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                     }
                 }
             }
+
+            isStartingRecording = false
+            binding.btnCapture.isEnabled = true
+            updateCaptureButton(isRecording = true)
         } catch (securityException: SecurityException) {
             videoFile.delete()
+            isStartingRecording = false
+            binding.btnCapture.isEnabled = true
             Toast.makeText(
                 context,
                 "Không thể bật micro để quay video",
                 Toast.LENGTH_SHORT
             ).show()
             Log.w("CameraX", "Không thể cấp quyền ghi âm cho CameraX", securityException)
+        } catch (illegalStateException: IllegalStateException) {
+            videoFile.delete()
+            isStartingRecording = false
+            binding.btnCapture.isEnabled = true
+            updateCaptureButton()
+            Toast.makeText(
+                context,
+                "Camera đang xử lý video trước đó, vui lòng thử lại",
+                Toast.LENGTH_SHORT
+            ).show()
+            Log.w("CameraX", "Không thể bắt đầu recording mới", illegalStateException)
         }
     }
 
