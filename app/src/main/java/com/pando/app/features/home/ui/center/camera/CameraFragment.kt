@@ -1,5 +1,6 @@
 package com.pando.app.features.home.ui.center.camera
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -43,25 +44,27 @@ import com.pando.app.core.extensions.showComingSoon
 import com.pando.app.core.extensions.toLocalDateTime
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentCameraBinding
-import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
 import com.pando.app.features.home.data.model.entity.enumEntity.TypePost
+import com.pando.app.features.home.data.store.PostFeedStore
 import com.pando.app.features.home.ui.center.CenterFragment
 import dagger.hilt.android.AndroidEntryPoint
+import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 @AndroidEntryPoint
 class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding::inflate) {
     private val viewModel: CameraViewModel by viewModels()
 
+    @Inject
+    lateinit var postFeedStore: PostFeedStore
+
     private var imageCapture: ImageCapture? = null
 
-    private lateinit var cameraExecutor: ExecutorService
     private var lensFacing = CameraSelector.LENS_FACING_BACK
 
     private var videoPreviewPlayer: ExoPlayer? = null
@@ -88,7 +91,6 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
 
     override fun initData() {
-        cameraExecutor = Executors.newSingleThreadExecutor()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
         initOrientationListener()
@@ -137,16 +139,18 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
         binding.btnCapture.setOnClickListener {
             viewLifecycleOwner.lifecycleScope.launch {
-                captureLocation()
-
                 when (captureMode) {
-                    CaptureMode.PHOTO -> takePhoto()
+                    CaptureMode.PHOTO -> {
+                        captureLocation()
+                        takePhoto()
+                    }
 
                     CaptureMode.VIDEO -> {
                         if (activeRecording != null) {
                             // Cho phép bấm lần hai để dừng trước 10 giây
                             activeRecording?.stop()
                         } else {
+                            captureLocation()
                             requestAudioAndRecord()
                         }
                     }
@@ -200,7 +204,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                                     createdAt = post.createAt?.toLocalDateTime()
                                 )
 
-                                DataPostReelItem.data.add(newPost)
+                                postFeedStore.addPost(newPost)
 
                                 Toast.makeText(requireContext(), "Đã gửi!", Toast.LENGTH_SHORT)
                                     .show()
@@ -442,28 +446,41 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         videoPreviewPlayer = null
     }
 
-    private suspend fun captureLocation() = withContext(Dispatchers.IO) {
-        if (ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            fusedLocationClient.getCurrentLocation(
-                Priority.PRIORITY_HIGH_ACCURACY,
-                null
-            ).addOnSuccessListener { location ->
-                if (location != null) {
-                    currentLat = location.latitude
-                    currentLng = location.longitude
-                    Log.d("LOCATION", "Đã lấy tọa độ: Lat=$currentLat, Lng=$currentLng")
-                } else {
-                    Log.d("LOCATION", "Không thể lấy tọa độ (Có thể do đang ở trong nhà quá kín)")
-                }
-            }
-        } else {
+    private suspend fun captureLocation() {
+        val context = requireContext()
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!fineGranted && !coarseGranted) {
             currentLat = null
             currentLng = null
+            return
         }
+
+        val location = try {
+            withContext(Dispatchers.IO) {
+                fusedLocationClient.getCurrentLocation(
+                    if (fineGranted) {
+                        Priority.PRIORITY_HIGH_ACCURACY
+                    } else {
+                        Priority.PRIORITY_BALANCED_POWER_ACCURACY
+                    },
+                    null
+                ).await()
+            }
+        } catch (securityException: SecurityException) {
+            Log.w("Camera", "Không thể lấy quyền vị trí", securityException)
+            null
+        }
+
+        currentLat = location?.latitude
+        currentLng = location?.longitude
     }
 
     private fun initOrientationListener() {
@@ -496,7 +513,6 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         cameraProvider?.unbindAll()
         cameraProvider = null
         imageCapture = null
-        cameraExecutor.shutdown()
 //        viewModel.socketDisconnect()
 
         super.onDestroyView()
@@ -534,11 +550,27 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
     }
 
+    @SuppressLint("MissingPermission")
     private fun startVideoRecording(enableAudio: Boolean) {
         val videoCapture = videoCapture ?: return
+        val context = requireContext()
+
+        val audioGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (enableAudio && !audioGranted) {
+            Toast.makeText(
+                context,
+                "Chưa được cấp quyền micro, video sẽ không có âm thanh",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
 
         val videoFile = File(
-            requireContext().cacheDir,
+            context.cacheDir,
             "Pando_${System.currentTimeMillis()}.mp4"
         )
 
@@ -546,80 +578,88 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             .setDurationLimitMillis(MAX_RECORDING_DURATION_MILLIS)
             .build()
 
-        var pendingRecording = videoCapture.output
-            .prepareRecording(requireContext(), outputOptions)
+        try {
+            var pendingRecording = videoCapture.output
+                .prepareRecording(context, outputOptions)
 
-        if (enableAudio) {
-            pendingRecording = pendingRecording.withAudioEnabled()
-        }
+            if (enableAudio) {
+                pendingRecording = pendingRecording.withAudioEnabled()
+            }
 
-        activeRecording = pendingRecording.start(
-            ContextCompat.getMainExecutor(requireContext())
-        ) { event ->
-            when (event) {
-                is VideoRecordEvent.Start -> {
-                    binding.btnTabCamera.isEnabled = false
-                    binding.btnTabVideo.isEnabled = false
-                    binding.btnSwitchCamera.isEnabled = false
+            activeRecording = pendingRecording.start(
+                ContextCompat.getMainExecutor(context)
+            ) { event ->
+                when (event) {
+                    is VideoRecordEvent.Start -> {
+                        binding.btnTabCamera.isEnabled = false
+                        binding.btnTabVideo.isEnabled = false
+                        binding.btnSwitchCamera.isEnabled = false
 
-                    binding.recordingBorderView.setProgress(0f)
-                    binding.recordingBorderView.visibility = View.VISIBLE
-
-                    Toast.makeText(
-                        requireContext(),
-                        "Đang quay...",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-
-                is VideoRecordEvent.Status -> {
-                    val recordedNanos = event.recordingStats.recordedDurationNanos
-                    val recordedSeconds = recordedNanos / 1_000_000_000L
-
-                    val progress = recordedNanos.toFloat() / MAX_RECORDING_DURATION_NANOS
-                    binding.recordingBorderView.setProgress(progress)
-
-                    Log.d("CameraX", "Đã quay: ${recordedSeconds}s")
-                }
-
-                is VideoRecordEvent.Finalize -> {
-                    activeRecording = null
-
-                    binding.recordingBorderView.visibility = View.GONE
-                    binding.recordingBorderView.setProgress(0f)
-
-                    binding.btnTabCamera.isEnabled = true
-                    binding.btnTabVideo.isEnabled = true
-                    binding.btnSwitchCamera.isEnabled = true
-
-                    /*
-                     * Khi đạt giới hạn 10 giây, CameraX trả về
-                     * ERROR_DURATION_LIMIT_REACHED nhưng file MP4 vẫn hợp lệ.
-                     */
-                    val isUsableVideo =
-                        event.error == VideoRecordEvent.Finalize.ERROR_NONE ||
-                                event.error == VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED
-
-                    if (isUsableVideo && videoFile.exists() && videoFile.length() > 0L) {
-                        savedMediaFile = videoFile
-                        viewModel.setSendMode(videoFile, TypePost.VIDEO)
-                    } else {
-                        videoFile.delete()
+                        binding.recordingBorderView.setProgress(0f)
+                        binding.recordingBorderView.visibility = View.VISIBLE
 
                         Toast.makeText(
                             requireContext(),
-                            "Quay video thất bại",
+                            "Đang quay...",
                             Toast.LENGTH_SHORT
                         ).show()
+                    }
 
-                        Log.e(
-                            "CameraX",
-                            "Video error=${event.error}",
-                            event.cause
-                        )
+                    is VideoRecordEvent.Status -> {
+                        val recordedNanos = event.recordingStats.recordedDurationNanos
+                        val progress =
+                            recordedNanos.toFloat() / MAX_RECORDING_DURATION_NANOS
+                        binding.recordingBorderView.setProgress(progress)
+                    }
+
+                    is VideoRecordEvent.Finalize -> {
+                        activeRecording = null
+
+                        binding.recordingBorderView.visibility = View.GONE
+                        binding.recordingBorderView.setProgress(0f)
+
+                        binding.btnTabCamera.isEnabled = true
+                        binding.btnTabVideo.isEnabled = true
+                        binding.btnSwitchCamera.isEnabled = true
+
+                        /*
+                         * Khi đạt giới hạn 10 giây, CameraX trả về
+                         * ERROR_DURATION_LIMIT_REACHED nhưng file MP4 vẫn hợp lệ.
+                         */
+                        val isUsableVideo =
+                            event.error == VideoRecordEvent.Finalize.ERROR_NONE ||
+                                event.error ==
+                                VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED
+
+                        if (isUsableVideo && videoFile.exists() && videoFile.length() > 0L) {
+                            savedMediaFile = videoFile
+                            viewModel.setSendMode(videoFile, TypePost.VIDEO)
+                        } else {
+                            videoFile.delete()
+
+                            Toast.makeText(
+                                requireContext(),
+                                "Quay video thất bại",
+                                Toast.LENGTH_SHORT
+                            ).show()
+
+                            Log.e(
+                                "CameraX",
+                                "Video error=${event.error}",
+                                event.cause
+                            )
+                        }
                     }
                 }
             }
+        } catch (securityException: SecurityException) {
+            videoFile.delete()
+            Toast.makeText(
+                context,
+                "Không thể bật micro để quay video",
+                Toast.LENGTH_SHORT
+            ).show()
+            Log.w("CameraX", "Không thể cấp quyền ghi âm cho CameraX", securityException)
         }
     }
 

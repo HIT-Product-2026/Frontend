@@ -86,11 +86,6 @@ class LocationTrackingService : Service() {
             val location = locationResult.lastLocation ?: return
             pendingLocation = location
             sendPendingLocationIfPossible()
-
-            Log.d(
-                TAG,
-                "Location received: lat=${location.latitude}, lng=${location.longitude}"
-            )
         }
     }
 

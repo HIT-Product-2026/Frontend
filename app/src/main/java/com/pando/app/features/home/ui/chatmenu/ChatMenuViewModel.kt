@@ -10,7 +10,6 @@ import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.dto.ConversationDto
 import com.pando.app.features.home.data.model.entity.ChatMenuItemModel
-import com.pando.app.features.home.data.model.entity.DataChatMenuItem
 import com.pando.app.features.home.data.model.response.ConversationsResponse
 import com.pando.app.features.home.data.repository.ConversationRepository
 import com.pando.app.features.home.data.socket.ConversationsSocket
@@ -71,11 +70,6 @@ class ChatMenuViewModel @Inject constructor(
             .distinctBy { it.id }
             .sortedByDescending { it.time }
 
-        DataChatMenuItem.data.apply {
-            clear()
-            addAll(sortedItems)
-        }
-
         _conversations.value = sortedItems
     }
 
@@ -86,13 +80,7 @@ class ChatMenuViewModel @Inject constructor(
 
             if (result is DataResult.Success) {
 
-                DataChatMenuItem.apply {
-                    data.clear()
-                    total = 0
-                }
-
                 val total = result.data.data.total
-                DataChatMenuItem.total = total
 
                 val data = result.data.data.items
                 if (total > 0) {
@@ -116,11 +104,6 @@ class ChatMenuViewModel @Inject constructor(
                     val sortedItems = conversations
                         .distinctBy { it.id }
                         .sortedByDescending { it.time }
-
-                    DataChatMenuItem.data.apply {
-                        clear()
-                        addAll(sortedItems)
-                    }
 
                     _conversations.value = sortedItems
                 }

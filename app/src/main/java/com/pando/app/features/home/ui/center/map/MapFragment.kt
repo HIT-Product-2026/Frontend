@@ -218,7 +218,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                 currentLat = location.latitude
                 currentLng = location.longitude
-                Log.d("LOCATION_UPDATE", "Lat=$currentLat, Lng=$currentLng")
                 updateCurrentLocationPoint()
             }
         }
@@ -375,34 +374,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                         }
                     }
                 }
-//                launch {
-//                    combine(
-//                        mapViewModel.friendState,
-//                        avatarViewModel.avatars
-//                    ) { friendState, avatarState ->
-//                        friendState to avatarState
-//                    }.collect { (friendState, avatarState) ->
-//                        when (friendState) {
-//                            is UiState.Loading -> {}
-//                            is UiState.Success -> {
-//                                val avatarMap = avatarState
-//                                val friendList = DataFriendItem.data.toList()
-//
-//                                val updatedFriendList = friendList.map { item ->
-//                                    item.copy(avatarUrl = if (avatarMap.containsKey(item.id)) avatarMap[item.id] else null)
-//                                }
-//
-//                                DataFriendItem.data.apply {
-//                                    clear()
-//                                    addAll(updatedFriendList)
-//                                }
-//                            }
-//
-//                            is UiState.Error -> {}
-//                            is UiState.Idle -> {}
-//                        }
-//                    }
-//                }
                 launch {
                     combine(
                         avatarViewModel.avatars,
@@ -593,11 +564,8 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 if (location != null) {
                     currentLat = location.latitude
                     currentLng = location.longitude
-                    Log.d("LOCATION", "Đã lấy tọa độ: Lat=$currentLat, Lng=$currentLng")
                     updateCurrentLocationPoint()
                     moveCameraToCurrentLocation()
-                } else {
-                    Log.d("LOCATION", "Không thể lấy tọa độ (Có thể do đang ở trong nhà quá kín)")
                 }
             }
         } else {

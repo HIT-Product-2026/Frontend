@@ -19,9 +19,11 @@ import id.zelory.compressor.constraint.quality
 import id.zelory.compressor.constraint.resolution
 import id.zelory.compressor.constraint.size
 import jakarta.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
@@ -54,44 +56,62 @@ class CameraViewModel @Inject constructor(
         val originFile = currentMode.mediaFile
 
         getData {
-            val normalizedFile = when (currentMode.type) {
+            val preparedMedia = withContext(Dispatchers.IO) {
+                val normalizedFile = when (currentMode.type) {
                     TypePost.IMAGE -> normalizeExif(originFile)
                     TypePost.VIDEO -> originFile
                 }
-//            val normalizedFile = originFile
 
-            val uploadFile = when (currentMode.type) {
-                TypePost.IMAGE -> {
-                    try {
-                        Compressor.compress(context, normalizedFile) {
-                            resolution(1280, 720)
-                            quality(80)
-                            format(Bitmap.CompressFormat.JPEG)
-                            size(2_097_152)
+                val uploadFile = when (currentMode.type) {
+                    TypePost.IMAGE -> {
+                        try {
+                            Compressor.compress(context, normalizedFile) {
+                                resolution(1280, 720)
+                                quality(80)
+                                format(Bitmap.CompressFormat.JPEG)
+                                size(2_097_152)
+                            }
+                        } catch (_: Exception) {
+                            normalizedFile
                         }
-                    } catch (_: Exception) {
-                        normalizedFile
                     }
+
+                    TypePost.VIDEO -> originFile
                 }
 
-                TypePost.VIDEO -> originFile
+                PreparedMedia(
+                    normalizedFile = normalizedFile,
+                    uploadFile = uploadFile
+                )
             }
 
-            val result = mediaRepository.sendPost(caption, longitude, latitude, uploadFile, currentMode.type)
+            val result = mediaRepository.sendPost(
+                caption,
+                longitude,
+                latitude,
+                preparedMedia.uploadFile,
+                currentMode.type
+            )
 
             if (result is DataResult.Success) {
-                if (originFile.exists() && originFile.absolutePath != uploadFile.absolutePath) {
-                    originFile.delete()
-                }
-                if (uploadFile.exists()) {
-                    uploadFile.delete()
-                }
+                withContext(Dispatchers.IO) {
+                    if (
+                        originFile.exists() &&
+                        originFile.absolutePath != preparedMedia.uploadFile.absolutePath
+                    ) {
+                        originFile.delete()
+                    }
+                    if (preparedMedia.uploadFile.exists()) {
+                        preparedMedia.uploadFile.delete()
+                    }
 
-                if (
-                    normalizedFile.absolutePath != originFile.absolutePath &&
-                    normalizedFile.absolutePath != uploadFile.absolutePath
-                ) {
-                    normalizedFile.delete()
+                    if (
+                        preparedMedia.normalizedFile.absolutePath != originFile.absolutePath &&
+                        preparedMedia.normalizedFile.absolutePath !=
+                        preparedMedia.uploadFile.absolutePath
+                    ) {
+                        preparedMedia.normalizedFile.delete()
+                    }
                 }
 
                 setCaptureMode()
@@ -100,6 +120,11 @@ class CameraViewModel @Inject constructor(
             result
         }
     }
+
+    private data class PreparedMedia(
+        val normalizedFile: File,
+        val uploadFile: File
+    )
 
     private fun normalizeExif(sourceFile: File): File {
         val exif = ExifInterface(sourceFile.absolutePath)

@@ -20,20 +20,3 @@ data class PostReelItemModel(
     val nsfw: NsfwStatus?= NsfwStatus.PROCESSING,
     val createdAt: LocalDateTime?
 ) : BaseItemModel
-
-class DataPostReelItem {
-    companion object {
-        var total: Int? = null
-        var nextCursor: String? = ""
-        var hasLoadedFirstPage = false
-
-        val data: MutableList<PostReelItemModel> = mutableListOf()
-
-        fun reset() {
-            total = null
-            nextCursor = ""
-            hasLoadedFirstPage = false
-            data.clear()
-        }
-    }
-}

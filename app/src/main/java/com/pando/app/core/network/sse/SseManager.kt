@@ -95,8 +95,6 @@ class SseManager @Inject constructor(
                 data = data
             )
 
-            Log.d(TAG, "SSE event: type=${event.type}, data=${event.data}")
-
             _events.tryEmit(event)
         }
 

@@ -5,8 +5,6 @@ import com.pando.app.core.data.api.LocationApi
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.response.LocationsResponse
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 class LocationRepository @Inject constructor(

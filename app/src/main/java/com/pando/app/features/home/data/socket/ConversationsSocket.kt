@@ -32,6 +32,7 @@ class ConversationsSocket @Inject constructor(
 
     private var subscription: Disposable? = null
 
+    @Synchronized
     fun subscribe() {
         val client = connectionManager.getConnectedClient() ?: run {
             Log.e(TAG, "Socket chưa kết nối")
@@ -52,8 +53,6 @@ class ConversationsSocket @Inject constructor(
             .topic(destination)
             .subscribe(
                 { message ->
-                    Log.d(TAG, "Nhận conversation update: ${message.payload}")
-
                     val conversation = runCatching {
                         gson.fromJson(message.payload, ConversationDto::class.java)
                     }.getOrElse { throwable ->
@@ -74,6 +73,7 @@ class ConversationsSocket @Inject constructor(
         Log.d(TAG, "Đã subscribe $destination")
     }
 
+    @Synchronized
     fun unsubscribe() {
         subscription?.dispose()
         subscription = null

@@ -10,10 +10,3 @@ data class SentRequestItemModel (
     val isLoading: Boolean = false,
     val errorMessage: String? = null
 ) : BaseItemModel
-
-class DataSentRequestItem {
-    companion object {
-        var total : Int? = null
-        val data : MutableList<SentRequestItemModel> = mutableListOf()
-    }
-}

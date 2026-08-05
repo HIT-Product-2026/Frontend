@@ -21,6 +21,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.bumptech.glide.Glide
@@ -40,7 +41,6 @@ import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentPostReelBinding
 import com.pando.app.databinding.ItemPostReelBinding
-import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
 import com.pando.app.features.home.data.model.entity.enumEntity.NsfwStatus
 import com.pando.app.features.home.data.model.entity.enumEntity.NsfwViewDecision
@@ -48,7 +48,6 @@ import com.pando.app.features.home.data.model.entity.enumEntity.TypePost
 import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -303,31 +302,32 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    combine(
-                        postReelViewModel.images,
-                        postReelViewModel.provinceNames,
-                        postReelViewModel.connectionState
-                    ) { images, provinces, connectionState ->
-                        Triple(images, provinces, connectionState)
-                    }.collect { (images, provinces, connectionState) ->
-                        imageMap = images
-                        provinceMap = provinces
-
-                        refreshPostReelAdapter()
-
-                        when (connectionState) {
-                            is SocketConnectionState.Connecting -> {}
-                            is SocketConnectionState.Connected -> {
-                                isSocketConnected = true
-                            }
-
-                            is SocketConnectionState.Disconnected -> {
-                                isSocketConnected = false
-                            }
-
-                            is SocketConnectionState.Error -> {
-                            }
+                    postReelViewModel.posts.collect { posts ->
+                        postReelAdapter.submitList(posts) {
+                            checkCurrentNsfwReel()
                         }
+                    }
+                }
+
+                launch {
+                    postReelViewModel.images.collect { images ->
+                        imageMap = images
+                        refreshPostReelAdapter()
+                    }
+                }
+
+                launch {
+                    postReelViewModel.provinceNames.collect { provinces ->
+                        provinceMap = provinces
+                        refreshPostReelAdapter()
+                    }
+                }
+
+                launch {
+                    postReelViewModel.connectionState
+                        .collect { connectionState ->
+                            isSocketConnected =
+                                connectionState is SocketConnectionState.Connected
                     }
                 }
 
@@ -339,23 +339,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 }
 
                 launch {
-                    postReelViewModel.uiState.collect { state ->
-                        when (state) {
-                            is UiState.Success -> {
-                                syncNsfwStatuses(mainViewModel.nsfwStatuses.value)
-                                submitPostReelsAndCheckCurrent()
-                            }
-
-                            is UiState.Error -> {}
-
-                            else -> {}
-                        }
-                    }
-                }
-                launch {
                     mainViewModel.nsfwStatuses.collect { statuses ->
                         syncNsfwStatuses(statuses)
-                        submitPostReelsAndCheckCurrent()
                     }
                 }
                 launch {
@@ -376,21 +361,6 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                             }
 
                             is UiState.Success -> {
-                                val postId = state.data
-
-                                DataPostReelItem.data.removeAll {
-                                    it.id == postId
-                                }
-
-                                DataPostReelItem.total =
-                                    DataPostReelItem.total
-                                        ?.minus(1)
-                                        ?.coerceAtLeast(0)
-
-                                postReelAdapter.submitList(
-                                    DataPostReelItem.data.toList()
-                                )
-
                                 binding.btnMore.isEnabled = true
 
                                 Toast.makeText(requireContext(), "Đã xóa bài viết", Toast.LENGTH_SHORT).show()
@@ -420,7 +390,6 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         if (!hasLoadedInitialData) {
             hasLoadedInitialData = true
 
-            DataPostReelItem.reset()
             postReelViewModel.getPosts()
         }
 
@@ -532,11 +501,30 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     private fun refreshPostReelAdapter() {
-        val recyclerView = binding.postReelViewPager.getChildAt(0) as RecyclerView
+        val recyclerView = binding.postReelViewPager.getChildAt(0) as? RecyclerView
+            ?: return
 
         recyclerView.post {
-            if (recyclerView.isAttachedToWindow) {
-                postReelAdapter.notifyDataSetChanged()
+            if (!recyclerView.isAttachedToWindow) return@post
+
+            val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+                ?: return@post
+            val firstVisiblePosition = layoutManager.findFirstVisibleItemPosition()
+            val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
+
+            if (firstVisiblePosition == RecyclerView.NO_POSITION ||
+                lastVisiblePosition == RecyclerView.NO_POSITION ||
+                postReelAdapter.itemCount == 0
+            ) {
+                return@post
+            }
+
+            val lastPosition = lastVisiblePosition.coerceAtMost(postReelAdapter.itemCount - 1)
+            if (firstVisiblePosition <= lastPosition) {
+                postReelAdapter.notifyItemRangeChanged(
+                    firstVisiblePosition,
+                    lastPosition - firstVisiblePosition + 1
+                )
             }
         }
     }
@@ -561,16 +549,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     private fun syncNsfwStatuses(statuses: Map<UUID, NsfwStatus>) {
-        DataPostReelItem.data.indices.forEach { index ->
-            val currentItem = DataPostReelItem.data[index]
-            val latestStatus = statuses[currentItem.id]
-                ?: return@forEach
-
-            if (currentItem.nsfw != latestStatus) {
-                DataPostReelItem.data[index] =
-                    currentItem.copy(nsfw = latestStatus)
-            }
-        }
+        postReelViewModel.updateNsfwStatuses(statuses)
     }
 
     private fun getCurrentUserAge(): Int? {
@@ -680,7 +659,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     private fun submitPostReelsAndCheckCurrent() {
-        postReelAdapter.submitList(DataPostReelItem.data.toList()) {
+        postReelAdapter.submitList(postReelViewModel.posts.value) {
             checkCurrentNsfwReel()
         }
     }

@@ -9,6 +9,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.pando.app.core.base.BaseAdapter
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
@@ -19,7 +20,6 @@ import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentChatMenuBinding
 import com.pando.app.databinding.ItemChatMenuRvBinding
 import com.pando.app.features.home.data.model.entity.ChatMenuItemModel
-import com.pando.app.features.home.data.model.entity.DataChatMenuItem
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -80,7 +80,7 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
                     avatarViewModel.avatars.collect { avatars ->
                         avatarMap = avatars
 
-                        chatMenuAdapter.notifyDataSetChanged()
+                        refreshVisibleItems()
                     }
                 }
                 launch {
@@ -141,6 +141,28 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
 
         if (avatar == null) {
             avatarViewModel.loadAvatar(userId)
+        }
+    }
+
+    private fun refreshVisibleItems() {
+        val layoutManager = binding.chatRV.layoutManager as? LinearLayoutManager
+            ?: return
+        val firstVisible = layoutManager.findFirstVisibleItemPosition()
+        val lastVisible = layoutManager.findLastVisibleItemPosition()
+
+        if (firstVisible == RecyclerView.NO_POSITION ||
+            lastVisible == RecyclerView.NO_POSITION ||
+            chatMenuAdapter.itemCount == 0
+        ) {
+            return
+        }
+
+        val lastPosition = lastVisible.coerceAtMost(chatMenuAdapter.itemCount - 1)
+        if (firstVisible <= lastPosition) {
+            chatMenuAdapter.notifyItemRangeChanged(
+                firstVisible,
+                lastPosition - firstVisible + 1
+            )
         }
     }
 

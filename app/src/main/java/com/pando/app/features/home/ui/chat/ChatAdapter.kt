@@ -26,6 +26,7 @@ class ChatAdapter(
         private const val VIEW_TYPE_TEXT_RECEIVED = 2
         private const val VIEW_TYPE_IMAGE_SENT = 3
         private const val VIEW_TYPE_IMAGE_RECEIVED = 4
+        private const val PAYLOAD_RECIPIENT_AVATAR = "recipient_avatar"
     }
 
     private var recipientAvatar: String? = null
@@ -126,6 +127,21 @@ class ChatAdapter(
         }
     }
 
+    override fun onBindViewHolder(
+        holder: RecyclerView.ViewHolder,
+        position: Int,
+        payloads: MutableList<Any>
+    ) {
+        if (PAYLOAD_RECIPIENT_AVATAR in payloads) {
+            if (holder is TextReceivedViewHolder) {
+                holder.updateAvatar()
+            }
+            return
+        }
+
+        super.onBindViewHolder(holder, position, payloads)
+    }
+
     inner class TextSentViewHolder(private val binding: ItemMessageSentBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(item: ChatMessageItemModel) {
@@ -143,6 +159,10 @@ class ChatAdapter(
             binding.imgAvatar.loadAvatar(recipientAvatar)
 
             binding.tvTime.text = item.createdAt.formatDateTime()
+        }
+
+        fun updateAvatar() {
+            binding.imgAvatar.loadAvatar(recipientAvatar)
         }
     }
 
@@ -163,9 +183,12 @@ class ChatAdapter(
     }
 
     fun updateRecipientAvatar(avatar: String) {
-        if (recipientAvatar === avatar) return
+        if (recipientAvatar == avatar) return
 
         recipientAvatar = avatar
-        notifyDataSetChanged()
+
+        if (itemCount > 0) {
+            notifyItemRangeChanged(0, itemCount, PAYLOAD_RECIPIENT_AVATAR)
+        }
     }
 }

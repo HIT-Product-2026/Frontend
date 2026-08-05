@@ -9,10 +9,3 @@ data class SearchItemModel (
     val isLoading: Boolean = false,
     val errorMessage: String? = null
 ) : BaseItemModel
-
-class DataSearchItem {
-    companion object {
-        var total : Int? = null
-        val data : MutableList<SearchItemModel> = mutableListOf()
-    }
-}

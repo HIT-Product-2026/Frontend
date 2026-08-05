@@ -8,7 +8,6 @@ import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.core.utils.DataResult
-import com.pando.app.features.home.data.model.entity.DataFriendItem
 import com.pando.app.features.home.data.model.entity.FriendItemModel
 import com.pando.app.features.home.data.model.response.FriendListResponse
 import com.pando.app.features.home.data.model.response.LocationResponse
@@ -78,7 +77,6 @@ class MapViewModel @Inject constructor(
     }
 
     private fun updateLocation(location: LocationResponse) {
-        Log.i(TAG, "Nhận cập nhật vị trí của ${location.userId}")
         val oldItem = _friends.value.firstOrNull { item ->
             item.id == location.userId
         } ?: return
@@ -108,14 +106,7 @@ class MapViewModel @Inject constructor(
             _friendState.value = UiState.Loading
             when (val result = friendshipRepository.getFriendList()) {
                 is DataResult.Success -> {
-                    DataFriendItem.apply {
-                        data.clear()
-                        total = 0
-                    }
-
                     val total = result.data.data.total
-                    DataFriendItem.total = total
-
                     val data = result.data.data.items
                     val currentFriendsById = _friends.value.associateBy(FriendItemModel::id)
                     val friendList = if (total > 0) {
@@ -217,11 +208,6 @@ class MapViewModel @Inject constructor(
     }
 
     private fun publishFriends(friendList: List<FriendItemModel>) {
-        DataFriendItem.data.apply {
-            clear()
-            addAll(friendList)
-        }
-        DataFriendItem.total = friendList.size
         _friends.value = friendList
     }
 

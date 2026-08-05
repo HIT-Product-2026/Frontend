@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import ua.naiksoftware.stomp.StompClient
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,7 +26,7 @@ class MapSocket @Inject constructor(
         private const val TAG = "MapSocket"
     }
 
-    private val mapSubscriptions = mutableMapOf<UUID, ActiveSubscription>()
+    private val mapSubscriptions = ConcurrentHashMap<UUID, ActiveSubscription>()
 
     private val _location = MutableSharedFlow<LocationResponse>(
         extraBufferCapacity = 64,
@@ -33,6 +34,7 @@ class MapSocket @Inject constructor(
     )
     val location = _location.asSharedFlow()
 
+    @Synchronized
     fun subscribeLocation(friendId: UUID) {
 
         val client = connectionManager.getConnectedClient() ?: run {
@@ -57,8 +59,6 @@ class MapSocket @Inject constructor(
             .topic(destination)
             .subscribe(
                 { topicMessage ->
-                    Log.d(TAG, "Nhận message: ${topicMessage.payload}")
-
                     val message = runCatching {
                         gson.fromJson(topicMessage.payload, LocationResponse::class.java)
                     }.getOrElse { throwable ->
@@ -81,11 +81,13 @@ class MapSocket @Inject constructor(
         )
     }
 
+    @Synchronized
     fun unsubscribeALocation(friendId: UUID) {
         mapSubscriptions.remove(friendId)?.disposable?.dispose()
         Log.d(TAG, "Đã unsubscribe location của friend: $friendId")
     }
 
+    @Synchronized
     fun unsubscribeAllLocation() {
         mapSubscriptions.values.forEach {
             it.disposable.dispose()

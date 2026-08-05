@@ -15,20 +15,3 @@ data class ChatMessageItemModel(
     val type: MessageType,
     val createdAt: LocalDateTime
 ) : BaseItemModel
-
-class DataChatMessageItem {
-    companion object {
-        var total: Int? = null
-        var nextCursor: String? = ""
-        var hasLoadedFirstPage = false
-
-        val data: MutableList<ChatMessageItemModel> = mutableListOf()
-
-        fun reset() {
-            total = null
-            nextCursor = ""
-            hasLoadedFirstPage = false
-            data.clear()
-        }
-    }
-}

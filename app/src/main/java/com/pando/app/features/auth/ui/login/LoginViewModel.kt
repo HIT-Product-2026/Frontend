@@ -53,10 +53,10 @@ class LoginViewModel @Inject constructor(
 
             if (!fcmToken.isNullOrEmpty()) {
                 authRepository.sendFcmToken(fcmToken)
-                Log.d("FCM", "FCM Token lấy thành công: $fcmToken")
+                Log.d("FCM", "FCM token đã được gửi thành công")
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w("FCM", "Không thể lấy hoặc gửi FCM token", e)
         }
     }
 

@@ -11,10 +11,3 @@ data class ReceivedRequestItemModel (
     val loadingAction: FriendAction? = null,
     val errorMessage: String? = null
 ) : BaseItemModel
-
-class DataReceivedRequestItem {
-    companion object {
-        var total : Int? = null
-        val data : MutableList<ReceivedRequestItemModel> = mutableListOf()
-    }
-}

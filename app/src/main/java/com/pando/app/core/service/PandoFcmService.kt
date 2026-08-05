@@ -31,7 +31,7 @@ class PandoFcmService : FirebaseMessagingService() {
 
         when (payload.type) {
             "POST" -> {
-                Log.d(TAG, "Bài viết mới: $payload")
+                Log.d(TAG, "Đã nhận thông báo bài viết mới")
 
                 updatePostWidget(payload)
             }
@@ -39,12 +39,6 @@ class PandoFcmService : FirebaseMessagingService() {
     }
 
     private fun updatePostWidget(payload: FcmPostPayload) {
-        Log.d(TAG, "Post ID: ${payload.postId}")
-        Log.d(TAG, "Người đăng: ${payload.displayName}")
-        Log.d(TAG, "Ảnh: ${payload.imageUrl}")
-        Log.d(TAG, "Địa điểm: ${payload.provinceName}")
-        Log.d(TAG, "Caption: ${payload.caption}")
-
         WidgetUpdater(applicationContext).updatePost(payload)
     }
 
@@ -52,6 +46,6 @@ class PandoFcmService : FirebaseMessagingService() {
     @Suppress("DEPRECATION")
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        Log.d("FCM_TOKEN", "Mã thiết bị mới: $token")
+        Log.d(TAG, "FCM token đã được làm mới")
     }
 }

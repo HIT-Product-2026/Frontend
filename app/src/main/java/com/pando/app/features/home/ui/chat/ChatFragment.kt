@@ -22,11 +22,9 @@ import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentChatBinding
 import com.pando.app.databinding.ItemImageMessageReceivedBinding
 import com.pando.app.databinding.ItemImageMessageSentBinding
-import com.pando.app.features.home.data.model.entity.DataChatMessageItem
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 @AndroidEntryPoint
 class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::inflate) {
@@ -34,7 +32,6 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
         private const val TAG = "SOCKET_CONNECTION"
     }
 
-    private var imageMap: Map<UUID, String> = emptyMap()
     private val args: ChatFragmentArgs by navArgs()
     private val chatViewModel: ChatViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
@@ -49,8 +46,6 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
         ) { itemBinding, item ->
             when (itemBinding) {
                 is ItemImageMessageReceivedBinding -> {
-//                    val image = imageMap[item.id]
-
                     Glide.with(this)
                         .load(item.imageUrl)
                         .into(itemBinding.imageMessage)
@@ -61,8 +56,6 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                 }
 
                 is ItemImageMessageSentBinding -> {
-//                    val image = imageMap[item.id]
-
                     Glide.with(this)
                         .load(item.imageUrl)
                         .into(itemBinding.imageMessage)
@@ -76,8 +69,6 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
     }
 
     override fun initData() {
-        DataChatMessageItem.reset()
-
         chatViewModel.setCurrentConversationId(args.conversationId)
         chatViewModel.setCurrentRecipientId(args.recipientId)
 
@@ -88,12 +79,8 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
         binding.toolbarName.text = args.name
         setupKeyboardInsets()
 
-        if (DataChatMessageItem.data.isEmpty()) {
-            chatViewModel.getMessageList(args.conversationId, args.recipientId)
-        }
-
         setupRecyclerView()
-        chatAdapter.submitList(DataChatMessageItem.data.toList())
+        chatViewModel.getMessageList(args.conversationId, args.recipientId)
     }
 
     override fun initActionView() {
@@ -120,12 +107,6 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                         }
                     }
                 }
-//                launch {
-//                    chatViewModel.images.collect { images ->
-//                        imageMap = images
-//                        chatAdapter.notifyDataSetChanged()
-//                    }
-//                }
                 launch {
                     chatViewModel.messages.collect { messages ->
                         chatAdapter.submitList(messages) {
@@ -135,7 +116,6 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                                 isLoadingOlderMessages = false
                             }
                         }
-                        Log.d("MessageSocket", "Chap nhat thanh cong len man hinh")
                     }
                 }
                 launch {
@@ -145,34 +125,6 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                             is UiState.Loading -> {}
                             is UiState.Success -> {
                                 chatViewModel.clearResult()
-//                                when (val event = state.data) {
-//                                    is ChatEvent.GetChatHistoryEvent -> {
-//                                        chatViewModel.clearResult()
-//                                    }
-////
-//                                    is ChatEvent.SendTextEvent -> {
-//                                        DataChatMessageItem.data.add(
-//                                            ChatMessageItemModel(
-//                                                id = event.response.data.id,
-//                                                conversationId = args.conversationId,
-//                                                senderId = event.response.data.sender.id,
-//                                                recipientId = args.recipientId,
-//                                                content = event.response.data.content,
-//                                                type = MessageType.TEXT,
-//                                                createdAt = event.response.data.createdAt
-//                                            )
-//                                        )
-//
-//                                        chatAdapter.submitList(DataChatMessageItem.data.toList())
-//                                        submitMessagesAndScrollToBottom()
-//                                        binding.sendMessageET.text?.clear()
-//                                        chatViewModel.clearResult()
-//                                    }
-//
-//                                    is ChatEvent.SocketErrorEvent -> {
-//                                        chatViewModel.clearResult()
-//                                    }
-//                                }
                             }
 
                             is UiState.Error -> {}
@@ -232,11 +184,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
 
                         val firstVisiblePosition = linearLayoutManager.findFirstVisibleItemPosition()
 
-                        Log.d("Test", "giá trị firstVisiblePosition $firstVisiblePosition")
-
                         if (firstVisiblePosition <= 2 && isLoadingOlderMessages == false) {
-                            Log.d("Test", "Đã thỏa mãn điều kiện để load ")
-
                             loadOlderMessages()
                         }
                     }
@@ -247,9 +195,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
 
     private fun loadOlderMessages() {
         if (isLoadingOlderMessages) return
-        if (DataChatMessageItem.nextCursor?.isBlank() == true) return
-
-        Log.d("Test", "loadOlderMessages đang chạy")
+        if (!chatViewModel.canLoadMoreMessages()) return
 
         isLoadingOlderMessages = true
 
@@ -284,22 +230,6 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
         ViewCompat.requestApplyInsets(binding.root)
     }
 
-
-//    private fun submitMessagesAndScrollToBottom(smooth: Boolean = true) {
-//        val messages = DataChatMessageItem.data.toList()
-//
-//        chatAdapter.submitList(messages) {
-//            if (messages.isEmpty()) return@submitList
-//
-//            val lastPosition = messages.lastIndex
-//
-//            if (smooth) {
-//                binding.messageList.smoothScrollToPosition(lastPosition)
-//            } else {
-//                binding.messageList.scrollToPosition(lastPosition)
-//            }
-//        }
-//    }
 
     override fun onDestroyView() {
         binding.messageList.adapter = null

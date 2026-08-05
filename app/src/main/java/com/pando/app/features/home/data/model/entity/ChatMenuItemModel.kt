@@ -12,10 +12,3 @@ data class ChatMenuItemModel (
     val previewChat : String?,
     val time : LocalDateTime?
 ) : BaseItemModel
-
-class DataChatMenuItem {
-    companion object {
-        var total : Int? = null
-        val data : MutableList<ChatMenuItemModel> = mutableListOf()
-    }
-}

@@ -7,14 +7,15 @@ import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.state.UiState
 import com.pando.app.core.utils.DataResult
-import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
+import com.pando.app.features.home.data.model.entity.enumEntity.NsfwStatus
 import com.pando.app.features.home.data.model.entity.enumEntity.NsfwViewDecision
 import com.pando.app.features.home.data.model.entity.enumEntity.PostModeLocation
 import com.pando.app.features.home.data.model.response.PostsResponse
 import com.pando.app.features.home.data.repository.LocationRepository
 import com.pando.app.features.home.data.repository.PostRepository
 import com.pando.app.features.home.data.socket.MessagesSocket
+import com.pando.app.features.home.data.store.PostFeedStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,9 +29,11 @@ class PostReelViewModel @Inject constructor(
     private val postRepository: PostRepository,
     private val messagesSocket: MessagesSocket,
     private val socketConnectionManager: SocketConnectionManager,
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val postFeedStore: PostFeedStore
 ) : BaseVM<ApiResponse<PostsResponse>>() {
     val connectionState = socketConnectionManager.connectionState
+    val posts = postFeedStore.posts
     private var isLoading = false
 
     private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
@@ -42,7 +45,9 @@ class PostReelViewModel @Inject constructor(
     val deletePostState = _deletePostState.asStateFlow()
 
     private val loadingImageIds = mutableSetOf<UUID>()
-    private val loadingProvinceIds = mutableSetOf<UUID>()
+    private val provinceCache = mutableMapOf<CoordinateKey, String>()
+    private val loadingProvinceKeys = mutableSetOf<CoordinateKey>()
+    private val waitingProvincePostIds = mutableMapOf<CoordinateKey, MutableSet<UUID>>()
 
     fun loadPost(postId: UUID, longitude: Double?, latitude: Double?) {
         loadPostImage(postId)
@@ -78,36 +83,61 @@ class PostReelViewModel @Inject constructor(
 
     private fun loadProvince(postId: UUID, latitude: Double, longitude: Double) {
         if (_provinceNames.value.containsKey(postId)) return
-        if (!loadingProvinceIds.add(postId)) return
+
+        val coordinateKey = CoordinateKey(latitude, longitude)
+        provinceCache[coordinateKey]?.let { province ->
+            _provinceNames.update { current ->
+                current + (postId to province)
+            }
+            return
+        }
+
+        waitingProvincePostIds
+            .getOrPut(coordinateKey) { linkedSetOf() }
+            .add(postId)
+
+        if (!loadingProvinceKeys.add(coordinateKey)) return
 
         viewModelScope.launch {
             try {
-                when (val result = locationRepository.getProvince(latitude, longitude)) {
+                when (val result = locationRepository.getProvince(
+                    coordinateKey.latitude,
+                    coordinateKey.longitude
+                )) {
                     is DataResult.Success -> {
+                        val province = result.data.data
+                        provinceCache[coordinateKey] = province
+                        val postIds = waitingProvincePostIds.remove(coordinateKey).orEmpty()
+
                         _provinceNames.update { current ->
-                            current + (postId to result.data.data)
+                            current + postIds.associateWith { province }
                         }
                     }
 
-                    is DataResult.Error -> {}
+                    is DataResult.Error -> {
+                        waitingProvincePostIds.remove(coordinateKey)
+                    }
                 }
             } finally {
-                loadingProvinceIds.remove(postId)
+                loadingProvinceKeys.remove(coordinateKey)
             }
         }
     }
 
+    private data class CoordinateKey(
+        val latitude: Double,
+        val longitude: Double
+    )
+
     fun getPosts() {
         if (isLoading) return
 
-        if (DataPostReelItem.hasLoadedFirstPage &&
-            DataPostReelItem.nextCursor == null
-        ) {
+        if (postFeedStore.hasReachedEnd()) {
             return
         }
 
         isLoading = true
-        val requestedCursor = DataPostReelItem.nextCursor
+        val requestedCursor = postFeedStore.getNextCursor()
 
         getData {
             val result = postRepository.getPosts(requestedCursor)
@@ -115,13 +145,7 @@ class PostReelViewModel @Inject constructor(
             if (result is DataResult.Success) {
                 val response = result.data.data
 
-                DataPostReelItem.total = DataPostReelItem.total?.plus(response.total)
-
-                val existingIds = DataPostReelItem.data
-                    .mapTo(hashSetOf()) { it.id }
-
                 val newPosts = response.items
-                    .filter { existingIds.add(it.id) }
                     .map { post ->
                         when (post.modeLocation) {
                             PostModeLocation.PUBLIC -> {
@@ -156,9 +180,7 @@ class PostReelViewModel @Inject constructor(
                         }
                     }
 
-                DataPostReelItem.data.addAll(newPosts)
-                DataPostReelItem.hasLoadedFirstPage = true
-                DataPostReelItem.nextCursor = result.data.data.cursor
+                postFeedStore.appendPage(newPosts, response.cursor)
             }
 
             isLoading = false
@@ -181,6 +203,14 @@ class PostReelViewModel @Inject constructor(
         }
     }
 
+    fun updateNsfwStatuses(statuses: Map<UUID, NsfwStatus>) {
+        postFeedStore.updateNsfwStatuses(statuses)
+    }
+
+    fun addPost(post: PostReelItemModel) {
+        postFeedStore.addPost(post)
+    }
+
     fun deletePost(postId: UUID) {
         if (_deletePostState.value is UiState.Loading) return
 
@@ -189,6 +219,7 @@ class PostReelViewModel @Inject constructor(
 
             when (val result = postRepository.deletePost(postId)) {
                 is DataResult.Success -> {
+                    postFeedStore.removePost(postId)
                     _images.update { it - postId }
                     _provinceNames.update { it - postId }
                     _nsfwDecisions.update { it - postId }

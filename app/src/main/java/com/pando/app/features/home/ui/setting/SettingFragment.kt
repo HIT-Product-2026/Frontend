@@ -17,13 +17,7 @@ import com.pando.app.core.location.TrackingPreferences
 import com.pando.app.core.network.api.TokenManager
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentSettingBinding
-import com.pando.app.features.home.data.model.entity.DataChatMenuItem
-import com.pando.app.features.home.data.model.entity.DataChatMessageItem
-import com.pando.app.features.home.data.model.entity.DataFriendItem
-import com.pando.app.features.home.data.model.entity.DataPostReelItem
-import com.pando.app.features.home.data.model.entity.DataReceivedRequestItem
-import com.pando.app.features.home.data.model.entity.DataSearchItem
-import com.pando.app.features.home.data.model.entity.DataSentRequestItem
+import com.pando.app.features.home.data.store.PostFeedStore
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.launch
@@ -36,6 +30,8 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
     lateinit var userSession: UserSession
     @Inject
     lateinit var trackingPreferences: TrackingPreferences
+    @Inject
+    lateinit var postFeedStore: PostFeedStore
     private val mainViewModel: MainViewModel by activityViewModels()
 
     override fun initData() {
@@ -57,40 +53,7 @@ class SettingFragment : BaseFragment<FragmentSettingBinding>(FragmentSettingBind
             userSession.clearCurrentUser()
             mainViewModel.socketDisconnect()
 
-            DataPostReelItem.apply {
-                data.clear()
-                total = 0
-            }
-
-            DataChatMenuItem.apply {
-                data.clear()
-                total = 0
-            }
-
-            DataChatMessageItem.apply {
-                data.clear()
-                total = 0
-            }
-
-            DataSentRequestItem.apply {
-                data.clear()
-                total = 0
-            }
-
-            DataFriendItem.apply {
-                data.clear()
-                total = 0
-            }
-
-            DataReceivedRequestItem.apply {
-                data.clear()
-                total = 0
-            }
-
-            DataSearchItem.apply {
-                data.clear()
-                total = 0
-            }
+            postFeedStore.reset()
 
             requireContext().showShortToast(R.string.logout_success)
 

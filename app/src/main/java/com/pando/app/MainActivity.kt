@@ -371,8 +371,7 @@ class MainActivity : AppCompatActivity() {
                 return@addOnCompleteListener
             }
 
-            val token = task.result
-            Log.d("FCM_INIT", "FCM Token của tui là: $token")
+            Log.d("FCM_INIT", "FCM token đã được lấy thành công")
         }
     }
 

@@ -11,10 +11,3 @@ data class FriendItemModel (
     val latitude: Double?=null,
     val lastActiveAt: String? = null
 ) : BaseItemModel
-
-class DataFriendItem {
-    companion object {
-        var total : Int? = null
-        val data : MutableList<FriendItemModel> = mutableListOf()
-    }
-}
