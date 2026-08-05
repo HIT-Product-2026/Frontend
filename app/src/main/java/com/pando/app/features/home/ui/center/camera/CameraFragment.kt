@@ -2,6 +2,9 @@ package com.pando.app.features.home.ui.center.camera
 
 import android.annotation.SuppressLint
 import android.Manifest
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
+import android.animation.ValueAnimator
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
@@ -9,6 +12,8 @@ import android.util.Rational
 import android.view.OrientationEventListener
 import android.view.Surface
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -80,6 +85,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private var cameraProvider: ProcessCameraProvider? = null
 
     private var captureMode = CaptureMode.PHOTO
+    private var videoIndicatorAnimator: ObjectAnimator? = null
 
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
@@ -132,6 +138,13 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
 
         binding.btnSwitchCamera.setOnClickListener {
+            binding.btnSwitchCamera.animate()
+                .rotationBy(360f)
+                .setDuration(450L)
+                .setInterpolator(LinearInterpolator())
+                .withLayer()
+                .start()
+
             lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
                 CameraSelector.LENS_FACING_FRONT
             } else {
@@ -436,7 +449,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         updateCaptureButton()
     }
 
-    private fun updateCaptureButton(isRecording: Boolean = activeRecording != null) {
+    private fun updateCaptureButton(
+        isRecording: Boolean = activeRecording != null,
+        animateVideoIndicator: Boolean = false
+    ) {
         val captureDrawable = when {
             isRecording -> R.drawable.capture_recording_btn
             captureMode == CaptureMode.VIDEO -> R.drawable.capture_video_btn
@@ -444,6 +460,74 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
 
         binding.btnCapture.setImageResource(captureDrawable)
+
+        if (captureMode == CaptureMode.VIDEO && !isRecording) {
+            if (animateVideoIndicator) {
+                animateVideoIndicator()
+            } else {
+                showVideoIndicator()
+            }
+        } else {
+            hideVideoIndicator()
+        }
+    }
+
+    private fun animateVideoIndicator() {
+        videoIndicatorAnimator?.cancel()
+        binding.videoIndicatorDot.apply {
+            visibility = View.VISIBLE
+            alpha = 0.55f
+            scaleX = 0.75f
+            scaleY = 0.75f
+        }
+
+        videoIndicatorAnimator = ObjectAnimator.ofPropertyValuesHolder(
+            binding.videoIndicatorDot,
+            PropertyValuesHolder.ofFloat(View.ALPHA, 0.55f, 1f),
+            PropertyValuesHolder.ofFloat(View.SCALE_X, 0.75f, 1f),
+            PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.75f, 1f)
+        ).apply {
+            duration = 650L
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
+    }
+
+    private fun showVideoIndicator() {
+        videoIndicatorAnimator?.cancel()
+        videoIndicatorAnimator = null
+        binding.videoIndicatorDot.visibility = View.VISIBLE
+        binding.videoIndicatorDot.alpha = 1f
+        binding.videoIndicatorDot.scaleX = 1f
+        binding.videoIndicatorDot.scaleY = 1f
+    }
+
+    private fun hideVideoIndicator() {
+        videoIndicatorAnimator?.cancel()
+        videoIndicatorAnimator = null
+        binding.videoIndicatorDot.visibility = View.GONE
+        binding.videoIndicatorDot.alpha = 1f
+        binding.videoIndicatorDot.scaleX = 1f
+        binding.videoIndicatorDot.scaleY = 1f
+    }
+
+    private fun animateCaptureButtonTransition() {
+        binding.captureButtonContainer.animate().cancel()
+        binding.captureButtonContainer.apply {
+            alpha = 0.75f
+            scaleX = 0.82f
+            scaleY = 0.82f
+        }
+        binding.captureButtonContainer.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(240L)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .withLayer()
+            .start()
     }
 
     private fun playCapturedVideo(videoUri: Uri) {
@@ -528,6 +612,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun onDestroyView() {
+        videoIndicatorAnimator?.cancel()
+        videoIndicatorAnimator = null
         releaseVideoPreview()
         orientationEventListener?.disable()
         orientationEventListener = null
@@ -548,7 +634,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         if (captureMode == mode || activeRecording != null) return
 
         captureMode = mode
-        updateCaptureButton()
+        updateCaptureButton(animateVideoIndicator = mode == CaptureMode.VIDEO)
+        animateCaptureButtonTransition()
 
         val thumbTranslation = if (mode == CaptureMode.VIDEO) {
             binding.btnTabVideo.x - binding.btnTabCamera.x

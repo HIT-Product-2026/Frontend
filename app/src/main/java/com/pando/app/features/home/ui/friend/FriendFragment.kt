@@ -39,6 +39,7 @@ import androidx.core.graphics.drawable.toDrawable
 import androidx.fragment.app.activityViewModels
 import androidx.viewbinding.ViewBinding
 import com.pando.app.R
+import com.pando.app.core.extensions.applyButtonPressFeedbackRecursively
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.extensions.showComingSoon
 import com.pando.app.core.extensions.showShortToast
@@ -536,6 +537,8 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             popupWindow.dismiss()
             requireContext().showComingSoon()
         }
+
+        popupBinding.root.applyButtonPressFeedbackRecursively()
 
         popupBinding.root.measure(
             View.MeasureSpec.UNSPECIFIED,

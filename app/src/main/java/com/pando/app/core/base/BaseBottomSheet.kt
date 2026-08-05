@@ -10,6 +10,7 @@ import androidx.viewbinding.ViewBinding
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.pando.app.core.extensions.applyButtonPressFeedbackRecursively
 
 abstract class BaseBottomSheet<B : ViewBinding>(
     private val inflate: (LayoutInflater, ViewGroup?, Boolean) -> B
@@ -46,6 +47,7 @@ abstract class BaseBottomSheet<B : ViewBinding>(
 
         initView()
         initActionView()
+        view.applyButtonPressFeedbackRecursively()
     }
 
     abstract fun initView()

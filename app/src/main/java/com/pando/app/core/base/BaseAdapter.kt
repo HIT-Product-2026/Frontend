@@ -6,6 +6,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
+import com.pando.app.core.extensions.applyButtonPressFeedbackRecursively
 
 open class BaseAdapter<T : Any, B : ViewBinding>(
     private val inflateMethod: (LayoutInflater, ViewGroup, Boolean) -> B,
@@ -32,6 +33,7 @@ open class BaseAdapter<T : Any, B : ViewBinding>(
     inner class ViewHolder(val binding: B) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: T) {
             onBind(binding, item)
+            binding.root.applyButtonPressFeedbackRecursively()
         }
     }
 

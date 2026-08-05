@@ -28,7 +28,7 @@ class RecordingBorderView @JvmOverloads constructor(
         style = Paint.Style.STROKE
         strokeWidth = borderWidth
         strokeCap = Paint.Cap.ROUND
-        color = ContextCompat.getColor(context, R.color.recording_indicator)
+        color = ContextCompat.getColor(context, R.color.accent5)
     }
 
     private val fullPath = Path()

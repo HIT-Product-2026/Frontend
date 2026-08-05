@@ -31,7 +31,6 @@
                     android:layout_width="@dimen/_48sdp"
                     android:layout_height="@dimen/_48sdp"
                     android:layout_marginStart="@dimen/_12sdp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
                     android:focusable="true"
                     android:padding="@dimen/_12sdp"
