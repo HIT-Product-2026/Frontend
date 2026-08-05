@@ -34,17 +34,17 @@
             app:strokeWidth="2dp" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/friendBtn"
+            android:id="@+id/mapBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_centerHorizontal="true"
             android:layout_centerVertical="true"
-            android:text="Bạn bè"
+            android:text="Bản đồ"
             android:textColor="@color/white"
             android:textSize="@dimen/_12sdp"
             app:backgroundTint="@color/accent6"
             app:cornerRadius="50dp"
-            app:icon="@drawable/user_profile_group"
+            app:icon="@drawable/ic_map"
             app:iconSize="@dimen/_16sdp"
             app:iconTint="@color/white" />
 

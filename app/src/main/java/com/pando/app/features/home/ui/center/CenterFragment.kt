@@ -75,8 +75,8 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
             findNavController().navigate(R.id.action_centerFragment_to_chatMenuFragment)
         }
 
-        binding.friendBtn.setOnClickListener {
-            findNavController().navigate(R.id.action_centerFragment_to_friendFragment)
+        binding.mapBtn.setOnClickListener {
+            openMap()
         }
 
         binding.profileIcon.setOnClickListener {
@@ -119,6 +119,10 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
 
     fun openPostReel() {
         binding.verticalViewPager.setCurrentItem(PAGE_POST_REEL, true)
+    }
+
+    fun openMap() {
+        binding.verticalViewPager.setCurrentItem(PAGE_MAP, true)
     }
 
     fun setCameraSendMode(isSendMode: Boolean) {
