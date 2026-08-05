@@ -12,7 +12,6 @@ import com.pando.app.features.home.data.model.entity.enumEntity.NsfwStatus
 import com.pando.app.features.home.data.model.entity.enumEntity.NsfwViewDecision
 import com.pando.app.features.home.data.model.entity.enumEntity.PostModeLocation
 import com.pando.app.features.home.data.model.response.PostsResponse
-import com.pando.app.features.home.data.repository.LocationRepository
 import com.pando.app.features.home.data.repository.PostRepository
 import com.pando.app.features.home.data.socket.MessagesSocket
 import com.pando.app.features.home.data.store.PostFeedStore
@@ -29,105 +28,18 @@ class PostReelViewModel @Inject constructor(
     private val postRepository: PostRepository,
     private val messagesSocket: MessagesSocket,
     private val socketConnectionManager: SocketConnectionManager,
-    private val locationRepository: LocationRepository,
     private val postFeedStore: PostFeedStore
 ) : BaseVM<ApiResponse<PostsResponse>>() {
     val connectionState = socketConnectionManager.connectionState
     val posts = postFeedStore.posts
     private var isLoading = false
 
-    private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
-    val images = _images.asStateFlow()
-    private val _provinceNames = MutableStateFlow<Map<UUID, String>>(emptyMap())
-    val provinceNames = _provinceNames.asStateFlow()
     private val _deletePostState = MutableStateFlow<UiState<UUID>>(UiState.Idle)
 
     val deletePostState = _deletePostState.asStateFlow()
 
-    private val loadingImageIds = mutableSetOf<UUID>()
-    private val provinceCache = mutableMapOf<CoordinateKey, String>()
-    private val loadingProvinceKeys = mutableSetOf<CoordinateKey>()
-    private val waitingProvincePostIds = mutableMapOf<CoordinateKey, MutableSet<UUID>>()
-
-    fun loadPost(postId: UUID, longitude: Double?, latitude: Double?) {
-        loadPostImage(postId)
-
-        if (latitude != null && longitude != null) {
-            loadProvince(postId, latitude, longitude)
-        }
-    }
-
     private val _nsfwDecisions = MutableStateFlow<Map<UUID, NsfwViewDecision>>(emptyMap())
     val nsfwDecisions = _nsfwDecisions.asStateFlow()
-
-    fun loadPostImage(postId: UUID) {
-        if (_images.value.containsKey(postId)) return
-        if (!loadingImageIds.add(postId)) return
-
-        viewModelScope.launch {
-            when (val result = postRepository.getPostImage(postId)) {
-                is DataResult.Success -> {
-                    _images.update { current ->
-                        current + (postId to result.data.data)
-                    }
-                }
-
-                is DataResult.Error -> {
-                    // Emit event
-                }
-            }
-
-            loadingImageIds.remove(postId)
-        }
-    }
-
-    private fun loadProvince(postId: UUID, latitude: Double, longitude: Double) {
-        if (_provinceNames.value.containsKey(postId)) return
-
-        val coordinateKey = CoordinateKey(latitude, longitude)
-        provinceCache[coordinateKey]?.let { province ->
-            _provinceNames.update { current ->
-                current + (postId to province)
-            }
-            return
-        }
-
-        waitingProvincePostIds
-            .getOrPut(coordinateKey) { linkedSetOf() }
-            .add(postId)
-
-        if (!loadingProvinceKeys.add(coordinateKey)) return
-
-        viewModelScope.launch {
-            try {
-                when (val result = locationRepository.getProvince(
-                    coordinateKey.latitude,
-                    coordinateKey.longitude
-                )) {
-                    is DataResult.Success -> {
-                        val province = result.data.data
-                        provinceCache[coordinateKey] = province
-                        val postIds = waitingProvincePostIds.remove(coordinateKey).orEmpty()
-
-                        _provinceNames.update { current ->
-                            current + postIds.associateWith { province }
-                        }
-                    }
-
-                    is DataResult.Error -> {
-                        waitingProvincePostIds.remove(coordinateKey)
-                    }
-                }
-            } finally {
-                loadingProvinceKeys.remove(coordinateKey)
-            }
-        }
-    }
-
-    private data class CoordinateKey(
-        val latitude: Double,
-        val longitude: Double
-    )
 
     fun getPosts() {
         if (isLoading) return
@@ -155,6 +67,8 @@ class PostReelViewModel @Inject constructor(
                                     caption = post.caption,
                                     latitude = post.latitude,
                                     longitude = post.longitude,
+                                    imageUrl = post.urlImage,
+                                    locationName = post.locationName,
                                     modeLocation = post.modeLocation,
                                     type = post.type,
                                     nsfw = post.nsfw,
@@ -170,6 +84,8 @@ class PostReelViewModel @Inject constructor(
                                     caption = post.caption,
                                     latitude = null,
                                     longitude = null,
+                                    imageUrl = post.urlImage,
+                                    locationName = null,
                                     nsfw = post.nsfw,
                                     modeLocation = post.modeLocation,
                                     type = post.type,
@@ -220,8 +136,6 @@ class PostReelViewModel @Inject constructor(
             when (val result = postRepository.deletePost(postId)) {
                 is DataResult.Success -> {
                     postFeedStore.removePost(postId)
-                    _images.update { it - postId }
-                    _provinceNames.update { it - postId }
                     _nsfwDecisions.update { it - postId }
 
                     _deletePostState.value = UiState.Success(postId)

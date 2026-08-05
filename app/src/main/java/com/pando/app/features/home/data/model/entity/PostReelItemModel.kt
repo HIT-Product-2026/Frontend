@@ -15,6 +15,8 @@ data class PostReelItemModel(
     val caption: String?,
     val latitude: Double?,
     val longitude: Double?,
+    val imageUrl: String? = null,
+    val locationName: String? = null,
     val modeLocation: PostModeLocation,
     val type: TypePost?,
     val nsfw: NsfwStatus?= NsfwStatus.PROCESSING,

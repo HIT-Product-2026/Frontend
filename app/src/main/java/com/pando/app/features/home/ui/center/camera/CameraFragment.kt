@@ -197,6 +197,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                                     caption = post.caption,
                                     latitude = post.latitude,
                                     longitude = post.longitude,
+                                    imageUrl = post.urlImage,
+                                    locationName = post.locationName,
                                     modeLocation = post.modeLocation,
                                     type = post.type,
                                     nsfw = post.nsfw,

@@ -60,8 +60,6 @@ import kotlin.math.abs
 @AndroidEntryPoint
 class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelBinding::inflate) {
     private var avatarMap: Map<UUID, String> = emptyMap()
-    private var imageMap: Map<UUID, String> = emptyMap()
-    private var provinceMap: Map<UUID, String> = emptyMap()
     private val postReelViewModel: PostReelViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
     private val mainViewModel: MainViewModel by activityViewModels()
@@ -70,6 +68,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     lateinit var userSession: UserSession
     private var isSocketConnected = false
     private var hasLoadedInitialData = false
+    private var lastRenderedFirstPostId: UUID? = null
     private var activeNsfwDialogPostId: UUID? = null
     private var videoPreviewPlayer: ExoPlayer? = null
     private var activeVideoPostId: UUID? = null
@@ -85,20 +84,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             val shouldHideMedia =
                 item.nsfw == NsfwStatus.TRUE && decision != NsfwViewDecision.ALLOWED
 
-            val mediaUrl = imageMap[item.id]
-            val province = provinceMap[item.id]
-
-            val shouldLoadProvince =
-                item.latitude != null && item.longitude != null && province == null
-            if ((mediaUrl == null || shouldLoadProvince) &&
-                lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-            ) {
-                postReelViewModel.loadPost(
-                    postId = item.id,
-                    longitude = item.longitude,
-                    latitude = item.latitude
-                )
-            }
+            val mediaUrl = item.imageUrl
+            val province = item.locationName
 
             bindAvatar(itemBinding.profileIcon, item.user.id)
 
@@ -246,7 +233,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 .getOrNull(position)
                 ?: return@setOnClickListener
 
-            val imageUrl = imageMap[currentReel.id] ?: return@setOnClickListener
+            val imageUrl = currentReel.imageUrl ?: return@setOnClickListener
             val isOwner = currentReel.user.id == userSession.getCurrentUser()?.id
 
             BottomSheetMorePostReelFragment
@@ -266,7 +253,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 val conversationId = currentReel.conversationId
                     ?: return@setOnClickListener
 
-                val postImageUrl = imageMap[currentReel.id]
+                val postImageUrl = currentReel.imageUrl
                     ?: return@setOnClickListener
 
                 postReelViewModel.sendImagePost(conversationId, postImageUrl)
@@ -303,23 +290,18 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     postReelViewModel.posts.collect { posts ->
+                        val firstPostId = posts.firstOrNull()?.id
+                        val shouldShowNewPost =
+                            firstPostId != null &&
+                                firstPostId != lastRenderedFirstPostId
+
+                        lastRenderedFirstPostId = firstPostId
                         postReelAdapter.submitList(posts) {
+                            if (shouldShowNewPost) {
+                                binding.postReelViewPager.setCurrentItem(0, false)
+                            }
                             checkCurrentNsfwReel()
                         }
-                    }
-                }
-
-                launch {
-                    postReelViewModel.images.collect { images ->
-                        imageMap = images
-                        refreshPostReelAdapter()
-                    }
-                }
-
-                launch {
-                    postReelViewModel.provinceNames.collect { provinces ->
-                        provinceMap = provinces
-                        refreshPostReelAdapter()
                     }
                 }
 
@@ -394,7 +376,16 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         }
 
         binding.postReelViewPager.post {
-            playCurrentVideo(binding.postReelViewPager.currentItem)
+            val posts = postReelViewModel.posts.value
+            postReelAdapter.submitList(posts) {
+                if (posts.isNotEmpty()) {
+                    binding.postReelViewPager.setCurrentItem(0, false)
+                    checkCurrentNsfwReel()
+                    playCurrentVideo(0)
+                } else {
+                    releaseVideoPreview()
+                }
+            }
         }
     }
 
@@ -694,7 +685,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             ?: NsfwViewDecision.UNDECIDED
         val shouldHideMedia =
             item.nsfw == NsfwStatus.TRUE && decision != NsfwViewDecision.ALLOWED
-        val mediaUrl = imageMap[item.id]
+        val mediaUrl = item.imageUrl
 
         if (shouldHideMedia || mediaUrl == null) {
             releaseVideoPreview()

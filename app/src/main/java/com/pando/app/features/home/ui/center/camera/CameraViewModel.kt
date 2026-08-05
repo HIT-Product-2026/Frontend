@@ -36,6 +36,7 @@ sealed interface CameraViewMode {
 @HiltViewModel
 class CameraViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
+    private val videoCompressor: VideoCompressor,
     @param:ApplicationContext private val context: Context
 ) : BaseVM<ApiResponse<PostResponse>>() {
     private val _cameraViewMode = MutableStateFlow<CameraViewMode>(CameraViewMode.Capture)
@@ -76,7 +77,9 @@ class CameraViewModel @Inject constructor(
                         }
                     }
 
-                    TypePost.VIDEO -> originFile
+                    TypePost.VIDEO -> {
+                        videoCompressor.compress(originFile) ?: originFile
+                    }
                 }
 
                 PreparedMedia(

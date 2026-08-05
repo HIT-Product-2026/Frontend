@@ -34,7 +34,7 @@ class PostFeedStore @Inject constructor() {
 
     fun addPost(post: PostReelItemModel) {
         _posts.update { current ->
-            if (current.any { it.id == post.id }) current else current + post
+            if (current.any { it.id == post.id }) current else listOf(post) + current
         }
     }
 
