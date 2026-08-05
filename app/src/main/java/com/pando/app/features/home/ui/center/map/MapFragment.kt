@@ -612,7 +612,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             style.addLayer(
                 CircleLayer(currentLocationLayerId, currentLocationSourceId).withProperties(
                     circleRadius(8f),
-                    circleColor("#1976D2"),
+                    circleColor("#6A9BFF"),
                     circleStrokeWidth(3f),
                     circleStrokeColor("#FFFFFF")
                 )

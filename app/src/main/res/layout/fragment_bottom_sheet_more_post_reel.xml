@@ -36,7 +36,7 @@
                 android:layout_marginBottom="@dimen/_5sdp"
                 android:gravity="center"
                 android:text="Xóa bài viết"
-                android:textColor="#FF4545"
+                android:textColor="@color/danger"
                 android:textSize="@dimen/_17sdp"
                 android:textStyle="bold" />
         </LinearLayout>

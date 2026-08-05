@@ -19,10 +19,10 @@
     </item>
 
     <item
-        android:top="@dimen/_16sdp"
-        android:left="@dimen/_16sdp"
-        android:right="@dimen/_16sdp"
-        android:bottom="@dimen/_16sdp">
+        android:top="@dimen/_20sdp"
+        android:left="@dimen/_20sdp"
+        android:right="@dimen/_20sdp"
+        android:bottom="@dimen/_20sdp">
         <shape android:shape="rectangle">
             <solid android:color="@color/recording_indicator" />
             <corners android:radius="2dp" />

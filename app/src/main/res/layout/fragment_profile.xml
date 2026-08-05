@@ -86,7 +86,7 @@
                         android:layout_gravity="center"
                         android:contentDescription="Chỉnh sửa ảnh đại diện"
                         android:src="@drawable/edit"
-                        app:tint="#1976D2" />
+                        app:tint="@color/accent5" />
 
                 </com.google.android.material.card.MaterialCardView>
 
