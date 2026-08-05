@@ -13,7 +13,8 @@ data class FcmPostPayload(
     val longitude: Double?,
     val provinceName: String,
     val wardName: String,
-    val caption: String
+    val caption: String,
+    val typePost: String
 ) {
     companion object {
         fun from(data: Map<String, String>): FcmPostPayload? {
@@ -32,7 +33,8 @@ data class FcmPostPayload(
                 longitude = data["longitude"]?.toDoubleOrNull(),
                 provinceName = data["province_name"].orEmpty(),
                 caption = data["caption"].orEmpty(),
-                wardName = data["ward_name"].orEmpty()
+                wardName = data["ward_name"].orEmpty(),
+                typePost = data["type_post"].orEmpty()
             )
         }
     }
