@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-08-03T15:33:14.586462420Z">
+        <DropdownSelection timestamp="2026-08-06T04:58:13.748790587Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=R3CX10HB44R" />
+              <DeviceId pluginId="PhysicalDevice" identifier="serial=7c792878" />
             </handle>
           </Target>
         </DropdownSelection>
@@ -15,12 +15,12 @@
           <targets>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="LocalEmulator" identifier="path=/home/toantran4606/.android/avd/Pixel_5.avd" />
+                <DeviceId pluginId="PhysicalDevice" identifier="serial=R3CX10HB44R" />
               </handle>
             </Target>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="PhysicalDevice" identifier="serial=R3CX10HB44R" />
+                <DeviceId pluginId="LocalEmulator" identifier="path=/home/toantran4606/.android/avd/Pixel_5.avd" />
               </handle>
             </Target>
           </targets>

@@ -65,6 +65,9 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     private var currentLat: Double? = null
     private var currentLng: Double? = null
     private var avatarMap: Map<UUID, String> = emptyMap()
+    private var currentUserId: UUID? = null
+    private var currentUserName: String = "Bạn"
+    private var currentUserAvatar: String? = null
 
     private var mapLibreMap: MapLibreMap? = null
     private var loadedStyle: Style? = null
@@ -248,7 +251,15 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 userSession.currentUser.collect { user ->
+                    currentUserId = user?.id
+                    currentUserName = user?.displayName
+                        ?.takeIf(String::isNotBlank)
+                        ?: user?.username
+                            ?.takeIf(String::isNotBlank)
+                        ?: "Bạn"
+                    currentUserAvatar = user?.avatar?.toString()
                     binding.profileIcon.loadAvatar(user?.avatar)
+                    renderFriendsState()
                 }
             }
         }
@@ -284,8 +295,18 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 return@addOnMapClickListener false
             }
 
-            if (feature.getNumberProperty("point_count") != null) {
+            val markerType = feature.getStringProperty("markerType")
+
+            if (
+                feature.getNumberProperty("point_count") != null ||
+                markerType == "doubleProxy"
+            ) {
                 zoomIntoCluster(map, feature)
+                return@addOnMapClickListener true
+            }
+
+            if (markerType == "double") {
+                focusDoubleFriendMarker(map, feature)
                 return@addOnMapClickListener true
             }
 
@@ -294,6 +315,10 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         }
 
         map.addOnCameraIdleListener {
+            loadedStyle?.let { style ->
+                markerRenderer.updateDoubleMarkerVisibility(map, style)
+            }
+
             if (isAnimatingToFriend) {
                 isAnimatingToFriend = false
                 return@addOnCameraIdleListener
@@ -348,6 +373,29 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         Log.d("FRIEND_MARKER", "id=$friendId, name=$friendName")
     }
 
+    private fun focusDoubleFriendMarker(map: MapLibreMap, feature: Feature) {
+        setFocusedFriendMarker(null)
+
+        val point = feature.geometry() as? Point
+        if (point != null) {
+            focusedFriendZoom = FRIEND_FOCUS_ZOOM
+            isAnimatingToFriend = true
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(
+                    LatLng(point.latitude(), point.longitude()),
+                    zoom = FRIEND_FOCUS_ZOOM
+                ),
+                500
+            )
+        }
+
+        Toast.makeText(
+            requireContext(),
+            "Bạn vừa chọn ${feature.getStringProperty("name")}",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
     private fun observeMapData() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -367,9 +415,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                             friend.copy(avatarUrl = avatars[friend.id])
                         }
                     }.collect { friends ->
-                        loadedStyle?.let { style ->
-                            markerRenderer.renderFriends(style, friends)
-                        }
+                        renderFriendsState(friends)
                     }
                 }
 
@@ -391,6 +437,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         currentLat = latitude
         currentLng = longitude
         updateCurrentLocationPoint()
+        renderFriendsState()
     }
 
     private fun handleCapturedLocation(location: Location, fromCache: Boolean) {
@@ -400,6 +447,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         currentLat = location.latitude
         currentLng = location.longitude
         updateCurrentLocationPoint()
+        renderFriendsState()
         moveCameraToCurrentLocation(animate = false)
     }
 
@@ -415,15 +463,42 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         val style = loadedStyle ?: return
 
         updateCurrentLocationPoint()
-        markerRenderer.renderFriends(
-            style,
-            mapViewModel.friends.value.map { friend ->
-                friend.copy(avatarUrl = avatarMap[friend.id])
-            }
-        )
+        renderFriendsState()
 
         // Khi quay lại Fragment, camera luôn cố gắng focus vị trí hiện tại.
         moveCameraToCurrentLocation(animate = false)
+    }
+
+    private fun renderFriendsState(
+        synchronizedFriends: List<com.pando.app.features.home.data.model.entity.FriendItemModel>? = null
+    ) {
+        val style = loadedStyle ?: return
+        val friends = synchronizedFriends ?: mapViewModel.friends.value.map { friend ->
+            friend.copy(avatarUrl = avatarMap[friend.id])
+        }
+
+        markerRenderer.renderFriends(
+            style = style,
+            friends = friends,
+            currentUser = currentUserMapMarker()
+        )
+        mapLibreMap?.let { map ->
+            markerRenderer.updateDoubleMarkerVisibility(map, style)
+        }
+    }
+
+    private fun currentUserMapMarker(): CurrentUserMapMarker? {
+        val id = currentUserId ?: return null
+        val latitude = currentLat ?: return null
+        val longitude = currentLng ?: return null
+
+        return CurrentUserMapMarker(
+            id = id,
+            name = currentUserName,
+            avatarUrl = currentUserAvatar,
+            latitude = latitude,
+            longitude = longitude
+        )
     }
 
     private fun setFocusedFriendMarker(friendId: String?) {
