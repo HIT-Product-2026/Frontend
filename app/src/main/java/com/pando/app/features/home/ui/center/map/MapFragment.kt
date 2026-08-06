@@ -9,6 +9,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.location.Location
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
@@ -21,7 +22,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
 import androidx.fragment.app.activityViewModels
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -95,9 +95,17 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     lateinit var userSession: UserSession
 
     private var avatarMap: Map<UUID, String> = emptyMap()
+    private data class CachedMarkerBitmap(
+        val avatarUrl: String?,
+        val bitmap: Bitmap
+    )
+
+    private val markerBitmapCache = mutableMapOf<UUID, CachedMarkerBitmap>()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
     private val locationNavigationViewModel: LocationNavigationViewModel by activityViewModels()
-    private val mapViewModel: MapViewModel by viewModels()
+    // Giữ cache friend/location khi MapFragment bị recreate lúc back từ màn
+    // hình khác. Nhờ vậy map không phải gọi lại friendship API từ đầu.
+    private val mapViewModel: MapViewModel by activityViewModels()
 
     private val styleUrl: String
         get() {
@@ -134,8 +142,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     private val orientationAngles = FloatArray(3)
 
     private var currentBearing = 0f
-
-    private var hasLoadedInitialData = false
 
     private val multiplePermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -309,9 +315,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                     )
                 }
 
-                updateCurrentLocationPoint()
-
-                showFriendLocations(style, mapViewModel.friends.value)
+                renderMapState()
 
                 focusCurrentLocationFromNotificationIfReady()
 
@@ -337,7 +341,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 //
             }
         }
-        captureLocation()
     }
 
     override fun initActionView() {
@@ -428,11 +431,10 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             )
         }
 
-        if (!hasLoadedInitialData) {
-            hasLoadedInitialData = true
-
-            mapViewModel.getFriendList()
-        }
+        // Lần đầu mới lấy danh sách friend. Các lần back chỉ refresh
+        // snapshot vị trí, không gọi lại endpoint friendship.
+        mapViewModel.refreshForMapResume()
+        renderMapState()
     }
 
     override fun onPause() {
@@ -461,8 +463,6 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     override fun onDestroyView() {
         mapLibreMap = null
         loadedStyle = null
-        currentLat = null
-        currentLng = null
 
         binding.mapView.onDestroy()
         super.onDestroyView()
@@ -518,14 +518,36 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         )
     }
 
-    private fun moveCameraToCurrentLocation() {
+    private fun renderMapState() {
+        val style = loadedStyle ?: return
+
+        updateCurrentLocationPoint()
+
+        val friendsWithAvatars = mapViewModel.friends.value.map { friend ->
+            friend.copy(avatarUrl = avatarMap[friend.id])
+        }
+        showFriendLocations(style, friendsWithAvatars)
+
+        // Khi quay lại Fragment, camera luôn cố gắng focus vị trí hiện tại.
+        moveCameraToCurrentLocation(animate = false)
+    }
+
+    private fun moveCameraToCurrentLocation(animate: Boolean = true) {
         val latitude = currentLat ?: return
         val longitude = currentLng ?: return
 
-        mapLibreMap?.animateCamera(
-            CameraUpdateFactory.newLatLngZoom(LatLng(latitude, longitude), zoom = 16.0),
-            800
+        val cameraUpdate = CameraUpdateFactory.newLatLngZoom(
+            LatLng(latitude, longitude),
+            zoom = 16.0
         )
+
+        mapLibreMap?.let { map ->
+            if (animate) {
+                map.animateCamera(cameraUpdate, 500)
+            } else {
+                map.moveCamera(cameraUpdate)
+            }
+        }
     }
 
     private fun focusCurrentLocationFromNotificationIfReady() {
@@ -553,6 +575,14 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         ) == PackageManager.PERMISSION_GRANTED
 
         if (fineGranted || coarseGranted) {
+            // Dùng cached location để camera nhảy ngay khi resume; request
+            // high-accuracy chạy song song và sẽ thay thế bằng tọa độ mới.
+            fusedLocationClient.lastLocation.addOnSuccessListener { lastLocation ->
+                if (currentLat == null && currentLng == null) {
+                    lastLocation?.let(::applyCurrentLocation)
+                }
+            }
+
             fusedLocationClient.getCurrentLocation(
                 if (fineGranted) {
                     Priority.PRIORITY_HIGH_ACCURACY
@@ -562,16 +592,22 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 null
             ).addOnSuccessListener { location ->
                 if (location != null) {
-                    currentLat = location.latitude
-                    currentLng = location.longitude
-                    updateCurrentLocationPoint()
-                    moveCameraToCurrentLocation()
+                    applyCurrentLocation(location)
+                } else {
+                    // lastLocation đã được dùng phía trên nếu có.
                 }
             }
         } else {
             currentLat = null
             currentLng = null
         }
+    }
+
+    private fun applyCurrentLocation(location: Location) {
+        currentLat = location.latitude
+        currentLng = location.longitude
+        updateCurrentLocationPoint()
+        moveCameraToCurrentLocation(animate = false)
     }
 
     private fun showCurrentLocationPoint(
@@ -693,6 +729,13 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 return@forEach
             }
 
+            markerBitmapCache[friend.id]
+                ?.takeIf { it.avatarUrl == friend.avatarUrl }
+                ?.let { cachedMarker ->
+                    style.addImage(iconId, cachedMarker.bitmap)
+                    return@forEach
+                }
+
             val avatarSize = 60.dpToPx()
             val cornerRadius = 15.dpToPx()
 
@@ -720,6 +763,10 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                         if (currentStyle !== style) return
 
                         val markerBitmap = createFriendMarkerBitmap(resource)
+                        markerBitmapCache[friend.id] = CachedMarkerBitmap(
+                            avatarUrl = friend.avatarUrl,
+                            bitmap = markerBitmap
+                        )
 
                         currentStyle.addImage(iconId, markerBitmap)
                     }

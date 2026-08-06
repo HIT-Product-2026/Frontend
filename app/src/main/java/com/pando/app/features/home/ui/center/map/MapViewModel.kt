@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.network.socket.SocketConnectionManager
+import com.pando.app.core.session.UserSession
 import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.core.utils.DataResult
@@ -29,11 +30,13 @@ class MapViewModel @Inject constructor(
     private val socketConnectionManager: SocketConnectionManager,
     private val mapSocket: MapSocket,
     private val friendshipRepository: FriendshipRepository,
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val userSession: UserSession
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "MapService"
+        private const val LOCATION_REFRESH_TTL_MILLIS = 30_000L
     }
 
     val connectionState = socketConnectionManager.connectionState
@@ -41,10 +44,18 @@ class MapViewModel @Inject constructor(
     private val _friends = MutableStateFlow<List<FriendItemModel>>(emptyList())
     val friends = _friends.asStateFlow()
 
+    private val _friendState =
+        MutableStateFlow<UiState<ApiResponse<FriendListResponse>>>(UiState.Idle)
+    val friendState: StateFlow<UiState<ApiResponse<FriendListResponse>>> =
+        _friendState.asStateFlow()
+
     private var friendIds: Set<UUID> = emptySet()
     private var subscribedFriendIds: Set<UUID> = emptySet()
     private var hasLoadedFriendList = false
+    private var friendListJob: Job? = null
     private var refreshLocationsJob: Job? = null
+    private var lastLocationRefreshAt = 0L
+    private var activeUserId: UUID? = null
 
     init {
         viewModelScope.launch {
@@ -61,7 +72,7 @@ class MapViewModel @Inject constructor(
 
                         // Bù những event có thể bị mất trong thời gian socket ngắt kết nối.
                         if (hasLoadedFriendList) {
-                            requestFriendLocationRefresh()
+                            requestFriendLocationRefresh(force = true)
                         }
                     }
 
@@ -71,6 +82,22 @@ class MapViewModel @Inject constructor(
                     }
 
                     SocketConnectionState.Connecting -> Unit
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            userSession.currentUser.collect { user ->
+                val userId = user?.id
+                if (userId == activeUserId) return@collect
+
+                activeUserId = userId
+                resetMapState()
+
+                // Nếu ViewModel được tạo trước khi session được khôi phục,
+                // tự tải danh sách ngay khi user xuất hiện.
+                if (userId != null) {
+                    getFriendList()
                 }
             }
         }
@@ -96,13 +123,10 @@ class MapViewModel @Inject constructor(
         publishFriends(updatedList)
     }
 
-    private val _friendState =
-        MutableStateFlow<UiState<ApiResponse<FriendListResponse>>>(UiState.Idle)
-    val friendState: StateFlow<UiState<ApiResponse<FriendListResponse>>> =
-        _friendState.asStateFlow()
-
     fun getFriendList() {
-        viewModelScope.launch {
+        if (friendListJob?.isActive == true) return
+
+        friendListJob = viewModelScope.launch {
             _friendState.value = UiState.Loading
             when (val result = friendshipRepository.getFriendList()) {
                 is DataResult.Success -> {
@@ -134,13 +158,21 @@ class MapViewModel @Inject constructor(
                         syncLocationSubscriptions(friendIds)
                     }
 
-                    requestFriendLocationRefresh()
+                    requestFriendLocationRefresh(force = true)
 
                     _friendState.value = UiState.Success(result.data)
                 }
 
                 is DataResult.Error -> _friendState.value = UiState.Error(result.message)
             }
+        }
+    }
+
+    fun refreshForMapResume() {
+        if (hasLoadedFriendList) {
+            requestFriendLocationRefresh(force = false)
+        } else {
+            getFriendList()
         }
     }
 
@@ -155,16 +187,40 @@ class MapViewModel @Inject constructor(
         subscribedFriendIds = emptySet()
     }
 
-    private fun requestFriendLocationRefresh() {
+    private fun resetMapState() {
+        friendListJob?.cancel()
+        refreshLocationsJob?.cancel()
+        friendListJob = null
+        refreshLocationsJob = null
+        clearLocationSubscriptions()
+        friendIds = emptySet()
+        hasLoadedFriendList = false
+        lastLocationRefreshAt = 0L
+        publishFriends(emptyList())
+        _friendState.value = UiState.Idle
+    }
+
+    private fun requestFriendLocationRefresh(force: Boolean) {
         if (!hasLoadedFriendList) return
         if (friendIds.isEmpty()) return
 
-        // Reconnect phải lấy một snapshot mới. Hủy request cũ nếu nó bắt đầu
-        // trước khi kết nối được khôi phục.
-        refreshLocationsJob?.cancel()
+        if (refreshLocationsJob?.isActive == true) {
+            if (!force) return
+            // Reconnect phải lấy snapshot mới thay vì chờ request cũ.
+            refreshLocationsJob?.cancel()
+        }
+
+        val now = System.currentTimeMillis()
+        if (!force && now - lastLocationRefreshAt < LOCATION_REFRESH_TTL_MILLIS) {
+            return
+        }
+
         refreshLocationsJob = viewModelScope.launch {
             when (val result = locationRepository.getFriendLocations()) {
-                is DataResult.Success -> mergeLocationSnapshot(result.data.data.items)
+                is DataResult.Success -> {
+                    mergeLocationSnapshot(result.data.data.items)
+                    lastLocationRefreshAt = System.currentTimeMillis()
+                }
                 is DataResult.Error -> Log.e(
                     TAG,
                     "Không lấy được vị trí gần nhất: ${result.message}"
