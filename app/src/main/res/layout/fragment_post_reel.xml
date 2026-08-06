@@ -95,6 +95,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
+            android:descendantFocusability="afterDescendants"
             android:gravity="center"
             android:orientation="horizontal"
             android:padding="@dimen/_9sdp"
@@ -112,6 +113,9 @@
                 app:boxCornerRadiusBottomStart="@dimen/_15sdp"
                 app:boxCornerRadiusTopEnd="@dimen/_15sdp"
                 app:boxCornerRadiusTopStart="@dimen/_15sdp"
+                app:boxStrokeColor="@color/text_input_stroke"
+                app:boxStrokeWidth="@dimen/_1sdp"
+                app:boxStrokeWidthFocused="@dimen/_2sdp"
                 app:hintEnabled="false">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -119,7 +123,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_weight="0"
+                    android:clickable="true"
+                    android:cursorVisible="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
                     android:hint="Gửi tin nhắn..."
+                    android:imeOptions="actionSend"
                     android:inputType="text"
                     android:textColor="@color/white"
                     android:textColorHint="@color/white" />

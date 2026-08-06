@@ -14,6 +14,8 @@ import android.widget.Toast
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsAnimationCompat
+import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.activityViewModels
@@ -73,6 +75,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     private var videoPreviewPlayer: ExoPlayer? = null
     private var activeVideoPostId: UUID? = null
     private var activeVideoView: PlayerView? = null
+    private var shouldKeepMessageFocus = false
+    private var wasKeyboardVisible = false
     private val postReelAdapter: BaseAdapter<PostReelItemModel, ItemPostReelBinding> by lazy {
         BaseAdapter(
             ItemPostReelBinding::inflate,
@@ -213,17 +217,11 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         }
 
         binding.SendMessageBtn.setOnClickListener {
-            setMessageComposerOpen(true)
-            binding.bottomLayout.visibility = View.VISIBLE
-            binding.sendMessageET.requestFocus()
+            openMessageComposer()
+        }
 
-            val inputMethodManager = requireContext()
-                .getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-
-            inputMethodManager.showSoftInput(
-                binding.sendMessageET,
-                InputMethodManager.SHOW_IMPLICIT
-            )
+        binding.sendMessageLayout.setOnClickListener {
+            requestMessageEditorFocus(showKeyboard = true)
         }
 
         binding.btnMore.setOnClickListener {
@@ -259,11 +257,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 postReelViewModel.sendImagePost(conversationId, postImageUrl)
                 postReelViewModel.sendMessage(conversationId, message)
 
-                binding.sendMessageET.clearFocus()
-                ViewCompat.getWindowInsetsController(binding.root)
-                    ?.hide(WindowInsetsCompat.Type.ime())
-                binding.bottomLayout.visibility = View.GONE
-                setMessageComposerOpen(false)
+                closeMessageComposer(clearText = true)
             }
         }
 
@@ -408,6 +402,9 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     override fun onDestroyView() {
+        shouldKeepMessageFocus = false
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
+        ViewCompat.setWindowInsetsAnimationCallback(binding.root, null)
         (parentFragment as? CenterFragment)?.setPostReelMessageComposerOpen(false)
         releaseVideoPreview()
         binding.postReelViewPager.unregisterOnPageChangeCallback(pageChangeCallback)
@@ -416,8 +413,6 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     private fun setupKeyboardInsets() {
-        var wasKeyboardVisible = false
-
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
             val imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
 
@@ -426,18 +421,109 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             val isKeyboardVisible =
                 windowInsets.isVisible(WindowInsetsCompat.Type.ime())
 
-            if (wasKeyboardVisible && !isKeyboardVisible) {
-                binding.sendMessageET.clearFocus()
-                binding.sendMessageET.text?.clear()
-                binding.bottomLayout.visibility = View.GONE
-                setMessageComposerOpen(false)
+            if (isKeyboardVisible && shouldKeepMessageFocus) {
+                if (!binding.sendMessageET.hasFocus()) {
+                    binding.sendMessageET.post {
+                        requestMessageEditorFocus(showKeyboard = false)
+                    }
+                }
+            } else if (wasKeyboardVisible && !isKeyboardVisible) {
+                closeMessageComposer(clearText = true)
             }
             wasKeyboardVisible = isKeyboardVisible
 
             windowInsets
         }
 
+        ViewCompat.setWindowInsetsAnimationCallback(
+            binding.root,
+            object : WindowInsetsAnimationCompat.Callback(
+                WindowInsetsAnimationCompat.Callback.DISPATCH_MODE_CONTINUE_ON_SUBTREE
+            ) {
+                override fun onProgress(
+                    insets: WindowInsetsCompat,
+                    runningAnimations: MutableList<WindowInsetsAnimationCompat>
+                ): WindowInsetsCompat = insets
+
+                override fun onEnd(animation: WindowInsetsAnimationCompat) {
+                    if ((animation.typeMask and WindowInsetsCompat.Type.ime()) == 0 ||
+                        !shouldKeepMessageFocus
+                    ) {
+                        return
+                    }
+
+                    val rootInsets = ViewCompat.getRootWindowInsets(binding.root)
+                    if (rootInsets?.isVisible(WindowInsetsCompat.Type.ime()) == true) {
+                        binding.root.post {
+                            requestMessageEditorFocus(showKeyboard = false)
+                        }
+                    }
+                }
+            }
+        )
+
         ViewCompat.requestApplyInsets(binding.root)
+    }
+
+    private fun openMessageComposer() {
+        shouldKeepMessageFocus = true
+
+        binding.bottomLayout.isVisible = true
+        setMessageComposerOpen(true)
+
+        binding.bottomLayout.doOnLayout {
+            requestMessageEditorFocus(showKeyboard = true)
+        }
+    }
+
+    private fun requestMessageEditorFocus(showKeyboard: Boolean) {
+        if (!shouldKeepMessageFocus || !binding.bottomLayout.isVisible) return
+
+        val messageEditor = binding.sendMessageET
+        if (!messageEditor.isAttachedToWindow) return
+
+        messageEditor.isFocusableInTouchMode = true
+        messageEditor.isCursorVisible = true
+        messageEditor.requestFocus()
+        messageEditor.setSelection(messageEditor.text?.length ?: 0)
+
+        messageEditor.post {
+            if (!shouldKeepMessageFocus || !messageEditor.isAttachedToWindow) return@post
+
+            messageEditor.requestFocus()
+            messageEditor.isCursorVisible = true
+            messageEditor.setSelection(messageEditor.text?.length ?: 0)
+
+            val inputMethodManager = context
+                ?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                ?: return@post
+
+            if (showKeyboard) {
+                ViewCompat.getWindowInsetsController(binding.root)
+                    ?.show(WindowInsetsCompat.Type.ime())
+                inputMethodManager.showSoftInput(
+                    messageEditor,
+                    InputMethodManager.SHOW_IMPLICIT
+                )
+            } else if (messageEditor.hasFocus()) {
+                inputMethodManager.restartInput(messageEditor)
+            }
+        }
+    }
+
+    private fun closeMessageComposer(clearText: Boolean) {
+        shouldKeepMessageFocus = false
+
+        val messageEditor = binding.sendMessageET
+        messageEditor.clearFocus()
+        if (clearText) {
+            messageEditor.text?.clear()
+        }
+
+        ViewCompat.getWindowInsetsController(binding.root)
+            ?.hide(WindowInsetsCompat.Type.ime())
+        binding.bottomLayout.isVisible = false
+        setMessageComposerOpen(false)
     }
 
     private fun setMessageComposerOpen(isOpen: Boolean) {
