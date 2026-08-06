@@ -59,14 +59,14 @@
 
     <ImageButton
         android:id="@+id/btnCurrentLocation"
-        android:layout_width="@dimen/_46sdp"
-        android:layout_height="@dimen/_46sdp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_30sdp"
         android:layout_marginEnd="@dimen/_20sdp"
         android:layout_marginBottom="@dimen/_18sdp"
         android:background="@drawable/bg_map_utility_button"
         android:contentDescription="Về vị trí hiện tại"
         android:elevation="@dimen/_3sdp"
-        android:padding="@dimen/_11sdp"
+        android:padding="@dimen/_7sdp"
         android:scaleType="fitCenter"
         android:src="@drawable/current_point"
         app:layout_constraintBottom_toTopOf="@+id/allFunctionsBar"
