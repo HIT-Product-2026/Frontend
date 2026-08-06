@@ -29,6 +29,8 @@
                 android:textSize="@dimen/_17sdp"
                 android:textStyle="bold" />
 
+            <View style="@style/BottomSheetDivider" />
+
             <TextView
                 android:id="@+id/captureImage"
                 android:layout_width="match_parent"
@@ -39,6 +41,8 @@
                 android:textColor="@color/white"
                 android:textSize="@dimen/_17sdp"
                 android:textStyle="bold" />
+
+            <View style="@style/BottomSheetDivider" />
 
             <TextView
                 android:id="@+id/removeImage"

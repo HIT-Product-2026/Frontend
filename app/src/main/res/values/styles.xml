@@ -28,4 +28,17 @@
         <item name="android:paddingHorizontal">@dimen/_3sdp</item>
         <item name="android:layout_marginBottom">@dimen/_5sdp</item>
     </style>
+
+    <style name="MenuDivider">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:layout_marginHorizontal">@dimen/_3sdp</item>
+        <item name="android:layout_marginVertical">@dimen/_2sdp</item>
+        <item name="android:background">@color/accent6</item>
+        <item name="android:importantForAccessibility">no</item>
+    </style>
+
+    <style name="BottomSheetDivider" parent="MenuDivider">
+        <item name="android:background">@color/primary2</item>
+    </style>
 </resources>

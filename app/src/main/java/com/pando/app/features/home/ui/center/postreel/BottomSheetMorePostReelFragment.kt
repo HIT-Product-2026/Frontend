@@ -40,6 +40,7 @@ class BottomSheetMorePostReelFragment : BaseBottomSheet<FragmentBottomSheetMoreP
 
     override fun initView() {
         binding.removeImage.isVisible = requireArguments().getBoolean(ARG_IS_OWNER)
+        binding.line.isVisible = requireArguments().getBoolean(ARG_IS_OWNER)
     }
 
     override fun initActionView() {

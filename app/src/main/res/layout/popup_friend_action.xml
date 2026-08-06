@@ -40,6 +40,8 @@
 
         </LinearLayout>
 
+        <View style="@style/MenuDivider" />
+
         <LinearLayout
             android:id="@+id/btnBlockFriend"
             android:layout_width="match_parent"

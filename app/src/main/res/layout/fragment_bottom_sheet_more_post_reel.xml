@@ -29,6 +29,10 @@
                 android:textSize="@dimen/_17sdp"
                 android:textStyle="bold" />
 
+            <View
+                android:id="@+id/line"
+                style="@style/BottomSheetDivider" />
+
             <TextView
                 android:id="@+id/removeImage"
                 android:layout_width="match_parent"

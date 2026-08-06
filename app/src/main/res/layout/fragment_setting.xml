@@ -130,15 +130,21 @@
                 style="@style/MenuTextStyle"
                 android:text="Quyền riêng tư" />
 
+            <View style="@style/MenuDivider" />
+
             <TextView
                 android:id="@+id/appearanceBtn"
                 style="@style/MenuTextStyle"
                 android:text="Giao diện" />
 
+            <View style="@style/MenuDivider" />
+
             <TextView
                 android:id="@+id/blockedAccountsBtn"
                 style="@style/MenuTextStyle"
                 android:text="Tài khoản đã chặn" />
+
+            <View style="@style/MenuDivider" />
 
             <TextView
                 android:id="@+id/shareProfileBtn"
@@ -174,15 +180,21 @@
                 style="@style/MenuTextStyle"
                 android:text="Giới thiệu" />
 
+            <View style="@style/MenuDivider" />
+
             <TextView
                 android:id="@+id/rateBtn"
                 style="@style/MenuTextStyle"
                 android:text="Đánh giá" />
 
+            <View style="@style/MenuDivider" />
+
             <TextView
                 android:id="@+id/reportIssueBtn"
                 style="@style/MenuTextStyle"
                 android:text="Báo cáo sự cố" />
+
+            <View style="@style/MenuDivider" />
 
             <TextView
                 android:id="@+id/privacyPolicyBtn"
@@ -208,6 +220,8 @@
                 style="@style/MenuTextStyle"
                 android:text="Xóa tài khoản"
                 android:textColor="@android:color/holo_red_light" />
+
+            <View style="@style/MenuDivider" />
 
             <TextView
                 android:id="@+id/logoutBtn"
