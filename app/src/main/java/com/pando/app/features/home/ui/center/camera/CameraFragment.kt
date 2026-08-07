@@ -94,6 +94,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private var camera: Camera? = null
 
     private var captureMode = CaptureMode.PHOTO
+    private var isFlashEnabled = false
+    private var zoomStep = 0
     private var videoIndicatorAnimator: ObjectAnimator? = null
 
     private var videoCapture: VideoCapture<Recorder>? = null
@@ -136,6 +138,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         setupCaptionKeyboardFocus()
         setupOutsideFocusDismissal()
         syncCaptureModeUi()
+        updateFlashButton()
+        updateZoomButton()
         binding.switchModeContainer.doOnLayout {
             syncCaptureModeUi()
         }
@@ -152,6 +156,16 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
         binding.btnTabCamera.setOnClickListener {
             selectCaptureMode(CaptureMode.PHOTO)
+        }
+
+        binding.btnFlash.setOnClickListener {
+            dismissCaptionFocusFromOutside()
+            toggleFlash()
+        }
+
+        binding.btnZoom.setOnClickListener {
+            dismissCaptionFocusFromOutside()
+            cycleZoom()
         }
 
         binding.btnSwitchCamera.setOnClickListener {
@@ -323,6 +337,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         activeRecording = null
 
         cameraProvider?.unbindAll()
+        camera = null
         imageCapture = null
         videoCapture = null
 
@@ -398,6 +413,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                     .build()
 
                 camera = provider.bindToLifecycle(viewLifecycleOwner, cameraSelector, useCaseGroup)
+                applyCameraControls()
             } catch (exc: Exception) {
                 Log.e("CameraX", "Khởi tạo camera thất bại", exc)
             }
@@ -467,6 +483,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
         binding.functionsBar.visibility = View.GONE
         binding.switchModeContainer.visibility = View.GONE
+        binding.btnFlash.visibility = View.GONE
+        binding.btnZoom.visibility = View.GONE
 
         binding.sendFunctionsBar.visibility = View.VISIBLE
         binding.historyBtn.visibility = View.GONE
@@ -493,6 +511,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
         binding.functionsBar.visibility = View.VISIBLE
         binding.switchModeContainer.visibility = View.VISIBLE
+        binding.btnFlash.visibility = View.VISIBLE
+        binding.btnZoom.visibility = View.VISIBLE
 
         // View có thể vừa được tạo lại sau khi quay sang Fragment khác;
         // đồng bộ thumb theo mode thật mà CameraX đang dùng.
@@ -538,6 +558,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             binding.captureButtonContainer,
             binding.btnCapture,
             binding.btnSwitchCamera,
+            binding.btnFlash,
+            binding.btnZoom,
             binding.btnCancel,
             binding.btnSend,
             binding.historyBtn
@@ -721,6 +743,88 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             }
         } else {
             hideVideoIndicator()
+        }
+    }
+
+    private fun toggleFlash() {
+        if (camera?.cameraInfo?.hasFlashUnit() != true) {
+            updateFlashButton()
+            return
+        }
+
+        isFlashEnabled = !isFlashEnabled
+        applyFlashMode()
+    }
+
+    private fun applyFlashMode() {
+        val currentCamera = camera
+        val hasFlashUnit = currentCamera?.cameraInfo?.hasFlashUnit() == true
+
+        binding.btnFlash.isEnabled = hasFlashUnit
+        if (hasFlashUnit) {
+            // Video dùng torch liên tục; ảnh dùng flashMode để chớp lúc chụp,
+            // tránh làm đèn sáng liên tục trong lúc chỉ đang ngắm ảnh.
+            currentCamera?.cameraControl?.enableTorch(
+                isFlashEnabled && captureMode == CaptureMode.VIDEO
+            )
+        } else {
+            isFlashEnabled = false
+        }
+
+        imageCapture?.flashMode = if (isFlashEnabled) {
+            ImageCapture.FLASH_MODE_ON
+        } else {
+            ImageCapture.FLASH_MODE_OFF
+        }
+        updateFlashButton()
+    }
+
+    private fun updateFlashButton() {
+        binding.btnFlash.setImageResource(
+            if (isFlashEnabled) R.drawable.ic_flash_on else R.drawable.ic_flash_off
+        )
+        binding.btnFlash.contentDescription = if (isFlashEnabled) {
+            "Tắt flash"
+        } else {
+            "Bật flash"
+        }
+        binding.btnFlash.alpha = if (binding.btnFlash.isEnabled) 1f else 0.45f
+    }
+
+    private fun cycleZoom() {
+        zoomStep = (zoomStep + 1) % ZOOM_RATIOS.size
+        applyZoom()
+    }
+
+    private fun applyZoom() {
+        val zoomState = camera?.cameraInfo?.zoomState?.value
+        val requestedRatio = ZOOM_RATIOS[zoomStep]
+        val appliedRatio = requestedRatio.coerceIn(
+            zoomState?.minZoomRatio ?: 1f,
+            zoomState?.maxZoomRatio ?: requestedRatio
+        )
+
+        camera?.cameraControl?.setZoomRatio(appliedRatio)
+        updateZoomButton(appliedRatio)
+    }
+
+    private fun updateZoomButton(ratio: Float? = null) {
+        val displayedRatio = ratio ?: ZOOM_RATIOS[zoomStep]
+        val label = formatZoomRatio(displayedRatio)
+        binding.btnZoom.text = label
+        binding.btnZoom.contentDescription = "Thu phóng $label"
+    }
+
+    private fun applyCameraControls() {
+        applyFlashMode()
+        applyZoom()
+    }
+
+    private fun formatZoomRatio(ratio: Float): String {
+        return if (ratio % 1f == 0f) {
+            "${ratio.toInt()}x"
+        } else {
+            "${"%.1f".format(java.util.Locale.US, ratio)}x"
         }
     }
 
@@ -1089,5 +1193,6 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         private const val MAX_RECORDING_DURATION_MILLIS = 10_000L
         private const val MAX_RECORDING_DURATION_NANOS =
             MAX_RECORDING_DURATION_MILLIS * 1_000_000L
+        private val ZOOM_RATIOS = floatArrayOf(1f, 2f, 3f)
     }
 }

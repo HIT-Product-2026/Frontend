@@ -47,6 +47,39 @@
                 app:use_controller="false"
                 android:visibility="gone"/>
 
+            <ImageButton
+                android:id="@+id/btnFlash"
+                android:layout_width="@dimen/_30sdp"
+                android:layout_height="@dimen/_30sdp"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="@dimen/_10sdp"
+                android:layout_marginTop="@dimen/_10sdp"
+                android:background="@drawable/bg_camera_control"
+                android:contentDescription="Bật flash"
+                android:elevation="4dp"
+                android:padding="@dimen/_9sdp"
+                android:src="@drawable/ic_flash_off"
+                app:tint="@color/white" />
+
+            <TextView
+                android:id="@+id/btnZoom"
+                android:layout_width="@dimen/_30sdp"
+                android:layout_height="@dimen/_30sdp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="@dimen/_10sdp"
+                android:layout_marginEnd="@dimen/_10sdp"
+                android:background="@drawable/bg_camera_control"
+                android:clickable="true"
+                android:contentDescription="Thu phóng 1x"
+                android:elevation="4dp"
+                android:focusable="true"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="1x"
+                android:textColor="@color/white"
+                android:textSize="@dimen/_11sdp"
+                android:textStyle="bold" />
+
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/captionLayout"
                 android:layout_width="wrap_content"
