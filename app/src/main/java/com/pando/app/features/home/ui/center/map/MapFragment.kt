@@ -2,6 +2,8 @@ package com.pando.app.features.home.ui.center.map
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.PointF
+import android.graphics.RectF
 import android.location.Location
 import android.os.Bundle
 import android.util.Log
@@ -40,6 +42,7 @@ import javax.inject.Inject
 class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate) {
     companion object {
         private const val FRIEND_FOCUS_ZOOM = 16.0
+        private const val FRIEND_MARKER_HIT_RADIUS_DP = 48f
     }
 
     @Inject
@@ -285,10 +288,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     private fun setupMapInteractions(map: MapLibreMap) {
         map.addOnMapClickListener { latLng ->
             val screenPoint = map.projection.toScreenLocation(latLng)
-            val feature = map.queryRenderedFeatures(
-                screenPoint,
-                *markerRenderer.interactiveLayerIds
-            ).firstOrNull()
+            val feature = queryFriendFeature(map, screenPoint)
 
             if (feature == null) {
                 setFocusedFriendMarker(null)
@@ -299,14 +299,14 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
             if (
                 feature.getNumberProperty("point_count") != null ||
-                markerType == "doubleProxy"
+                markerType == "nearbyGroupProxy"
             ) {
                 zoomIntoCluster(map, feature)
                 return@addOnMapClickListener true
             }
 
-            if (markerType == "double") {
-                focusDoubleFriendMarker(map, feature)
+            if (markerType == "nearbyGroup") {
+                focusNearbyGroupMarker(map, feature)
                 return@addOnMapClickListener true
             }
 
@@ -316,7 +316,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
         map.addOnCameraIdleListener {
             loadedStyle?.let { style ->
-                markerRenderer.updateDoubleMarkerVisibility(map, style)
+                markerRenderer.updateNearbyGroupVisibility(map, style)
             }
 
             if (isAnimatingToFriend) {
@@ -328,6 +328,39 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             if (map.cameraPosition.zoom < focusZoom) {
                 setFocusedFriendMarker(null)
             }
+        }
+    }
+
+    /**
+     * Marker icons are anchored at their pointer, while the visible avatar is
+     * rendered above it. Query a small screen rectangle instead of a single
+     * pixel so tapping the avatar body still resolves the marker. When more
+     * than one layer returns the same/nearby feature, prefer the closest
+     * feature to the tap point.
+     */
+    private fun queryFriendFeature(
+        map: MapLibreMap,
+        screenPoint: PointF
+    ): Feature? {
+        val hitRadius = FRIEND_MARKER_HIT_RADIUS_DP * resources.displayMetrics.density
+        val bounds = RectF(
+            screenPoint.x - hitRadius,
+            screenPoint.y - hitRadius,
+            screenPoint.x + hitRadius,
+            screenPoint.y + hitRadius
+        )
+
+        return map.queryRenderedFeatures(
+            bounds,
+            *markerRenderer.interactiveLayerIds
+        ).minByOrNull { feature ->
+            val point = feature.geometry() as? Point ?: return@minByOrNull Float.MAX_VALUE
+            val featureScreenPoint = map.projection.toScreenLocation(
+                LatLng(point.latitude(), point.longitude())
+            )
+            val dx = featureScreenPoint.x - screenPoint.x
+            val dy = featureScreenPoint.y - screenPoint.y
+            dx * dx + dy * dy
         }
     }
 
@@ -373,7 +406,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         Log.d("FRIEND_MARKER", "id=$friendId, name=$friendName")
     }
 
-    private fun focusDoubleFriendMarker(map: MapLibreMap, feature: Feature) {
+    private fun focusNearbyGroupMarker(map: MapLibreMap, feature: Feature) {
         setFocusedFriendMarker(null)
 
         val point = feature.geometry() as? Point
@@ -488,7 +521,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             currentUser = currentUserMapMarker()
         )
         mapLibreMap?.let { map ->
-            markerRenderer.updateDoubleMarkerVisibility(map, style)
+            markerRenderer.updateNearbyGroupVisibility(map, style)
         }
     }
 
