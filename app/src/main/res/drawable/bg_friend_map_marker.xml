@@ -6,7 +6,7 @@
     android:viewportHeight="86">
 
     <path
-        android:fillColor="#3988F5"
+        android:fillColor="@color/map_marker"
         android:pathData="
             M18,3
             C9,3 3,10 3,19

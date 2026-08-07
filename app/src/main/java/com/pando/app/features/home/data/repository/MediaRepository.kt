@@ -5,6 +5,7 @@ import com.pando.app.core.data.api.PostApi
 import com.pando.app.core.data.api.UserApi
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.utils.DataResult
+import com.pando.app.features.home.data.model.entity.enumEntity.TypePost
 import com.pando.app.features.home.data.model.response.PostResponse
 import jakarta.inject.Inject
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -20,18 +21,26 @@ class MediaRepository @Inject constructor(
         caption: String?,
         longitude: Double?,
         latitude: Double?,
-        photoFile: File
+        mediaFile: File,
+        type: TypePost
     ): DataResult<ApiResponse<PostResponse>> {
-        val requestFile = photoFile.asRequestBody("image/*".toMediaTypeOrNull())
+        val mimeType = when (type) {
+            TypePost.IMAGE -> "image/jpeg"
+            TypePost.VIDEO -> "video/mp4"
+        }
+
+        val requestFile = mediaFile.asRequestBody(
+            mimeType.toMediaTypeOrNull()
+        )
 
         val body = MultipartBody.Part.createFormData(
             "file",
-            photoFile.name,
+            mediaFile.name,
             requestFile
         )
 
         return safeApiCall {
-            postApi.doPost(longitude, latitude, body, caption)
+            postApi.doPost(longitude, latitude, body, caption, type)
         }
     }
 

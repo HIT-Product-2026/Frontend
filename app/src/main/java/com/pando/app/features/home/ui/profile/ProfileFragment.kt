@@ -16,6 +16,7 @@ import androidx.navigation.fragment.findNavController
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.extensions.showShortToast
 import com.pando.app.core.session.UserSession
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentProfileBinding
@@ -162,6 +163,7 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
 
                                 pendingDisplayName = null
                                 pendingProfile = null
+                                requireContext().showShortToast(R.string.profile_updated_success)
                                 findNavController().navigateUp()
                             }
 
@@ -193,6 +195,7 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
 
                                 clearSelectedAvatarFile()
                                 binding.btnEditAvatar.isEnabled = true
+                                requireContext().showShortToast(R.string.avatar_updated_success)
                                 profileViewModel.clearAvatarResult()
                             }
 

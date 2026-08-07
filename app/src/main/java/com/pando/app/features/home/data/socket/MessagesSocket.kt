@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import ua.naiksoftware.stomp.StompClient
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,7 +26,7 @@ class MessagesSocket @Inject constructor(
         private const val TAG = "MessageSocket"
     }
 
-    private val conversationSubscriptions = mutableMapOf<UUID, ActiveSubscription>()
+    private val conversationSubscriptions = ConcurrentHashMap<UUID, ActiveSubscription>()
 
     private val _message = MutableSharedFlow<ChatMessageResponse>(
         extraBufferCapacity = 64,
@@ -33,6 +34,7 @@ class MessagesSocket @Inject constructor(
     )
     val message = _message.asSharedFlow()
 
+    @Synchronized
     fun subscribeConversation(conversationId: UUID) {
         val client = connectionManager.getConnectedClient() ?: run {
             Log.e(TAG, "Chưa kết nối")
@@ -56,8 +58,6 @@ class MessagesSocket @Inject constructor(
             .topic(destination)
             .subscribe(
                 { topicMessage ->
-                    Log.d(TAG, "Nhận message: ${topicMessage.payload}")
-
                     val message = runCatching {
                         gson.fromJson(topicMessage.payload, ChatMessageResponse::class.java)
                     }.getOrElse { throwable ->
@@ -80,12 +80,14 @@ class MessagesSocket @Inject constructor(
             )
     }
 
+    @Synchronized
     fun unsubscribeConversation(conversationId: UUID) {
         conversationSubscriptions.remove(conversationId)?.disposable?.dispose()
 
         Log.d(TAG, "Đã unsubscribe conversation $conversationId")
     }
 
+    @Synchronized
     fun unsubscribeAllConversation() {
         conversationSubscriptions.values.forEach {
             it.disposable.dispose()

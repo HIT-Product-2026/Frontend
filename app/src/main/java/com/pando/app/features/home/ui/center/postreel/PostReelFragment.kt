@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -13,6 +14,7 @@ import android.widget.Toast
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.activityViewModels
@@ -20,10 +22,16 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.bumptech.glide.Glide
+import com.google.android.exoplayer2.ExoPlayer
+import com.google.android.exoplayer2.MediaItem
+import com.google.android.exoplayer2.Player
+import com.google.android.exoplayer2.ui.PlayerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
 import com.pando.app.MainViewModel
 import com.pando.app.core.base.BaseAdapter
 import com.pando.app.core.base.BaseDiffCallBack
@@ -35,14 +43,13 @@ import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentPostReelBinding
 import com.pando.app.databinding.ItemPostReelBinding
-import com.pando.app.features.home.data.model.entity.DataPostReelItem
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
 import com.pando.app.features.home.data.model.entity.enumEntity.NsfwStatus
 import com.pando.app.features.home.data.model.entity.enumEntity.NsfwViewDecision
+import com.pando.app.features.home.data.model.entity.enumEntity.TypePost
 import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -55,8 +62,6 @@ import kotlin.math.abs
 @AndroidEntryPoint
 class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelBinding::inflate) {
     private var avatarMap: Map<UUID, String> = emptyMap()
-    private var imageMap: Map<UUID, String> = emptyMap()
-    private var provinceMap: Map<UUID, String> = emptyMap()
     private val postReelViewModel: PostReelViewModel by viewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
     private val mainViewModel: MainViewModel by activityViewModels()
@@ -65,7 +70,14 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     lateinit var userSession: UserSession
     private var isSocketConnected = false
     private var hasLoadedInitialData = false
+    private var lastRenderedFirstPostId: UUID? = null
     private var activeNsfwDialogPostId: UUID? = null
+    private var videoPreviewPlayer: ExoPlayer? = null
+    private var activeVideoPostId: UUID? = null
+    private var activeVideoView: PlayerView? = null
+    private var shouldKeepMessageFocus = false
+    private var wasKeyboardVisible = false
+    private var messageFocusRecovery: Runnable? = null
     private val postReelAdapter: BaseAdapter<PostReelItemModel, ItemPostReelBinding> by lazy {
         BaseAdapter(
             ItemPostReelBinding::inflate,
@@ -74,30 +86,13 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             val decision =
                 postReelViewModel.nsfwDecisions.value[item.id] ?: NsfwViewDecision.UNDECIDED
 
-            val shouldHideImage =
+            val shouldHideMedia =
                 item.nsfw == NsfwStatus.TRUE && decision != NsfwViewDecision.ALLOWED
-            itemBinding.imgCaptured.isVisible = !shouldHideImage
 
-            val image = imageMap[item.id]
-            val province = provinceMap[item.id]
+            val mediaUrl = item.imageUrl
+            val province = item.locationName
 
-            val shouldLoadProvince =
-                item.latitude != null && item.longitude != null && province == null
-            if ((image == null || shouldLoadProvince) &&
-                lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-            ) {
-                postReelViewModel.loadPost(
-                    postId = item.id,
-                    longitude = item.longitude,
-                    latitude = item.latitude
-                )
-            }
-
-            Glide.with(this)
-                .load(image)
-                .into(itemBinding.imgCaptured)
-
-            bindAvatar(itemBinding.profileIcon, item.user.id)
+            bindAvatar(itemBinding.profileIcon, item.user.id, item.user.avatarUrl)
 
             itemBinding.nameTV.text = item.user.displayName.ifEmpty { item.user.username }
 
@@ -110,6 +105,54 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             itemBinding.locationLayout.isVisible = !province.isNullOrBlank()
 
             itemBinding.timeTV.text = item.createdAt?.formatDateTime()
+
+            if (item.type == null ) {
+                if (activeVideoView === itemBinding.videoCaptured) {
+                    releaseVideoPreview()
+                }
+
+                itemBinding.videoCaptured.player = null
+                itemBinding.videoCaptured.isVisible = false
+                itemBinding.imgCaptured.isVisible = !shouldHideMedia
+
+                Glide.with(this)
+                    .load(mediaUrl)
+                    .into(itemBinding.imgCaptured)
+            } else {
+                when (item.type) {
+                    TypePost.IMAGE -> {
+                        if (activeVideoView === itemBinding.videoCaptured) {
+                            releaseVideoPreview()
+                        }
+
+                        itemBinding.videoCaptured.player = null
+                        itemBinding.videoCaptured.isVisible = false
+                        itemBinding.imgCaptured.isVisible = !shouldHideMedia
+
+                        Glide.with(this)
+                            .load(mediaUrl)
+                            .into(itemBinding.imgCaptured)
+                    }
+
+                    TypePost.VIDEO -> {
+                        Glide.with(this).clear(itemBinding.imgCaptured)
+                        itemBinding.imgCaptured.isVisible = false
+                        itemBinding.videoCaptured.isVisible = !shouldHideMedia
+
+                        if (shouldHideMedia) {
+                            if (activeVideoPostId == item.id) {
+                                releaseVideoPreview()
+                            } else {
+                                itemBinding.videoCaptured.player = null
+                            }
+                        } else if (isCurrentPost(item) && mediaUrl != null) {
+                            playCapturedVideo(itemBinding, mediaUrl.toUri(), item.id)
+                        } else if (activeVideoPostId != item.id) {
+                            itemBinding.videoCaptured.player = null
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -118,6 +161,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
             override fun onPageSelected(position: Int) {
                 if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
+                releaseVideoPreview()
                 val itemCount = postReelAdapter.itemCount
 
                 val currentReel = postReelAdapter.currentList
@@ -128,6 +172,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 if (shouldLoadNextPage) {
                     postReelViewModel.getPosts()
                 }
+
+                playCurrentVideo(position)
 
                 if (currentReel.nsfw != NsfwStatus.TRUE) {
                     return
@@ -143,27 +189,68 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     override fun initView() {
         setupPostReel()
         setupNestedPagerGesture()
+        setupOutsideFocusDismissal()
         setupKeyboardInsets()
 
         submitPostReelsAndCheckCurrent()
     }
 
     override fun initActionView() {
+        childFragmentManager.setFragmentResultListener(
+            BottomSheetMorePostReelFragment.REQUEST_KEY,
+            viewLifecycleOwner
+        ) { _, bundle ->
+            val action = bundle.getString(
+                BottomSheetMorePostReelFragment.RESULT_ACTION
+            )
+
+            val postId = bundle
+                .getString(BottomSheetMorePostReelFragment.RESULT_POST_ID)
+                ?.let(UUID::fromString)
+                ?: return@setFragmentResultListener
+
+            if (action == BottomSheetMorePostReelFragment.ACTION_DELETE_POST) {
+                postReelViewModel.deletePost(postId)
+            }
+        }
+
         binding.btnCapture.setOnClickListener {
             (parentFragment as? CenterFragment)?.openCamera()
         }
 
         binding.SendMessageBtn.setOnClickListener {
-            binding.bottomLayout.visibility = View.VISIBLE
-            binding.sendMessageET.requestFocus()
+            openMessageComposer()
+        }
 
-            val inputMethodManager = requireContext()
-                .getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        binding.sendMessageLayout.setOnClickListener {
+            requestMessageEditorFocus(showKeyboard = true)
+        }
 
-            inputMethodManager.showSoftInput(
-                binding.sendMessageET,
-                InputMethodManager.SHOW_IMPLICIT
-            )
+        binding.sendMessageET.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN && !shouldKeepMessageFocus) {
+                openMessageComposer()
+            }
+
+            false
+        }
+
+        binding.sendMessageET.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus &&
+                shouldKeepMessageFocus &&
+                messageFocusRecovery == null
+            ) {
+                scheduleMessageFocusRecovery()
+            }
+        }
+
+        binding.sendMessageET.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (shouldKeepMessageFocus &&
+                wasKeyboardVisible &&
+                !binding.sendMessageET.hasFocus() &&
+                messageFocusRecovery == null
+            ) {
+                scheduleMessageFocusRecovery()
+            }
         }
 
         binding.btnMore.setOnClickListener {
@@ -173,10 +260,11 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 .getOrNull(position)
                 ?: return@setOnClickListener
 
-            val imageUrl = imageMap[currentReel.id] ?: return@setOnClickListener
+            val imageUrl = currentReel.imageUrl ?: return@setOnClickListener
+            val isOwner = currentReel.user.id == userSession.getCurrentUser()?.id
 
             BottomSheetMorePostReelFragment
-                .newInstance(currentReel.id, imageUrl)
+                .newInstance(currentReel.id, imageUrl, isOwner)
                 .show(childFragmentManager, "MorePostReel")
         }
 
@@ -192,16 +280,13 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 val conversationId = currentReel.conversationId
                     ?: return@setOnClickListener
 
-                val postImageUrl = imageMap[currentReel.id]
+                val postImageUrl = currentReel.imageUrl
                     ?: return@setOnClickListener
 
                 postReelViewModel.sendImagePost(conversationId, postImageUrl)
                 postReelViewModel.sendMessage(conversationId, message)
 
-                binding.sendMessageET.clearFocus()
-                ViewCompat.getWindowInsetsController(binding.root)
-                    ?.hide(WindowInsetsCompat.Type.ime())
-                binding.bottomLayout.visibility = View.GONE
+                closeMessageComposer(clearText = true)
             }
         }
 
@@ -227,31 +312,27 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    combine(
-                        postReelViewModel.images,
-                        postReelViewModel.provinceNames,
-                        postReelViewModel.connectionState
-                    ) { images, provinces, connectionState ->
-                        Triple(images, provinces, connectionState)
-                    }.collect { (images, provinces, connectionState) ->
-                        imageMap = images
-                        provinceMap = provinces
+                    postReelViewModel.posts.collect { posts ->
+                        val firstPostId = posts.firstOrNull()?.id
+                        val shouldShowNewPost =
+                            firstPostId != null &&
+                                firstPostId != lastRenderedFirstPostId
 
-                        refreshPostReelAdapter()
-
-                        when (connectionState) {
-                            is SocketConnectionState.Connecting -> {}
-                            is SocketConnectionState.Connected -> {
-                                isSocketConnected = true
+                        lastRenderedFirstPostId = firstPostId
+                        postReelAdapter.submitList(posts) {
+                            if (shouldShowNewPost) {
+                                binding.postReelViewPager.setCurrentItem(0, false)
                             }
-
-                            is SocketConnectionState.Disconnected -> {
-                                isSocketConnected = false
-                            }
-
-                            is SocketConnectionState.Error -> {
-                            }
+                            checkCurrentNsfwReel()
                         }
+                    }
+                }
+
+                launch {
+                    postReelViewModel.connectionState
+                        .collect { connectionState ->
+                            isSocketConnected =
+                                connectionState is SocketConnectionState.Connected
                     }
                 }
 
@@ -263,23 +344,8 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                 }
 
                 launch {
-                    postReelViewModel.uiState.collect { state ->
-                        when (state) {
-                            is UiState.Success -> {
-                                syncNsfwStatuses(mainViewModel.nsfwStatuses.value)
-                                submitPostReelsAndCheckCurrent()
-                            }
-
-                            is UiState.Error -> {}
-
-                            else -> {}
-                        }
-                    }
-                }
-                launch {
                     mainViewModel.nsfwStatuses.collect { statuses ->
                         syncNsfwStatuses(statuses)
-                        submitPostReelsAndCheckCurrent()
                     }
                 }
                 launch {
@@ -292,6 +358,33 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                             }
                         }
                 }
+                launch {
+                    postReelViewModel.deletePostState.collect { state ->
+                        when (state) {
+                            is UiState.Loading -> {
+                                binding.btnMore.isEnabled = false
+                            }
+
+                            is UiState.Success -> {
+                                binding.btnMore.isEnabled = true
+
+                                Toast.makeText(requireContext(), "Đã xóa bài viết", Toast.LENGTH_SHORT).show()
+
+                                postReelViewModel.clearDeletePostState()
+                            }
+
+                            is UiState.Error -> {
+                                binding.btnMore.isEnabled = true
+
+                                Toast.makeText(requireContext(), state.message,Toast.LENGTH_SHORT).show()
+
+                                postReelViewModel.clearDeletePostState()
+                            }
+
+                            UiState.Idle -> Unit
+                        }
+                    }
+                }
             }
         }
     }
@@ -302,8 +395,20 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         if (!hasLoadedInitialData) {
             hasLoadedInitialData = true
 
-            DataPostReelItem.reset()
             postReelViewModel.getPosts()
+        }
+
+        binding.postReelViewPager.post {
+            val posts = postReelViewModel.posts.value
+            postReelAdapter.submitList(posts) {
+                if (posts.isNotEmpty()) {
+                    binding.postReelViewPager.setCurrentItem(0, false)
+                    checkCurrentNsfwReel()
+                    playCurrentVideo(0)
+                } else {
+                    releaseVideoPreview()
+                }
+            }
         }
     }
 
@@ -315,24 +420,29 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         }
     }
 
-    private fun bindAvatar(imageView: ImageView, userId: UUID) {
-        val avatar = avatarMap[userId]
+    private fun bindAvatar(imageView: ImageView, userId: UUID, avatarUrl: String?) {
+        val avatar = avatarUrl?.takeIf(String::isNotBlank) ?: avatarMap[userId]
 
         imageView.loadAvatar(avatar)
 
-        if (avatar == null) {
+        if (avatar.isNullOrBlank()) {
             avatarViewModel.loadAvatar(userId)
         }
     }
 
     override fun onDestroyView() {
+        cancelMessageFocusRecovery()
+        shouldKeepMessageFocus = false
+        wasKeyboardVisible = false
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
+        (parentFragment as? CenterFragment)?.setPostReelMessageComposerOpen(false)
+        releaseVideoPreview()
         binding.postReelViewPager.unregisterOnPageChangeCallback(pageChangeCallback)
 
         super.onDestroyView()
     }
 
     private fun setupKeyboardInsets() {
-
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
             val imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
 
@@ -341,16 +451,178 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             val isKeyboardVisible =
                 windowInsets.isVisible(WindowInsetsCompat.Type.ime())
 
-            if (!isKeyboardVisible) {
-                binding.sendMessageET.clearFocus()
-                binding.sendMessageET.text?.clear()
-                binding.bottomLayout.visibility = View.GONE
+            if (isKeyboardVisible &&
+                shouldKeepMessageFocus &&
+                !binding.sendMessageET.hasFocus() &&
+                messageFocusRecovery == null
+            ) {
+                scheduleMessageFocusRecovery()
+            } else if (wasKeyboardVisible && !isKeyboardVisible) {
+                closeMessageComposer(clearText = true)
             }
+            wasKeyboardVisible = isKeyboardVisible
 
             windowInsets
         }
 
         ViewCompat.requestApplyInsets(binding.root)
+    }
+
+    private fun openMessageComposer() {
+        shouldKeepMessageFocus = true
+
+        binding.bottomLayout.isVisible = true
+        setMessageComposerOpen(true)
+
+        binding.bottomLayout.doOnLayout {
+            requestMessageEditorFocus(showKeyboard = true)
+            if (!binding.sendMessageET.hasFocus()) {
+                scheduleMessageFocusRecovery()
+            }
+        }
+    }
+
+    private fun scheduleMessageFocusRecovery() {
+        val messageEditor = binding.sendMessageET
+        messageFocusRecovery?.let(messageEditor::removeCallbacks)
+
+        var attempts = 0
+        lateinit var recovery: Runnable
+        recovery = Runnable {
+            if (!shouldKeepMessageFocus ||
+                !binding.bottomLayout.isVisible ||
+                messageEditor.hasFocus()
+            ) {
+                if (messageFocusRecovery === recovery) {
+                    messageFocusRecovery = null
+                }
+                return@Runnable
+            }
+
+            requestMessageEditorFocus(showKeyboard = false, restartInput = true)
+            attempts++
+
+            if (messageEditor.hasFocus() || attempts >= 3) {
+                if (messageFocusRecovery === recovery) {
+                    messageFocusRecovery = null
+                }
+            } else {
+                messageEditor.postDelayed(recovery, 180L)
+            }
+        }
+
+        messageFocusRecovery = recovery
+        messageEditor.post(recovery)
+    }
+
+    private fun cancelMessageFocusRecovery() {
+        messageFocusRecovery?.let(binding.sendMessageET::removeCallbacks)
+        messageFocusRecovery = null
+    }
+
+    private fun requestMessageEditorFocus(
+        showKeyboard: Boolean,
+        restartInput: Boolean = false
+    ) {
+        if (!shouldKeepMessageFocus || !binding.bottomLayout.isVisible) return
+
+        val messageEditor = binding.sendMessageET
+        if (!messageEditor.isAttachedToWindow) return
+
+        messageEditor.isFocusable = true
+        messageEditor.isFocusableInTouchMode = true
+        messageEditor.isCursorVisible = true
+        if (!messageEditor.hasFocus()) {
+            focusMessageEditor(messageEditor)
+        }
+        messageEditor.setSelection(messageEditor.text?.length ?: 0)
+
+        messageEditor.post {
+            if (!shouldKeepMessageFocus || !messageEditor.isAttachedToWindow) return@post
+
+            if (!messageEditor.hasFocus()) {
+                focusMessageEditor(messageEditor)
+            }
+            messageEditor.isCursorVisible = true
+            messageEditor.setSelection(messageEditor.text?.length ?: 0)
+
+            val inputMethodManager = context
+                ?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                ?: return@post
+
+            if (showKeyboard) {
+                ViewCompat.getWindowInsetsController(binding.root)
+                    ?.show(WindowInsetsCompat.Type.ime())
+                inputMethodManager.showSoftInput(
+                    messageEditor,
+                    InputMethodManager.SHOW_IMPLICIT
+                )
+            } else if (restartInput && messageEditor.hasFocus()) {
+                inputMethodManager.restartInput(messageEditor)
+            }
+        }
+    }
+
+    private fun focusMessageEditor(messageEditor: TextInputEditText): Boolean {
+        messageEditor.isFocusable = true
+        messageEditor.isFocusableInTouchMode = true
+        val focusedFromTouch = messageEditor.requestFocusFromTouch()
+        val focused = messageEditor.requestFocus()
+        return focusedFromTouch || focused || messageEditor.hasFocus()
+    }
+
+    private fun closeMessageComposer(clearText: Boolean) {
+        cancelMessageFocusRecovery()
+        shouldKeepMessageFocus = false
+        wasKeyboardVisible = false
+
+        val messageEditor = binding.sendMessageET
+        messageEditor.clearFocus()
+        if (clearText) {
+            messageEditor.text?.clear()
+        }
+
+        ViewCompat.getWindowInsetsController(binding.root)
+            ?.hide(WindowInsetsCompat.Type.ime())
+        binding.bottomLayout.isVisible = false
+        setMessageComposerOpen(false)
+    }
+
+    private fun dismissMessageFocusFromOutside() {
+        val messageEditor = binding.sendMessageET
+        if (!shouldKeepMessageFocus && !messageEditor.hasFocus()) return
+
+        // Ấn ra ngoài phải đóng cả bàn phím lẫn composer. Giữ lại nội dung
+        // nháp để lần mở tiếp theo không làm mất phần người dùng đang gõ.
+        closeMessageComposer(clearText = false)
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupOutsideFocusDismissal() {
+        val outsideViews = listOf(
+            binding.root,
+            binding.SendMessageBtn,
+            binding.bottomLayout,
+            binding.btnGoThere,
+            binding.btnCapture,
+            binding.btnMore,
+            binding.sendBtn
+        )
+
+        outsideViews.forEach { outsideView ->
+            outsideView.setOnTouchListener { _, event ->
+                if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                    dismissMessageFocusFromOutside()
+                }
+
+                false
+            }
+        }
+    }
+
+    private fun setMessageComposerOpen(isOpen: Boolean) {
+        binding.postReelViewPager.isUserInputEnabled = !isOpen
+        (parentFragment as? CenterFragment)?.setPostReelMessageComposerOpen(isOpen)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -365,6 +637,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         reelRecyclerView.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    dismissMessageFocusFromOutside()
                     startX = event.x
                     startY = event.y
 
@@ -400,11 +673,30 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     private fun refreshPostReelAdapter() {
-        val recyclerView = binding.postReelViewPager.getChildAt(0) as RecyclerView
+        val recyclerView = binding.postReelViewPager.getChildAt(0) as? RecyclerView
+            ?: return
 
         recyclerView.post {
-            if (recyclerView.isAttachedToWindow) {
-                postReelAdapter.notifyDataSetChanged()
+            if (!recyclerView.isAttachedToWindow) return@post
+
+            val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+                ?: return@post
+            val firstVisiblePosition = layoutManager.findFirstVisibleItemPosition()
+            val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
+
+            if (firstVisiblePosition == RecyclerView.NO_POSITION ||
+                lastVisiblePosition == RecyclerView.NO_POSITION ||
+                postReelAdapter.itemCount == 0
+            ) {
+                return@post
+            }
+
+            val lastPosition = lastVisiblePosition.coerceAtMost(postReelAdapter.itemCount - 1)
+            if (firstVisiblePosition <= lastPosition) {
+                postReelAdapter.notifyItemRangeChanged(
+                    firstVisiblePosition,
+                    lastPosition - firstVisiblePosition + 1
+                )
             }
         }
     }
@@ -423,21 +715,20 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     override fun onPause() {
+        if (binding.bottomLayout.isVisible) {
+            closeMessageComposer(clearText = false)
+        } else {
+            cancelMessageFocusRecovery()
+            shouldKeepMessageFocus = false
+            wasKeyboardVisible = false
+        }
         binding.postReelViewPager.setCurrentItem(0, false)
+        releaseVideoPreview()
         super.onPause()
     }
 
     private fun syncNsfwStatuses(statuses: Map<UUID, NsfwStatus>) {
-        DataPostReelItem.data.indices.forEach { index ->
-            val currentItem = DataPostReelItem.data[index]
-            val latestStatus = statuses[currentItem.id]
-                ?: return@forEach
-
-            if (currentItem.nsfw != latestStatus) {
-                DataPostReelItem.data[index] =
-                    currentItem.copy(nsfw = latestStatus)
-            }
-        }
+        postReelViewModel.updateNsfwStatuses(statuses)
     }
 
     private fun getCurrentUserAge(): Int? {
@@ -547,7 +838,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
     }
 
     private fun submitPostReelsAndCheckCurrent() {
-        postReelAdapter.submitList(DataPostReelItem.data.toList()) {
+        postReelAdapter.submitList(postReelViewModel.posts.value) {
             checkCurrentNsfwReel()
         }
     }
@@ -559,5 +850,86 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         val currentReel = postReelAdapter.currentList.getOrNull(position) ?: return
 
         handleNsfwReel(currentReel, position)
+    }
+
+    private fun isCurrentPost(item: PostReelItemModel): Boolean {
+        return postReelAdapter.currentList
+            .getOrNull(binding.postReelViewPager.currentItem)
+            ?.id == item.id
+    }
+
+    private fun playCurrentVideo(position: Int) {
+        val item = postReelAdapter.currentList.getOrNull(position) ?: run {
+            releaseVideoPreview()
+            return
+        }
+
+        if (item.type != TypePost.VIDEO) {
+            releaseVideoPreview()
+            return
+        }
+
+        val decision = postReelViewModel.nsfwDecisions.value[item.id]
+            ?: NsfwViewDecision.UNDECIDED
+        val shouldHideMedia =
+            item.nsfw == NsfwStatus.TRUE && decision != NsfwViewDecision.ALLOWED
+        val mediaUrl = item.imageUrl
+
+        if (shouldHideMedia || mediaUrl == null) {
+            releaseVideoPreview()
+            return
+        }
+
+        val recyclerView = binding.postReelViewPager.getChildAt(0) as RecyclerView
+        recyclerView.post {
+            if (binding.postReelViewPager.currentItem != position) {
+                return@post
+            }
+
+            val itemView = recyclerView
+                .findViewHolderForAdapterPosition(position)
+                ?.itemView
+                ?: return@post
+
+            playCapturedVideo(
+                itemBinding = ItemPostReelBinding.bind(itemView),
+                videoUri = mediaUrl.toUri(),
+                postId = item.id
+            )
+        }
+    }
+
+    private fun playCapturedVideo(itemBinding: ItemPostReelBinding, videoUri: Uri, postId: UUID) {
+        if (activeVideoPostId == postId && videoPreviewPlayer != null) {
+            if (activeVideoView !== itemBinding.videoCaptured) {
+                activeVideoView?.player = null
+                activeVideoView = itemBinding.videoCaptured
+                itemBinding.videoCaptured.player = videoPreviewPlayer
+            }
+            return
+        }
+
+        releaseVideoPreview()
+
+        videoPreviewPlayer = ExoPlayer.Builder(requireContext())
+            .build()
+            .also { player ->
+                itemBinding.videoCaptured.player = player
+                player.setMediaItem(MediaItem.fromUri(videoUri))
+                player.repeatMode = Player.REPEAT_MODE_ONE
+                player.prepare()
+                player.playWhenReady = true
+            }
+
+        activeVideoPostId = postId
+        activeVideoView = itemBinding.videoCaptured
+    }
+
+    private fun releaseVideoPreview() {
+        activeVideoView?.player = null
+        videoPreviewPlayer?.release()
+        videoPreviewPlayer = null
+        activeVideoView = null
+        activeVideoPostId = null
     }
 }

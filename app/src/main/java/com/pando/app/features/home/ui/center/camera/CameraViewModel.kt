@@ -8,6 +8,7 @@ import androidx.exifinterface.media.ExifInterface
 import com.pando.app.core.base.BaseVM
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.utils.DataResult
+import com.pando.app.features.home.data.model.entity.enumEntity.TypePost
 import com.pando.app.features.home.data.model.response.PostResponse
 import com.pando.app.features.home.data.repository.MediaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,28 +19,31 @@ import id.zelory.compressor.constraint.quality
 import id.zelory.compressor.constraint.resolution
 import id.zelory.compressor.constraint.size
 import jakarta.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
 sealed interface CameraViewMode {
-    object Capture : CameraViewMode                // Chế độ live preview để chụp
-    data class Send(val photoFile: File) :
-        CameraViewMode  // Chế độ hiển thị ảnh vừa chụp kèm nút Gửi
+    data object Capture : CameraViewMode
+
+    data class Send(val mediaFile: File, val type: TypePost) : CameraViewMode
 }
 
 @HiltViewModel
 class CameraViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
+    private val videoCompressor: VideoCompressor,
     @param:ApplicationContext private val context: Context
 ) : BaseVM<ApiResponse<PostResponse>>() {
     private val _cameraViewMode = MutableStateFlow<CameraViewMode>(CameraViewMode.Capture)
     val cameraViewMode: StateFlow<CameraViewMode> = _cameraViewMode.asStateFlow()
 
-    fun setSendMode(photoFile: File) {
-        _cameraViewMode.value = CameraViewMode.Send(photoFile)
+    fun setSendMode(mediaFile: File, type: TypePost) {
+        _cameraViewMode.value = CameraViewMode.Send(mediaFile, type)
     }
 
     fun setCaptureMode() {
@@ -50,47 +54,80 @@ class CameraViewModel @Inject constructor(
         val currentMode = _cameraViewMode.value
         if (currentMode !is CameraViewMode.Send) return
 
-        val originFile = currentMode.photoFile
+        val originFile = currentMode.mediaFile
 
         getData {
-            val normalizedFile = normalizeExif(originFile)
-//            val normalizedFile = originFile
-
-            val uploadFile = try {
-                Compressor.compress(context, normalizedFile) {
-                    resolution(1280, 720)
-                    quality(80)
-                    format(Bitmap.CompressFormat.JPEG)
-                    size(2_097_152)
+            val preparedMedia = withContext(Dispatchers.IO) {
+                val normalizedFile = when (currentMode.type) {
+                    TypePost.IMAGE -> normalizeExif(originFile)
+                    TypePost.VIDEO -> originFile
                 }
 
-            } catch (e: Exception) {
-                normalizedFile
+                val uploadFile = when (currentMode.type) {
+                    TypePost.IMAGE -> {
+                        try {
+                            Compressor.compress(context, normalizedFile) {
+                                resolution(1280, 720)
+                                quality(80)
+                                format(Bitmap.CompressFormat.JPEG)
+                                size(2_097_152)
+                            }
+                        } catch (_: Exception) {
+                            normalizedFile
+                        }
+                    }
+
+                    TypePost.VIDEO -> {
+                        videoCompressor.compress(originFile) ?: originFile
+                    }
+                }
+
+                PreparedMedia(
+                    normalizedFile = normalizedFile,
+                    uploadFile = uploadFile
+                )
             }
 
-            val result = mediaRepository.sendPost(caption, longitude, latitude, uploadFile)
-
-            if (originFile.exists() && originFile.absolutePath != uploadFile.absolutePath) {
-                originFile.delete()
-            }
-            if (uploadFile.exists()) {
-                uploadFile.delete()
-            }
-
-            if (
-                normalizedFile.absolutePath != originFile.absolutePath &&
-                normalizedFile.absolutePath != uploadFile.absolutePath
-            ) {
-                normalizedFile.delete()
-            }
+            val result = mediaRepository.sendPost(
+                caption,
+                longitude,
+                latitude,
+                preparedMedia.uploadFile,
+                currentMode.type
+            )
 
             if (result is DataResult.Success) {
+                withContext(Dispatchers.IO) {
+                    if (
+                        originFile.exists() &&
+                        originFile.absolutePath != preparedMedia.uploadFile.absolutePath
+                    ) {
+                        originFile.delete()
+                    }
+                    if (preparedMedia.uploadFile.exists()) {
+                        preparedMedia.uploadFile.delete()
+                    }
+
+                    if (
+                        preparedMedia.normalizedFile.absolutePath != originFile.absolutePath &&
+                        preparedMedia.normalizedFile.absolutePath !=
+                        preparedMedia.uploadFile.absolutePath
+                    ) {
+                        preparedMedia.normalizedFile.delete()
+                    }
+                }
+
                 setCaptureMode()
             }
 
             result
         }
     }
+
+    private data class PreparedMedia(
+        val normalizedFile: File,
+        val uploadFile: File
+    )
 
     private fun normalizeExif(sourceFile: File): File {
         val exif = ExifInterface(sourceFile.absolutePath)

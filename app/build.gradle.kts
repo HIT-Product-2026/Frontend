@@ -51,9 +51,12 @@ android {
 
     buildTypes {
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
             optimization {
-                enable = false
+                enable = true
             }
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
         }
     }
     compileOptions {
@@ -91,6 +94,8 @@ dependencies {
     implementation("io.coil-kt.coil3:coil:3.5.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
     implementation("androidx.viewpager2:viewpager2:1.1.0")
+    implementation("com.google.android.exoplayer:exoplayer:2.19.1")
+    implementation("androidx.media3:media3-transformer:1.9.0")
     implementation("com.auth0.android:jwtdecode:2.0.2")
     implementation("androidx.core:core-splashscreen:1.2.0")
 

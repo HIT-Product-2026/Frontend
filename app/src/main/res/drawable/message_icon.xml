@@ -6,9 +6,9 @@
         </shape>
     </item>
     <item
-        android:drawable="@drawable/message_typing"
-        android:top="@dimen/_5sdp"
-        android:left="@dimen/_5sdp"
-        android:right="@dimen/_5sdp"
-        android:bottom="@dimen/_5sdp" />
+        android:drawable="@drawable/message_circle_filled"
+        android:top="@dimen/_13sdp"
+        android:left="@dimen/_13sdp"
+        android:right="@dimen/_13sdp"
+        android:bottom="@dimen/_13sdp" />
 </layer-list>

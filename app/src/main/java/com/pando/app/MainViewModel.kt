@@ -11,6 +11,7 @@ import com.pando.app.features.home.data.model.entity.CurrentUserProfile
 import com.pando.app.features.home.data.model.entity.enumEntity.NsfwStatus
 import com.pando.app.features.home.data.model.response.PostResponse
 import com.pando.app.features.home.data.repository.ProfileRepository
+import com.pando.app.features.home.data.store.PostFeedStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +28,8 @@ class MainViewModel @Inject constructor(
     private val sseManager: SseManager,
     private val gson: Gson,
     private val profileRepository: ProfileRepository,
-    private val userSession: UserSession
+    private val userSession: UserSession,
+    private val postFeedStore: PostFeedStore
 ) : ViewModel() {
     val connectionState = socketConnectionManager.connectionState
 
@@ -46,6 +48,7 @@ class MainViewModel @Inject constructor(
 
     fun socketDisconnect() {
         socketConnectionManager.disconnect()
+        postFeedStore.reset()
         _nsfwStatuses.value = emptyMap()
         loadedProfileUserId = null
         loadingProfileUserId = null

@@ -4,6 +4,7 @@ import com.pando.app.features.home.data.model.dto.Conversation
 import com.pando.app.features.home.data.model.dto.UserDto
 import com.pando.app.features.home.data.model.entity.enumEntity.NsfwStatus
 import com.pando.app.features.home.data.model.entity.enumEntity.PostModeLocation
+import com.pando.app.features.home.data.model.entity.enumEntity.TypePost
 import java.util.UUID
 
 data class PostResponse (
@@ -13,7 +14,10 @@ data class PostResponse (
     val latitude: Double,
     val longitude: Double,
     val modeLocation: PostModeLocation,
-    val conversation: Conversation?,
     val nsfw: NsfwStatus ?= NsfwStatus.PROCESSING,
-    val createAt: String?
+    val urlImage: String?,
+    val conversation: Conversation?,
+    val createAt: String?,
+    val locationName: String?,
+    val type: TypePost
 )

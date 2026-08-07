@@ -11,7 +11,6 @@ import com.pando.app.core.utils.DataResult
 import com.pando.app.features.auth.data.model.response.LoginResponse
 import com.pando.app.features.auth.data.repository.AuthRepository
 import com.pando.app.features.home.data.model.entity.CurrentUser
-import com.pando.app.features.shared.AvatarRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
 import kotlinx.coroutines.tasks.await
@@ -19,7 +18,6 @@ import kotlinx.coroutines.tasks.await
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val avatarRepository: AvatarRepository,
     private val userSession: UserSession
 ) : BaseVM<ApiResponse<LoginResponse>>() {
     fun login(email: String, password: String) {
@@ -33,7 +31,7 @@ class LoginViewModel @Inject constructor(
 
             if (loginResult is DataResult.Success) {
                 val response = loginResult.data.data
-                saveAvatarOfUserSession(response)
+                saveUserSession(response)
 
                 sendEvent(ViewModelEvent.ShowSnackbar("Đăng nhập thành công!"))
 
@@ -53,14 +51,14 @@ class LoginViewModel @Inject constructor(
 
             if (!fcmToken.isNullOrEmpty()) {
                 authRepository.sendFcmToken(fcmToken)
-                Log.d("FCM", "FCM Token lấy thành công: $fcmToken")
+                Log.d("FCM", "FCM token đã được gửi thành công")
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w("FCM", "Không thể lấy hoặc gửi FCM token", e)
         }
     }
 
-    private suspend fun saveAvatarOfUserSession(response: LoginResponse) {
+    private fun saveUserSession(response: LoginResponse) {
         val user = response.user
 
         userSession.setCurrentUser(
@@ -68,18 +66,9 @@ class LoginViewModel @Inject constructor(
                 id = user.id,
                 username = user.username,
                 displayName = user.displayName,
-                mode = user.mode
+                mode = user.mode,
+                avatar = user.avatarUrl?.takeIf(String::isNotBlank)
             )
         )
-
-        when (val avatarResult = avatarRepository.getUserAvatar(user.id)) {
-            is DataResult.Success -> {
-                userSession.updateAvatar(avatarResult.data.data)
-            }
-
-            is DataResult.Error -> {
-
-            }
-        }
     }
 }

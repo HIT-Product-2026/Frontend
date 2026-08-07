@@ -1,15 +1,12 @@
 package com.pando.app.features.home.ui.chat
 
-import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.base.BaseVM
-import com.pando.app.core.extensions.formatDateTime
 import com.pando.app.core.extensions.toLocalDateTime
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.entity.ChatMessageItemModel
-import com.pando.app.features.home.data.model.entity.DataChatMessageItem
 import com.pando.app.features.home.data.model.entity.enumEntity.MessageType
 import com.pando.app.features.home.data.model.response.ChatMessageResponse
 import com.pando.app.features.home.data.model.response.MessagePageResponse
@@ -20,7 +17,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
 import java.util.UUID
 import javax.inject.Inject
 
@@ -43,8 +39,8 @@ class ChatViewModel @Inject constructor(
     private lateinit var currentRecipientId: UUID
 
     private var isLoading = false
-
-    private val loadingIds = mutableSetOf<UUID>()
+    private var hasLoadedFirstPage = false
+    private var nextCursor: String? = null
 
     init {
         viewModelScope.launch {
@@ -75,7 +71,12 @@ class ChatViewModel @Inject constructor(
     }
 
     fun updateMessages(message: ChatMessageResponse) {
-        Log.d("MessageSocket", "Dang cap nhat")
+        if (!::currentConversationId.isInitialized ||
+            message.conversationId != currentConversationId
+        ) {
+            return
+        }
+
         _messages.update { currentList ->
             val newMessage = when (message.type) {
                 MessageType.TEXT -> {
@@ -108,10 +109,8 @@ class ChatViewModel @Inject constructor(
                 .values
                 .sortedBy { it.createdAt }
 
-            Log.d("MessageSocket", "Đã tạo danh sách messages mới")
             list
         }
-        Log.d("MessageSocket", "Cập nhật thành công lên data")
     }
 
 //    fun loadImageMessage(messageId: UUID) {
@@ -143,19 +142,15 @@ class ChatViewModel @Inject constructor(
 
     fun getMessageList(conversationId: UUID, recipientId: UUID) {
         if (isLoading) {
-            Log.d("OkHttp", "Đang load danh sách tin ")
             return
         }
 
-        if (DataChatMessageItem.hasLoadedFirstPage &&
-            DataChatMessageItem.nextCursor?.isBlank() == true
-        ) {
-            Log.d("OkHttp", "Đã hết trang")
+        if (hasLoadedFirstPage && nextCursor.isNullOrBlank()) {
             return
         }
 
         isLoading = true
-        val requestedCursor = DataChatMessageItem.nextCursor
+        val requestedCursor = nextCursor
 
         getData {
             val result =
@@ -164,9 +159,7 @@ class ChatViewModel @Inject constructor(
             if (result is DataResult.Success) {
                 val response = result.data.data
 
-                DataChatMessageItem.total = DataChatMessageItem.total?.plus(response.total)
-
-                val existingIds = DataChatMessageItem.data
+                val existingIds = _messages.value
                     .mapTo(hashSetOf()) { it.id }
 
                 val newMessages = response.items
@@ -215,14 +208,18 @@ class ChatViewModel @Inject constructor(
 //                        .map { it.id }
 //                )
 
-                DataChatMessageItem.hasLoadedFirstPage = true
-                DataChatMessageItem.nextCursor = result.data.data.cursor
+                hasLoadedFirstPage = true
+                nextCursor = result.data.data.cursor
             }
 
             isLoading = false
 
             result
         }
+    }
+
+    fun canLoadMoreMessages(): Boolean {
+        return !hasLoadedFirstPage || !nextCursor.isNullOrBlank()
     }
 
 //    fun sendTextMessage(conversationId: UUID, content: String) {

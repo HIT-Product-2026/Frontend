@@ -10,6 +10,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.pando.app.R
 import com.pando.app.core.base.BaseBottomSheet
+import com.pando.app.core.extensions.showShortToast
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentRegisterBinding
 import dagger.hilt.android.AndroidEntryPoint
@@ -75,6 +76,7 @@ class RegisterFragment : BaseBottomSheet<FragmentRegisterBinding>(FragmentRegist
                         is UiState.Success -> {
                             binding.registerText.visibility = View.VISIBLE
                             binding.registerProgressBar.visibility = View.GONE
+                            requireContext().showShortToast(R.string.otp_sent_success)
 
                             val action = RegisterFragmentDirections.actionRegisterBottomSheetToVerifyOtpFragment(
                                 isRegister = "true",

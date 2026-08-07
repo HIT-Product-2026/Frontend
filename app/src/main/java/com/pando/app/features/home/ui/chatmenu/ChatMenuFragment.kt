@@ -9,6 +9,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.pando.app.core.base.BaseAdapter
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
@@ -19,7 +20,6 @@ import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentChatMenuBinding
 import com.pando.app.databinding.ItemChatMenuRvBinding
 import com.pando.app.features.home.data.model.entity.ChatMenuItemModel
-import com.pando.app.features.home.data.model.entity.DataChatMenuItem
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -41,7 +41,7 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name.orEmpty()
 
-            bindAvatar(itemBinding.profileIcon, item.recipientId)
+            bindAvatar(itemBinding.profileIcon, item.recipientId, item.avatarUrl)
 
             itemBinding.chatPreviewTV.text =
                 item.previewChat?.takeIf { it.isNotBlank() } ?: "Hãy bắt đầu cuộc trò chuyện!"
@@ -53,7 +53,8 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
                     conversationId = item.id,
                     senderId = item.senderId,
                     recipientId = item.recipientId,
-                    name = item.name.orEmpty()
+                    name = item.name.orEmpty(),
+                    avatarUrl = item.avatarUrl.orEmpty()
                 )
                 findNavController().navigate(action)
             }
@@ -80,7 +81,7 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
                     avatarViewModel.avatars.collect { avatars ->
                         avatarMap = avatars
 
-                        chatMenuAdapter.notifyDataSetChanged()
+                        refreshVisibleItems()
                     }
                 }
                 launch {
@@ -117,10 +118,6 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
                 launch {
                     chatMenuViewModel.conversations.collect { conversations ->
                         chatMenuAdapter.submitList(conversations)
-
-                        avatarViewModel.loadAvatars(
-                            conversations.map { it.recipientId }
-                        )
                     }
                 }
             }
@@ -134,13 +131,35 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
         }
     }
 
-    private fun bindAvatar(imageView: ImageView, userId: UUID) {
-        val avatar = avatarMap[userId]
+    private fun bindAvatar(imageView: ImageView, userId: UUID, avatarUrl: String?) {
+        val avatar = avatarUrl?.takeIf(String::isNotBlank) ?: avatarMap[userId]
 
         imageView.loadAvatar(avatar)
 
-        if (avatar == null) {
+        if (avatar.isNullOrBlank()) {
             avatarViewModel.loadAvatar(userId)
+        }
+    }
+
+    private fun refreshVisibleItems() {
+        val layoutManager = binding.chatRV.layoutManager as? LinearLayoutManager
+            ?: return
+        val firstVisible = layoutManager.findFirstVisibleItemPosition()
+        val lastVisible = layoutManager.findLastVisibleItemPosition()
+
+        if (firstVisible == RecyclerView.NO_POSITION ||
+            lastVisible == RecyclerView.NO_POSITION ||
+            chatMenuAdapter.itemCount == 0
+        ) {
+            return
+        }
+
+        val lastPosition = lastVisible.coerceAtMost(chatMenuAdapter.itemCount - 1)
+        if (firstVisible <= lastPosition) {
+            chatMenuAdapter.notifyItemRangeChanged(
+                firstVisible,
+                lastPosition - firstVisible + 1
+            )
         }
     }
 

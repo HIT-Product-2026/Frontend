@@ -14,7 +14,6 @@
         android:layout_gravity="top|start"
         android:layout_marginStart="@dimen/_12sdp"
         android:layout_marginTop="@dimen/_24sdp"
-        android:background="?attr/selectableItemBackgroundBorderless"
         android:clickable="true"
         android:focusable="true"
         android:padding="@dimen/_12sdp"
@@ -56,7 +55,7 @@
                     android:layout_marginBottom="@dimen/_2sdp"
                     android:text="Chúng tôi đã gửi mã OTP đến email "
                     android:textAlignment="center"
-                    android:textColor="#C4C4C4"
+                    android:textColor="@color/neutral2"
                     android:textSize="@dimen/_14sdp" />
 
                 <TextView
@@ -66,7 +65,7 @@
                     android:layout_marginBottom="@dimen/_10sdp"
                     android:text=""
                     android:textAlignment="center"
-                    android:textColor="#C4C4C4"
+                    android:textColor="@color/neutral2"
                     android:textSize="@dimen/_14sdp"
                     android:textStyle="bold" />
             </LinearLayout>

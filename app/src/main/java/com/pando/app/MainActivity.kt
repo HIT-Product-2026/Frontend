@@ -17,12 +17,16 @@ import androidx.navigation.fragment.NavHostFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.messaging.FirebaseMessaging
 import com.pando.app.core.network.sse.SseManager
+import com.pando.app.core.location.LocationTrackingController
+import com.pando.app.core.location.LocationNavigationViewModel
+import com.pando.app.core.location.TrackingPreferences
 import com.pando.app.core.session.SessionStartupManager
 import com.pando.app.core.session.SessionState
 import com.pando.app.core.session.StartupSessionResult
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.ActivityMainBinding
 import com.pando.app.features.onboarding.OnboardingPreferences
+import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
 import com.pando.app.features.widget.WidgetNavigationViewModel
 import com.pando.app.features.widget.WidgetPendingIntentFactory
 import dagger.hilt.android.AndroidEntryPoint
@@ -40,11 +44,17 @@ class MainActivity : AppCompatActivity() {
     @Inject
     lateinit var sseManager: SseManager
 
+    @Inject
+    lateinit var trackingPreferences: TrackingPreferences
+
     private val viewModel: MainViewModel by viewModels()
 
     private lateinit var binding: ActivityMainBinding
 
     private val widgetNavigationViewModel: WidgetNavigationViewModel by viewModels()
+    private val locationNavigationViewModel: LocationNavigationViewModel by viewModels()
+
+    private lateinit var navController: NavController
 
     //    override fun onCreate(savedInstanceState: Bundle?) {
 //        installSplashScreen()
@@ -131,7 +141,7 @@ class MainActivity : AppCompatActivity() {
 
         val navHostFragment = supportFragmentManager.findFragmentById(R.id.FragmentContainer) as NavHostFragment
 
-        val navController = navHostFragment.navController
+        navController = navHostFragment.navController
 
         sendFCMToken()
         observeUiEvents()
@@ -181,13 +191,13 @@ class MainActivity : AppCompatActivity() {
                 observeSessionState(navController)
 
                 startupCompleted = true
-                handleWidgetIntent(intent)
+                handleNavigationIntent(intent)
             }
         } else {
             startupCompleted = true
 
             observeSessionState(navController)
-            handleWidgetIntent(intent)
+            handleNavigationIntent(intent)
         }
     }
 
@@ -277,6 +287,23 @@ class MainActivity : AppCompatActivity() {
                             viewModel.socketConnect()
                             sseManager.connect()
                             viewModel.loadCurrentUserProfile(user.id)
+
+                            if (user.mode == UserMode.PUBLIC) {
+                                // PUBLIC là mặc định: khôi phục tracking ngay cả
+                                // khi bản cài cũ chưa có cờ local hoặc cờ đang false.
+                                // PRIVATE từ backend là lựa chọn tắt của người dùng
+                                // và không bị tự động ghi đè.
+                                trackingPreferences.setTrackingEnabled(true)
+                                val started = LocationTrackingController.start(
+                                    this@MainActivity
+                                )
+                                if (!started) {
+                                    trackingPreferences.setTrackingEnabled(false)
+                                }
+                            } else if (user.mode == UserMode.PRIVATE) {
+                                trackingPreferences.setTrackingEnabled(false)
+                                LocationTrackingController.stop(this@MainActivity)
+                            }
                         }
                     }
                 }
@@ -285,6 +312,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleExpiredSession(navController: NavController) {
+        trackingPreferences.setTrackingEnabled(false)
+        LocationTrackingController.stop(this)
         viewModel.socketDisconnect()
         sseManager.disconnect()
 
@@ -338,7 +367,7 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
 
-        handleWidgetIntent(intent)
+        handleNavigationIntent(intent)
     }
 
     @Suppress("DEPRECATION")
@@ -349,14 +378,35 @@ class MainActivity : AppCompatActivity() {
                 return@addOnCompleteListener
             }
 
-            val token = task.result
-            Log.d("FCM_INIT", "FCM Token của tui là: $token")
+            Log.d("FCM_INIT", "FCM token đã được lấy thành công")
         }
     }
 
-    private fun handleWidgetIntent(intent: Intent?) {
-        if (intent?.action == WidgetPendingIntentFactory.ACTION_OPEN_POST_REEL) {
-            widgetNavigationViewModel.goToTarget()
+    private fun handleNavigationIntent(intent: Intent?) {
+        when (intent?.action) {
+            WidgetPendingIntentFactory.ACTION_OPEN_POST_REEL -> {
+                widgetNavigationViewModel.goToTarget()
+                intent.action = null
+            }
+
+            LocationTrackingController.ACTION_OPEN_CURRENT_LOCATION -> {
+                locationNavigationViewModel.requestCurrentLocationFocus()
+
+                if (
+                    userSession.getCurrentUser() != null &&
+                    navController.currentDestination?.id != R.id.centerFragment
+                ) {
+                    val navOptions = NavOptions.Builder()
+                        .setPopUpTo(R.id.nav_graph, true)
+                        .setLaunchSingleTop(true)
+                        .build()
+
+                    navController.navigate(R.id.centerFragment, null, navOptions)
+                }
+
+                // Không xử lý lại cùng action khi Activity được tạo lại do xoay màn hình.
+                intent.action = null
+            }
         }
     }
 }

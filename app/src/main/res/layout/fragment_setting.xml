@@ -20,7 +20,6 @@
             android:layout_alignParentStart="true"
             android:layout_alignParentTop="true"
             android:layout_marginTop="@dimen/_9sdp"
-            android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
             android:padding="@dimen/_12sdp"
@@ -127,14 +126,28 @@
             android:padding="@dimen/_10sdp">
 
             <TextView
+                android:id="@+id/privacyBtn"
                 style="@style/MenuTextStyle"
                 android:text="Quyền riêng tư" />
 
+            <View style="@style/MenuDivider" />
+
             <TextView
+                android:id="@+id/appearanceBtn"
+                style="@style/MenuTextStyle"
+                android:text="Giao diện" />
+
+            <View style="@style/MenuDivider" />
+
+            <TextView
+                android:id="@+id/blockedAccountsBtn"
                 style="@style/MenuTextStyle"
                 android:text="Tài khoản đã chặn" />
 
+            <View style="@style/MenuDivider" />
+
             <TextView
+                android:id="@+id/shareProfileBtn"
                 style="@style/MenuTextStyle"
                 android:layout_marginBottom="0dp"
                 android:text="Chia sẻ hồ sơ" />
@@ -163,18 +176,28 @@
             android:padding="@dimen/_10sdp">
 
             <TextView
+                android:id="@+id/aboutBtn"
                 style="@style/MenuTextStyle"
                 android:text="Giới thiệu" />
 
+            <View style="@style/MenuDivider" />
+
             <TextView
+                android:id="@+id/rateBtn"
                 style="@style/MenuTextStyle"
                 android:text="Đánh giá" />
 
+            <View style="@style/MenuDivider" />
+
             <TextView
+                android:id="@+id/reportIssueBtn"
                 style="@style/MenuTextStyle"
                 android:text="Báo cáo sự cố" />
 
+            <View style="@style/MenuDivider" />
+
             <TextView
+                android:id="@+id/privacyPolicyBtn"
                 style="@style/MenuTextStyle"
                 android:layout_marginBottom="0dp"
                 android:text="Chính sách quyền riêng tư" />
@@ -193,9 +216,12 @@
             android:padding="@dimen/_10sdp">
 
             <TextView
+                android:id="@+id/deleteAccountBtn"
                 style="@style/MenuTextStyle"
                 android:text="Xóa tài khoản"
                 android:textColor="@android:color/holo_red_light" />
+
+            <View style="@style/MenuDivider" />
 
             <TextView
                 android:id="@+id/logoutBtn"

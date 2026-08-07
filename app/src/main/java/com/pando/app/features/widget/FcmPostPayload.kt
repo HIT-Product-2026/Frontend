@@ -1,6 +1,6 @@
 package com.pando.app.features.widget
 
-import java.util.UUID
+import com.pando.app.features.home.data.model.entity.enumEntity.NsfwStatus
 
 data class FcmPostPayload(
     val senderId: String,
@@ -13,7 +13,9 @@ data class FcmPostPayload(
     val longitude: Double?,
     val provinceName: String,
     val wardName: String,
-    val caption: String
+    val caption: String,
+    val typePost: String,
+    val nsfw: NsfwStatus? = null
 ) {
     companion object {
         fun from(data: Map<String, String>): FcmPostPayload? {
@@ -32,8 +34,29 @@ data class FcmPostPayload(
                 longitude = data["longitude"]?.toDoubleOrNull(),
                 provinceName = data["province_name"].orEmpty(),
                 caption = data["caption"].orEmpty(),
-                wardName = data["ward_name"].orEmpty()
+                wardName = data["ward_name"].orEmpty(),
+                typePost = data["type_post"].orEmpty(),
+                nsfw = parseNsfw(
+                    data["nsfw"]
+                        ?: data["is_nsfw"]
+                        ?: data["nsfw_status"]
+                )
             )
+        }
+
+        private fun parseNsfw(value: String?): NsfwStatus? {
+            val normalized = value
+                ?.trim()
+                ?.removePrefix("NsfwStatus.")
+                ?.uppercase()
+                ?: return null
+
+            return when (normalized) {
+                "TRUE", "1", "YES" -> NsfwStatus.TRUE
+                "FALSE", "0", "NO" -> NsfwStatus.FALSE
+                "PROCESSING", "PENDING" -> NsfwStatus.PROCESSING
+                else -> null
+            }
         }
     }
 }

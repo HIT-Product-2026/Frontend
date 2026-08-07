@@ -18,6 +18,7 @@ class WidgetStorage(context: Context) {
         private const val KEY_LONGITUDE = "longitude"
         private const val KEY_LATITUDE = "latitude"
         private const val KEY_TYPE = "type"
+        private const val KEY_POST_TYPE = "type_post"
     }
 
     private val pref = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -35,6 +36,7 @@ class WidgetStorage(context: Context) {
             putString(KEY_WARD_NAME, payload.wardName)
             putString(KEY_LATITUDE, payload.latitude?.toString().orEmpty())
             putString(KEY_LONGITUDE, payload.longitude?.toString().orEmpty())
+            putString(KEY_POST_TYPE, payload.typePost)
         }
     }
 
@@ -59,7 +61,8 @@ class WidgetStorage(context: Context) {
             longitude = pref.getString(KEY_LONGITUDE, null)?.toDoubleOrNull(),
             provinceName = pref.getString(KEY_PROVINCE_NAME, "").orEmpty(),
             caption = pref.getString(KEY_CONTENT, "") .orEmpty(),
-            wardName = pref.getString(KEY_WARD_NAME, "").orEmpty()
+            wardName = pref.getString(KEY_WARD_NAME, "").orEmpty(),
+            typePost = pref.getString(KEY_POST_TYPE, "").orEmpty()
         )
     }
 
