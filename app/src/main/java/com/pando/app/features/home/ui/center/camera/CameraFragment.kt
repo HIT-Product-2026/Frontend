@@ -101,6 +101,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private var currentZoomRatio = 1f
     private var zoomStops = listOf(1f)
     private var zoomStopIndex = 0
+    private var isZoomGestureActive = false
     private var zoomGestureDetector: ScaleGestureDetector? = null
     private var zoomAnimator: ValueAnimator? = null
     private var videoIndicatorAnimator: ObjectAnimator? = null
@@ -339,6 +340,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         closeCaptionEditor()
         releaseVideoPreview()
         zoomAnimator?.cancel()
+        setZoomGestureActive(false)
         orientationEventListener?.disable()
         binding.cameraContainer.visibility = View.GONE
 
@@ -470,6 +472,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
         // Không tiếp tục thay đổi zoom khi preview ảnh/video gửi đang hiển thị.
         zoomAnimator?.cancel()
+        setZoomGestureActive(false)
         binding.viewFinder.visibility = View.INVISIBLE
 
         when (type) {
@@ -592,7 +595,11 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
                 override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
                     zoomAnimator?.cancel()
-                    return camera != null && binding.viewFinder.visibility == View.VISIBLE
+                    val canZoom = camera != null && binding.viewFinder.visibility == View.VISIBLE
+                    if (canZoom) {
+                        setZoomGestureActive(true)
+                    }
+                    return canZoom
                 }
 
                 override fun onScale(detector: ScaleGestureDetector): Boolean {
@@ -612,6 +619,16 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.viewFinder.setOnTouchListener { _, event ->
             if (event.actionMasked == MotionEvent.ACTION_DOWN) {
                 dismissCaptionFocusFromOutside()
+            } else if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+                // Khóa ViewPager ngay khi xuất hiện ngón thứ hai để pager
+                // không giành touch stream trước khi ScaleGestureDetector
+                // bắt đầu phát sinh onScale().
+                setZoomGestureActive(true)
+            } else if (
+                event.actionMasked == MotionEvent.ACTION_UP ||
+                event.actionMasked == MotionEvent.ACTION_CANCEL
+            ) {
+                setZoomGestureActive(false)
             }
 
             detector.onTouchEvent(event)
@@ -619,6 +636,14 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             // ACTION_POINTER_* và ACTION_UP.
             true
         }
+    }
+
+    private fun setZoomGestureActive(active: Boolean) {
+        if (isZoomGestureActive == active) return
+
+        isZoomGestureActive = active
+        binding.viewFinder.parent?.requestDisallowInterceptTouchEvent(active)
+        (parentFragment as? CenterFragment)?.setCameraZooming(active)
     }
 
     private fun dismissCaptionFocusFromOutside() {
@@ -1089,6 +1114,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         releaseVideoPreview()
         zoomAnimator?.cancel()
         zoomAnimator = null
+        setZoomGestureActive(false)
         zoomGestureDetector = null
         binding.viewFinder.setOnTouchListener(null)
         orientationEventListener?.disable()

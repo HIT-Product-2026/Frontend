@@ -37,6 +37,7 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
     private val locationNavigationViewModel: LocationNavigationViewModel by activityViewModels()
     private val avatarViewModel: AvatarViewModel by activityViewModels()
     private var isCameraInSendMode = false
+    private var isCameraZooming = false
     private var isPostReelMessageComposerOpen = false
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -132,6 +133,11 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
         updatePagerSwipeState(binding.verticalViewPager.currentItem)
     }
 
+    fun setCameraZooming(isZooming: Boolean) {
+        isCameraZooming = isZooming
+        updatePagerSwipeState(binding.verticalViewPager.currentItem)
+    }
+
     fun setPostReelMessageComposerOpen(isOpen: Boolean) {
         isPostReelMessageComposerOpen = isOpen
         updatePagerSwipeState(binding.verticalViewPager.currentItem)
@@ -140,7 +146,7 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
     private fun updatePagerSwipeState(position: Int) {
         binding.verticalViewPager.isUserInputEnabled =
             position != PAGE_MAP &&
-                !(position == PAGE_CAMERA && isCameraInSendMode) &&
+                !(position == PAGE_CAMERA && (isCameraInSendMode || isCameraZooming)) &&
                 !(position == PAGE_POST_REEL && isPostReelMessageComposerOpen)
 
         disablePagerKeyboardFocus()
