@@ -135,7 +135,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     override fun initView() {
         setupCaptionKeyboardFocus()
         setupOutsideFocusDismissal()
-        updateCaptureButton()
+        syncCaptureModeUi()
+        binding.switchModeContainer.doOnLayout {
+            syncCaptureModeUi()
+        }
     }
 
     override fun initActionView() {
@@ -303,7 +306,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         super.onResume()
         orientationEventListener?.enable()
         binding.cameraContainer.visibility = View.VISIBLE
-        updateCaptureButton()
+        syncCaptureModeUi()
+        binding.switchModeContainer.doOnLayout {
+            syncCaptureModeUi()
+        }
         startCamera()
     }
 
@@ -487,6 +493,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
         binding.functionsBar.visibility = View.VISIBLE
         binding.switchModeContainer.visibility = View.VISIBLE
+
+        // View có thể vừa được tạo lại sau khi quay sang Fragment khác;
+        // đồng bộ thumb theo mode thật mà CameraX đang dùng.
+        syncCaptureModeUi()
 
         binding.sendFunctionsBar.visibility = View.GONE
         binding.historyBtn.visibility = View.VISIBLE
@@ -881,21 +891,37 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         if (captureMode == mode || activeRecording != null) return
 
         captureMode = mode
-        updateCaptureButton(animateVideoIndicator = mode == CaptureMode.VIDEO)
+        syncCaptureModeUi(animate = true)
         animateCaptureButtonTransition()
 
-        val thumbTranslation = if (mode == CaptureMode.VIDEO) {
+        startCamera()
+    }
+
+    /**
+     * Giữ switch và nút chụp khớp với captureMode.
+     * ViewPager có thể tạo lại view của CameraFragment trong khi instance
+     * Fragment vẫn giữ mode VIDEO, khiến thumb quay về vị trí PHOTO mặc định.
+     */
+    private fun syncCaptureModeUi(animate: Boolean = false) {
+        val targetTranslation = if (captureMode == CaptureMode.VIDEO) {
             binding.btnTabVideo.x - binding.btnTabCamera.x
         } else {
             0f
         }
 
-        binding.viewThumb.animate()
-            .translationX(thumbTranslation)
-            .setDuration(200L)
-            .start()
+        binding.viewThumb.animate().cancel()
+        if (animate) {
+            binding.viewThumb.animate()
+                .translationX(targetTranslation)
+                .setDuration(200L)
+                .start()
+        } else {
+            binding.viewThumb.translationX = targetTranslation
+        }
 
-        startCamera()
+        updateCaptureButton(
+            animateVideoIndicator = animate && captureMode == CaptureMode.VIDEO
+        )
     }
 
     private fun requestAudioAndRecord() {
