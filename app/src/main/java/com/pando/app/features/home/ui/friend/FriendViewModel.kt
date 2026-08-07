@@ -128,7 +128,8 @@ class FriendViewModel @Inject constructor(
                     _searchResults.value = result.data.data.items.map { item ->
                         SearchItemModel(
                             item.id,
-                            item.displayName
+                            item.displayName,
+                            avatarUrl = item.avatarUrl
                         )
                     }
 
@@ -156,7 +157,8 @@ class FriendViewModel @Inject constructor(
                     val friendList = result.data.data.items.map { item ->
                         FriendItemModel(
                             item.id,
-                            item.displayName.ifEmpty { item.username }
+                            item.displayName.ifEmpty { item.username },
+                            avatarUrl = item.avatarUrl
                         )
                     }
                     _friends.value = friendList
@@ -178,7 +180,8 @@ class FriendViewModel @Inject constructor(
                         SentRequestItemModel(
                             item.receiver.id,
                             item.receiver.displayName.ifEmpty { item.receiver.username },
-                            item.id
+                            item.id,
+                            avatarUrl = item.receiver.avatarUrl
                         )
                     }
                     DataResult.Success(FriendResult.SentRequestedUsersSuccess(result.data))
@@ -197,7 +200,8 @@ class FriendViewModel @Inject constructor(
                         ReceivedRequestItemModel(
                             item.requester.id,
                             item.requester.displayName.ifEmpty { item.requester.username },
-                            item.id
+                            item.id,
+                            avatarUrl = item.requester.avatarUrl
                         )
                     }
                     DataResult.Success(FriendResult.ReceivedRequestedUsersSuccess(result.data))
@@ -231,7 +235,8 @@ class FriendViewModel @Inject constructor(
                                 name = request.receiver.displayName.ifEmpty {
                                     request.receiver.username
                                 },
-                                friendshipId = request.id
+                                friendshipId = request.id,
+                                avatarUrl = request.receiver.avatarUrl
                             )
                         }
                     }
@@ -272,7 +277,8 @@ class FriendViewModel @Inject constructor(
                                 id = request.requester.id,
                                 name = request.requester.displayName.ifEmpty {
                                     request.requester.username
-                                }
+                                },
+                                avatarUrl = request.requester.avatarUrl
                             )
                         }
                         _friendTotal.update { it + 1 }

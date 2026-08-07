@@ -58,9 +58,16 @@ class ChatMenuViewModel @Inject constructor(
             item.id == response.id
         } ?: return
 
+        val recipient = if (getCurrentUserId() == response.user1.id) {
+            response.user2
+        } else {
+            response.user1
+        }
+
         val updatedItem = oldItem.copy(
             previewChat = response.lastMessageContent,
-            time = response.lastMessageTime?.toLocalDateTime()
+            time = response.lastMessageTime?.toLocalDateTime(),
+            avatarUrl = recipient.avatarUrl ?: oldItem.avatarUrl
         )
 
         val updatedList = _conversations.value
@@ -87,17 +94,28 @@ class ChatMenuViewModel @Inject constructor(
                     val conversations = data.map { item ->
                         ChatMenuItemModel(
                             id = item.id,
-                            senderId =
-                                if (getCurrentUserId()?.equals(item.user1.id) == true) item.user1.id else item.user2.id,
-                            recipientId =
-                                if (getCurrentUserId()?.equals(item.user1.id) == true) item.user2.id else item.user1.id,
+                            senderId = if (getCurrentUserId()?.equals(item.user1.id) == true) {
+                                item.user1.id
+                            } else {
+                                item.user2.id
+                            },
+                            recipientId = if (getCurrentUserId()?.equals(item.user1.id) == true) {
+                                item.user2.id
+                            } else {
+                                item.user1.id
+                            },
                             name = if (getCurrentUserId()?.equals(item.user1.id) == true) {
                                 item.user2.displayName.ifEmpty { item.user2.username }
                             } else {
                                 item.user1.displayName.ifEmpty { item.user1.username }
                             },
                             previewChat = item.lastMessageContent,
-                            time = item.lastMessageTime?.toLocalDateTime()
+                            time = item.lastMessageTime?.toLocalDateTime(),
+                            avatarUrl = if (getCurrentUserId()?.equals(item.user1.id) == true) {
+                                item.user2.avatarUrl
+                            } else {
+                                item.user1.avatarUrl
+                            }
                         )
                     }
 

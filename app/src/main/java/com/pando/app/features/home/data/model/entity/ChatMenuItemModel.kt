@@ -10,5 +10,6 @@ data class ChatMenuItemModel (
     val recipientId: UUID,
     val name: String?,
     val previewChat : String?,
-    val time : LocalDateTime?
+    val time : LocalDateTime?,
+    val avatarUrl: String? = null
 ) : BaseItemModel

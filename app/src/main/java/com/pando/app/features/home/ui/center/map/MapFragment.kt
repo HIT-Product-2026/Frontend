@@ -412,7 +412,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                     ) { avatars, friends ->
                         avatarMap = avatars
                         friends.map { friend ->
-                            friend.copy(avatarUrl = avatars[friend.id])
+                            friend.copy(avatarUrl = avatars[friend.id] ?: friend.avatarUrl)
                         }
                     }.collect { friends ->
                         renderFriendsState(friends)
@@ -421,7 +421,12 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
                 launch {
                     mapViewModel.friends.collect { friends ->
-                        avatarViewModel.loadAvatars(friends.map { it.id })
+                        // DTO mới đã có URL; chỉ fallback API cho bạn cũ chưa có URL.
+                        avatarViewModel.loadAvatars(
+                            friends
+                                .filter { it.avatarUrl.isNullOrBlank() }
+                                .map { it.id }
+                        )
                     }
                 }
             }
@@ -474,7 +479,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     ) {
         val style = loadedStyle ?: return
         val friends = synchronizedFriends ?: mapViewModel.friends.value.map { friend ->
-            friend.copy(avatarUrl = avatarMap[friend.id])
+            friend.copy(avatarUrl = avatarMap[friend.id] ?: friend.avatarUrl)
         }
 
         markerRenderer.renderFriends(

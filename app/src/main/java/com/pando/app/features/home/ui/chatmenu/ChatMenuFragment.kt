@@ -41,7 +41,7 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name.orEmpty()
 
-            bindAvatar(itemBinding.profileIcon, item.recipientId)
+            bindAvatar(itemBinding.profileIcon, item.recipientId, item.avatarUrl)
 
             itemBinding.chatPreviewTV.text =
                 item.previewChat?.takeIf { it.isNotBlank() } ?: "Hãy bắt đầu cuộc trò chuyện!"
@@ -53,7 +53,8 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
                     conversationId = item.id,
                     senderId = item.senderId,
                     recipientId = item.recipientId,
-                    name = item.name.orEmpty()
+                    name = item.name.orEmpty(),
+                    avatarUrl = item.avatarUrl.orEmpty()
                 )
                 findNavController().navigate(action)
             }
@@ -117,10 +118,6 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
                 launch {
                     chatMenuViewModel.conversations.collect { conversations ->
                         chatMenuAdapter.submitList(conversations)
-
-                        avatarViewModel.loadAvatars(
-                            conversations.map { it.recipientId }
-                        )
                     }
                 }
             }
@@ -134,12 +131,12 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
         }
     }
 
-    private fun bindAvatar(imageView: ImageView, userId: UUID) {
-        val avatar = avatarMap[userId]
+    private fun bindAvatar(imageView: ImageView, userId: UUID, avatarUrl: String?) {
+        val avatar = avatarUrl?.takeIf(String::isNotBlank) ?: avatarMap[userId]
 
         imageView.loadAvatar(avatar)
 
-        if (avatar == null) {
+        if (avatar.isNullOrBlank()) {
             avatarViewModel.loadAvatar(userId)
         }
     }

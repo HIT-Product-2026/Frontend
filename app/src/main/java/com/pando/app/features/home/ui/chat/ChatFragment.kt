@@ -76,11 +76,15 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
         chatViewModel.setCurrentConversationId(args.conversationId)
         chatViewModel.setCurrentRecipientId(args.recipientId)
 
-        avatarViewModel.loadAvatar(args.recipientId)
+        if (args.avatarUrl.isBlank()) {
+            // Chỉ gọi API cho dữ liệu hội thoại cũ chưa có avatarUrl.
+            avatarViewModel.loadAvatar(args.recipientId)
+        }
     }
 
     override fun initView() {
         binding.toolbarName.text = args.name
+        binding.toolBarAvatar.loadAvatar(args.avatarUrl.takeIf(String::isNotBlank))
         setupKeyboardInsets()
 
         setupRecyclerView()
@@ -106,7 +110,10 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     avatarViewModel.avatars.collect { avatars ->
-                        avatars[args.recipientId]?.let { avatar ->
+                        val avatar = args.avatarUrl
+                            .takeIf(String::isNotBlank)
+                            ?: avatars[args.recipientId]
+                        avatar?.let {
                             chatAdapter.updateRecipientAvatar(avatar)
                             binding.toolBarAvatar.loadAvatar(avatar)
                         }

@@ -167,6 +167,10 @@
             android:name="name"
             android:defaultValue=""
             app:argType="string" />
+        <argument
+            android:name="avatarUrl"
+            android:defaultValue=""
+            app:argType="string" />
     </fragment>
     <dialog
         android:id="@+id/bottomSheetEditAvatarFragment"

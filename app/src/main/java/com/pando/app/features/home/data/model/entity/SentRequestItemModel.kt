@@ -8,5 +8,6 @@ data class SentRequestItemModel (
     val name: String,
     val friendshipId: UUID,
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val avatarUrl: String? = null
 ) : BaseItemModel

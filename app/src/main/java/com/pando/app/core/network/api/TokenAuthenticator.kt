@@ -82,7 +82,9 @@ class TokenAuthenticator @Inject constructor(
                         username = refreshedUser.username,
                         displayName = refreshedUser.displayName,
                         mode = refreshedUser.mode,
-                        avatar = previousUser?.avatar,
+                        avatar = refreshedUser.avatarUrl
+                            ?.takeIf(String::isNotBlank)
+                            ?: previousUser?.avatar,
                         profile = previousUser?.profile
                     )
                 )

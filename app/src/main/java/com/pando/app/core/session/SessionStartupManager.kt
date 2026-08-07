@@ -85,7 +85,9 @@ class SessionStartupManager @Inject constructor(
                         username = refreshedUser.username,
                         displayName = refreshedUser.displayName,
                         mode = refreshedUser.mode,
-                        avatar = previousUser?.avatar,
+                        avatar = refreshedUser.avatarUrl
+                            ?.takeIf(String::isNotBlank)
+                            ?: previousUser?.avatar,
                         profile = previousUser?.profile
                     )
                 )
@@ -121,6 +123,8 @@ class SessionStartupManager @Inject constructor(
             val userName = jwt.getClaim("username").asString()
             val displayName = jwt.getClaim("displayName").asString()
             val userMode = jwt.getClaim("mode").asString()
+            val avatarUrl = jwt.getClaim("avatarUrl").asString()
+                ?: jwt.getClaim("avatar_url").asString()
 
             val mode: UserMode? = try {
                 if (userMode != null) {
@@ -142,7 +146,9 @@ class SessionStartupManager @Inject constructor(
                     username = userName,
                     displayName = displayName,
                     mode = mode,
-                    avatar = previousUser?.avatar,
+                    avatar = avatarUrl
+                        ?.takeIf(String::isNotBlank)
+                        ?: previousUser?.avatar,
                     profile = previousUser?.profile
                 )
             )

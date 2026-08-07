@@ -139,7 +139,8 @@ class MapViewModel @Inject constructor(
                             FriendItemModel(
                                 id = user.id,
                                 name = user.displayName.ifEmpty { user.username },
-                                avatarUrl = currentFriend?.avatarUrl,
+                                avatarUrl = user.avatarUrl?.takeIf(String::isNotBlank)
+                                    ?: currentFriend?.avatarUrl,
                                 longitude = currentFriend?.longitude,
                                 latitude = currentFriend?.latitude,
                                 lastActiveAt = currentFriend?.lastActiveAt

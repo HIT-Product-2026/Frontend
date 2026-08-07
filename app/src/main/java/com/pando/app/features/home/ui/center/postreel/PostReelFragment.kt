@@ -92,7 +92,7 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
             val mediaUrl = item.imageUrl
             val province = item.locationName
 
-            bindAvatar(itemBinding.profileIcon, item.user.id)
+            bindAvatar(itemBinding.profileIcon, item.user.id, item.user.avatarUrl)
 
             itemBinding.nameTV.text = item.user.displayName.ifEmpty { item.user.username }
 
@@ -420,12 +420,12 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         }
     }
 
-    private fun bindAvatar(imageView: ImageView, userId: UUID) {
-        val avatar = avatarMap[userId]
+    private fun bindAvatar(imageView: ImageView, userId: UUID, avatarUrl: String?) {
+        val avatar = avatarUrl?.takeIf(String::isNotBlank) ?: avatarMap[userId]
 
         imageView.loadAvatar(avatar)
 
-        if (avatar == null) {
+        if (avatar.isNullOrBlank()) {
             avatarViewModel.loadAvatar(userId)
         }
     }

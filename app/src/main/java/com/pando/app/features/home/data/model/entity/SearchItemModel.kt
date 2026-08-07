@@ -7,5 +7,6 @@ data class SearchItemModel (
     override val id: UUID,
     val name: String,
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val avatarUrl: String? = null
 ) : BaseItemModel

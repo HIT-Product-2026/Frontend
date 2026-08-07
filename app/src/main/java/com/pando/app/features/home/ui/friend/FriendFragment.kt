@@ -268,7 +268,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            bindAvatar(itemBinding.profileIcon, item.id)
+            bindAvatar(itemBinding.profileIcon, item.id, item.avatarUrl)
 
             itemBinding.functionBtn.setOnClickListener {
                 showFriendActions(itemBinding, item)
@@ -281,7 +281,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            bindAvatar(itemBinding.profileIcon, item.id)
+            bindAvatar(itemBinding.profileIcon, item.id, item.avatarUrl)
 
             itemBinding.addFriendBtn.setOnClickListener {
                 friendViewModel.requestFriend(item.id)
@@ -294,7 +294,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            bindAvatar(itemBinding.profileIcon, item.id)
+            bindAvatar(itemBinding.profileIcon, item.id, item.avatarUrl)
 
             itemBinding.cancelBtn.setOnClickListener {
                 friendViewModel.rejectFriend(item.friendshipId)
@@ -307,7 +307,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            bindAvatar(itemBinding.profileIcon, item.id)
+            bindAvatar(itemBinding.profileIcon, item.id, item.avatarUrl)
 
             itemBinding.cancelBtn.setOnClickListener {
                 friendViewModel.rejectFriend(item.friendshipId)
@@ -374,10 +374,6 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             binding.sentFriendRequestLayout.visibility = View.VISIBLE
 
             sentRequestedAdapter.submitList(dataItems)
-
-            avatarViewModel.loadAvatars(
-                dataItems.map { it.id }
-            )
         } else {
             binding.sentFriendRequestLayout.visibility = View.GONE
             sentRequestedAdapter.submitList(emptyList())
@@ -390,10 +386,6 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
                 View.VISIBLE
 
             receivedRequestedAdapter.submitList(dataItems)
-
-            avatarViewModel.loadAvatars(
-                dataItems.map { it.id }
-            )
         } else {
             binding.receivedFriendRequestLayout.visibility = View.GONE
             receivedRequestedAdapter.submitList(emptyList())
@@ -405,10 +397,6 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             binding.resultLayout.visibility = View.VISIBLE
 
             searchItemAdapter.submitList(searchItems)
-
-            avatarViewModel.loadAvatars(
-                searchItems.map { it.id }
-            )
         } else {
             binding.resultLayout.visibility = View.GONE
             searchItemAdapter.submitList(emptyList())
@@ -453,10 +441,6 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             }
 
             friendsItemAdapter.submitList(displayedItems)
-
-            avatarViewModel.loadAvatars(
-                displayedItems.map { it.id }
-            )
         } else {
             binding.friendNumberText.visibility = View.GONE
             binding.friendsLayout.visibility = View.GONE
@@ -546,8 +530,6 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             View.MeasureSpec.UNSPECIFIED
         )
 
-        // sdp values can become very wide on high-density phones. Keep this
-        // action menu compact and leave enough room for the labels/icons.
         val maxPopupWidth = (view.root.width * 0.64f).toInt()
         val popupWidth = popupBinding.root.measuredWidth
             .coerceAtMost(maxPopupWidth)
@@ -558,12 +540,12 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         popupWindow.showAsDropDown(view.root, xOffset, -20)
     }
 
-    private fun bindAvatar(imageView: ImageView, userId: UUID) {
-        val avatar = avatarMap[userId]
+    private fun bindAvatar(imageView: ImageView, userId: UUID, avatarUrl: String?) {
+        val avatar = avatarUrl?.takeIf(String::isNotBlank) ?: avatarMap[userId]
 
         imageView.loadAvatar(avatar)
 
-        if (avatar == null) {
+        if (avatar.isNullOrBlank()) {
             avatarViewModel.loadAvatar(userId)
         }
     }
