@@ -2,6 +2,8 @@ package com.pando.app.features.home.ui.center.camera
 
 import android.annotation.SuppressLint
 import android.Manifest
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
@@ -12,6 +14,7 @@ import android.util.Log
 import android.util.Rational
 import android.view.MotionEvent
 import android.view.OrientationEventListener
+import android.view.ScaleGestureDetector
 import android.view.Surface
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
@@ -95,7 +98,11 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
     private var captureMode = CaptureMode.PHOTO
     private var isFlashEnabled = false
-    private var zoomStep = 0
+    private var currentZoomRatio = 1f
+    private var zoomStops = listOf(1f)
+    private var zoomStopIndex = 0
+    private var zoomGestureDetector: ScaleGestureDetector? = null
+    private var zoomAnimator: ValueAnimator? = null
     private var videoIndicatorAnimator: ObjectAnimator? = null
 
     private var videoCapture: VideoCapture<Recorder>? = null
@@ -137,6 +144,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     override fun initView() {
         setupCaptionKeyboardFocus()
         setupOutsideFocusDismissal()
+        setupZoomGesture()
         syncCaptureModeUi()
         updateFlashButton()
         updateZoomButton()
@@ -330,6 +338,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     override fun onPause() {
         closeCaptionEditor()
         releaseVideoPreview()
+        zoomAnimator?.cancel()
         orientationEventListener?.disable()
         binding.cameraContainer.visibility = View.GONE
 
@@ -459,6 +468,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private fun switchToSendMode(mediaUri: Uri, type: TypePost) {
         (parentFragment as? CenterFragment)?.setCameraSendMode(true)
 
+        // Không tiếp tục thay đổi zoom khi preview ảnh/video gửi đang hiển thị.
+        zoomAnimator?.cancel()
         binding.viewFinder.visibility = View.INVISIBLE
 
         when (type) {
@@ -547,7 +558,6 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private fun setupOutsideFocusDismissal() {
         val outsideViews = listOf(
             binding.root,
-            binding.viewFinder,
             binding.imgPreviewCaptured,
             binding.videoPreviewCaptured,
             binding.switchModeContainer,
@@ -573,6 +583,41 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
                 false
             }
+        }
+    }
+
+    private fun setupZoomGesture() {
+        val detector = ScaleGestureDetector(
+            requireContext(),
+            object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                    zoomAnimator?.cancel()
+                    return camera != null && binding.viewFinder.visibility == View.VISIBLE
+                }
+
+                override fun onScale(detector: ScaleGestureDetector): Boolean {
+                    applyZoomRatio(
+                        // ScaleGestureDetector reports the factor since the
+                        // previous event, so accumulate it ourselves instead
+                        // of reading CameraX's asynchronously updated state.
+                        ratio = currentZoomRatio * detector.scaleFactor,
+                        updatePresetIndex = true
+                    )
+                    return true
+                }
+            }
+        )
+
+        zoomGestureDetector = detector
+        binding.viewFinder.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                dismissCaptionFocusFromOutside()
+            }
+
+            detector.onTouchEvent(event)
+            // Giữ toàn bộ pointer stream để detector nhận được
+            // ACTION_POINTER_* và ACTION_UP.
+            true
         }
     }
 
@@ -792,24 +837,89 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     private fun cycleZoom() {
-        zoomStep = (zoomStep + 1) % ZOOM_RATIOS.size
-        applyZoom()
+        if (zoomStops.isEmpty() || camera == null) return
+
+        zoomStopIndex = (zoomStopIndex + 1) % zoomStops.size
+        animateZoomTo(zoomStops[zoomStopIndex])
     }
 
-    private fun applyZoom() {
+    private fun rebuildZoomStops() {
         val zoomState = camera?.cameraInfo?.zoomState?.value
-        val requestedRatio = ZOOM_RATIOS[zoomStep]
-        val appliedRatio = requestedRatio.coerceIn(
-            zoomState?.minZoomRatio ?: 1f,
-            zoomState?.maxZoomRatio ?: requestedRatio
+            ?: return
+
+        zoomStops = CameraZoomPresets.build(
+            minZoomRatio = zoomState.minZoomRatio,
+            maxZoomRatio = zoomState.maxZoomRatio
+        )
+        currentZoomRatio = currentZoomRatio.coerceIn(
+            zoomState.minZoomRatio,
+            zoomState.maxZoomRatio
+        )
+        zoomStopIndex = CameraZoomPresets.nearestIndex(zoomStops, currentZoomRatio)
+    }
+
+    private fun animateZoomTo(targetRatio: Float) {
+        val zoomState = camera?.cameraInfo?.zoomState?.value ?: return
+        val clampedTarget = targetRatio.coerceIn(
+            zoomState.minZoomRatio,
+            zoomState.maxZoomRatio
+        )
+        val startRatio = currentZoomRatio.coerceIn(
+            zoomState.minZoomRatio,
+            zoomState.maxZoomRatio
+        )
+
+        zoomAnimator?.cancel()
+
+        if (kotlin.math.abs(startRatio - clampedTarget) < ZOOM_EPSILON) {
+            applyZoomRatio(clampedTarget, updatePresetIndex = false)
+            return
+        }
+
+        zoomAnimator = ValueAnimator.ofFloat(startRatio, clampedTarget).apply {
+            duration = ZOOM_ANIMATION_DURATION_MILLIS
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { animator ->
+                applyZoomRatio(
+                    ratio = animator.animatedValue as Float,
+                    updatePresetIndex = false
+                )
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (zoomAnimator !== animation) return
+
+                    zoomAnimator = null
+                    applyZoomRatio(clampedTarget, updatePresetIndex = false)
+                }
+
+                override fun onAnimationCancel(animation: Animator) {
+                    if (zoomAnimator === animation) {
+                        zoomAnimator = null
+                    }
+                }
+            })
+            start()
+        }
+    }
+
+    private fun applyZoomRatio(ratio: Float, updatePresetIndex: Boolean) {
+        val zoomState = camera?.cameraInfo?.zoomState?.value ?: return
+        val appliedRatio = ratio.coerceIn(
+            zoomState.minZoomRatio,
+            zoomState.maxZoomRatio
         )
 
         camera?.cameraControl?.setZoomRatio(appliedRatio)
+        currentZoomRatio = appliedRatio
+        if (updatePresetIndex) {
+            zoomStopIndex = CameraZoomPresets.nearestIndex(zoomStops, appliedRatio)
+        }
         updateZoomButton(appliedRatio)
     }
 
-    private fun updateZoomButton(ratio: Float? = null) {
-        val displayedRatio = ratio ?: ZOOM_RATIOS[zoomStep]
+    private fun updateZoomButton(ratio: Float = currentZoomRatio) {
+        val displayedRatio = ratio
         val label = formatZoomRatio(displayedRatio)
         binding.btnZoom.text = label
         binding.btnZoom.contentDescription = "Thu phóng $label"
@@ -817,7 +927,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
     private fun applyCameraControls() {
         applyFlashMode()
-        applyZoom()
+        rebuildZoomStops()
+        applyZoomRatio(currentZoomRatio, updatePresetIndex = false)
     }
 
     private fun formatZoomRatio(ratio: Float): String {
@@ -976,6 +1087,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         videoIndicatorAnimator?.cancel()
         videoIndicatorAnimator = null
         releaseVideoPreview()
+        zoomAnimator?.cancel()
+        zoomAnimator = null
+        zoomGestureDetector = null
+        binding.viewFinder.setOnTouchListener(null)
         orientationEventListener?.disable()
         orientationEventListener = null
 
@@ -1193,6 +1308,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         private const val MAX_RECORDING_DURATION_MILLIS = 10_000L
         private const val MAX_RECORDING_DURATION_NANOS =
             MAX_RECORDING_DURATION_MILLIS * 1_000_000L
-        private val ZOOM_RATIOS = floatArrayOf(1f, 2f, 3f)
+        private const val ZOOM_ANIMATION_DURATION_MILLIS = 220L
+        private const val ZOOM_EPSILON = 0.01f
     }
 }
