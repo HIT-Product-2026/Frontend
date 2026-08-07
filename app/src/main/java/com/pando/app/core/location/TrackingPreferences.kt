@@ -16,7 +16,9 @@ class TrackingPreferences @Inject constructor(
     )
 
     fun isTrackingEnabled(): Boolean =
-        preferences.getBoolean(KEY_TRACKING_ENABLED, false)
+        // Chia sẻ vị trí là trạng thái mặc định. Khi người dùng tắt trong
+        // PrivacyFragment, giá trị false sẽ được lưu lại rõ ràng.
+        preferences.getBoolean(KEY_TRACKING_ENABLED, true)
 
     fun setTrackingEnabled(enabled: Boolean) {
         preferences.edit {

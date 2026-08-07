@@ -288,11 +288,18 @@ class MainActivity : AppCompatActivity() {
                             sseManager.connect()
                             viewModel.loadCurrentUserProfile(user.id)
 
-                            if (
-                                user.mode == UserMode.PUBLIC &&
-                                trackingPreferences.isTrackingEnabled()
-                            ) {
-                                LocationTrackingController.start(this@MainActivity)
+                            if (user.mode == UserMode.PUBLIC) {
+                                // PUBLIC là mặc định: khôi phục tracking ngay cả
+                                // khi bản cài cũ chưa có cờ local hoặc cờ đang false.
+                                // PRIVATE từ backend là lựa chọn tắt của người dùng
+                                // và không bị tự động ghi đè.
+                                trackingPreferences.setTrackingEnabled(true)
+                                val started = LocationTrackingController.start(
+                                    this@MainActivity
+                                )
+                                if (!started) {
+                                    trackingPreferences.setTrackingEnabled(false)
+                                }
                             } else if (user.mode == UserMode.PRIVATE) {
                                 trackingPreferences.setTrackingEnabled(false)
                                 LocationTrackingController.stop(this@MainActivity)
