@@ -1,6 +1,10 @@
 package com.pando.app.features.home.ui.chat
 
+import android.content.Context
 import android.util.Log
+import android.view.MotionEvent
+import android.view.View
+import android.view.inputmethod.InputMethodManager
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
@@ -80,6 +84,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
         setupKeyboardInsets()
 
         setupRecyclerView()
+        setupOutsideFocusDismissal()
         chatViewModel.getMessageList(args.conversationId, args.recipientId)
     }
 
@@ -228,6 +233,48 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
         }
 
         ViewCompat.requestApplyInsets(binding.root)
+    }
+
+    private fun setupOutsideFocusDismissal() {
+        val dismissOnTouch = View.OnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                dismissMessageFocusFromOutside()
+            }
+
+            false
+        }
+
+        binding.root.setOnTouchListener(dismissOnTouch)
+        binding.toolBar.setOnTouchListener(dismissOnTouch)
+        binding.sendBtn.setOnTouchListener(dismissOnTouch)
+
+        binding.messageList.addOnItemTouchListener(
+            object : RecyclerView.SimpleOnItemTouchListener() {
+                override fun onInterceptTouchEvent(
+                    recyclerView: RecyclerView,
+                    event: MotionEvent
+                ): Boolean {
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                        dismissMessageFocusFromOutside()
+                    }
+
+                    return false
+                }
+            }
+        )
+    }
+
+    private fun dismissMessageFocusFromOutside() {
+        val messageEditor = binding.sendMessageET
+        if (!messageEditor.hasFocus()) return
+
+        messageEditor.clearFocus()
+        ViewCompat.getWindowInsetsController(binding.root)
+            ?.hide(WindowInsetsCompat.Type.ime())
+
+        val inputMethodManager =
+            requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        inputMethodManager.hideSoftInputFromWindow(messageEditor.windowToken, 0)
     }
 
 

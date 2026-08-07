@@ -2,8 +2,9 @@
 <androidx.cardview.widget.CardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="@dimen/_150sdp"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
+    android:minWidth="120dp"
     app:cardBackgroundColor="@color/primary2"
     app:cardCornerRadius="@dimen/_15sdp"
     app:cardElevation="@dimen/_4sdp">
@@ -40,7 +41,11 @@
 
         </LinearLayout>
 
-        <View style="@style/MenuDivider" />
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginHorizontal="16dp"
+            android:background="@color/primary1" />
 
         <LinearLayout
             android:id="@+id/btnBlockFriend"

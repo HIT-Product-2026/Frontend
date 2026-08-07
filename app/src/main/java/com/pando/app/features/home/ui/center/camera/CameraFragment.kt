@@ -5,17 +5,21 @@ import android.Manifest
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
+import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
 import android.util.Rational
+import android.view.MotionEvent
 import android.view.OrientationEventListener
 import android.view.Surface
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.LinearInterpolator
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -33,6 +37,9 @@ import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnLayout
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -44,6 +51,7 @@ import com.google.android.exoplayer2.Player
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.material.textfield.TextInputEditText
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.showComingSoon
@@ -83,6 +91,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private var rotation = Surface.ROTATION_0
 
     private var cameraProvider: ProcessCameraProvider? = null
+    private var camera: Camera? = null
 
     private var captureMode = CaptureMode.PHOTO
     private var videoIndicatorAnimator: ObjectAnimator? = null
@@ -92,6 +101,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private var isStartingRecording = false
 
     private var savedMediaFile: File? = null
+    private var shouldKeepCaptionFocus = false
+    private var isCaptionImeVisible = false
+    private var captionFocusRecovery: Runnable? = null
 
     private val audioPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -121,6 +133,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun initView() {
+        setupCaptionKeyboardFocus()
+        setupOutsideFocusDismissal()
         updateCaptureButton()
     }
 
@@ -202,6 +216,34 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
 
             viewModel.sendPost(caption, currentLng, currentLat)
         }
+
+        binding.captionET.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN && !shouldKeepCaptionFocus) {
+                openCaptionComposer()
+            }
+
+            false
+        }
+
+        binding.captionET.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus &&
+                shouldKeepCaptionFocus &&
+                captionFocusRecovery == null
+            ) {
+                scheduleCaptionFocusRecovery()
+            }
+        }
+
+        binding.captionET.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (shouldKeepCaptionFocus &&
+                isCaptionImeVisible &&
+                !binding.captionET.hasFocus() &&
+                captionFocusRecovery == null
+            ) {
+                scheduleCaptionFocusRecovery()
+            }
+        }
+
         lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
@@ -266,6 +308,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun onPause() {
+        closeCaptionEditor()
         releaseVideoPreview()
         orientationEventListener?.disable()
         binding.cameraContainer.visibility = View.GONE
@@ -348,7 +391,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
                     .setViewPort(viewPort)
                     .build()
 
-                provider.bindToLifecycle(viewLifecycleOwner, cameraSelector, useCaseGroup)
+                camera = provider.bindToLifecycle(viewLifecycleOwner, cameraSelector, useCaseGroup)
             } catch (exc: Exception) {
                 Log.e("CameraX", "Khởi tạo camera thất bại", exc)
             }
@@ -423,6 +466,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.historyBtn.visibility = View.GONE
 
         binding.captionLayout.visibility = View.VISIBLE
+        binding.captionLayout.doOnLayout {
+            freezeCaptionWidth()
+        }
     }
 
     private fun switchToCaptureMode() {
@@ -445,8 +491,204 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.sendFunctionsBar.visibility = View.GONE
         binding.historyBtn.visibility = View.VISIBLE
 
+        closeCaptionEditor()
         binding.captionLayout.visibility = View.GONE
         updateCaptureButton()
+    }
+
+    private fun setupCaptionKeyboardFocus() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
+            isCaptionImeVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime())
+
+            if (shouldKeepCaptionFocus &&
+                isCaptionImeVisible &&
+                !binding.captionET.hasFocus() &&
+                captionFocusRecovery == null
+            ) {
+                scheduleCaptionFocusRecovery()
+            }
+
+            windowInsets
+        }
+
+        ViewCompat.requestApplyInsets(binding.root)
+    }
+
+    private fun setupOutsideFocusDismissal() {
+        val outsideViews = listOf(
+            binding.root,
+            binding.viewFinder,
+            binding.imgPreviewCaptured,
+            binding.videoPreviewCaptured,
+            binding.switchModeContainer,
+            binding.btnTabCamera,
+            binding.btnTabVideo,
+            binding.allFunctionsBar,
+            binding.btnGallery,
+            binding.captureButtonContainer,
+            binding.btnCapture,
+            binding.btnSwitchCamera,
+            binding.btnCancel,
+            binding.btnSend,
+            binding.historyBtn
+        )
+
+        outsideViews.forEach { outsideView ->
+            outsideView.setOnTouchListener { _, event ->
+                if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                    dismissCaptionFocusFromOutside()
+                }
+
+                false
+            }
+        }
+    }
+
+    private fun dismissCaptionFocusFromOutside() {
+        val captionEditor = binding.captionET
+        if (!shouldKeepCaptionFocus && !captionEditor.hasFocus()) return
+
+        cancelCaptionFocusRecovery()
+        shouldKeepCaptionFocus = false
+        isCaptionImeVisible = false
+        captionEditor.clearFocus()
+
+        ViewCompat.getWindowInsetsController(binding.root)
+            ?.hide(WindowInsetsCompat.Type.ime())
+
+        val inputMethodManager = context
+            ?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        inputMethodManager?.hideSoftInputFromWindow(captionEditor.windowToken, 0)
+    }
+
+    private fun openCaptionComposer() {
+        shouldKeepCaptionFocus = true
+        binding.captionET.doOnLayout {
+            requestCaptionEditorFocus(showKeyboard = true)
+            if (!binding.captionET.hasFocus()) {
+                scheduleCaptionFocusRecovery()
+            }
+        }
+    }
+
+    private fun scheduleCaptionFocusRecovery() {
+        val captionEditor = binding.captionET
+        captionFocusRecovery?.let(captionEditor::removeCallbacks)
+
+        var attempts = 0
+        lateinit var recovery: Runnable
+        recovery = Runnable {
+            if (!shouldKeepCaptionFocus ||
+                binding.captionLayout.visibility != View.VISIBLE ||
+                captionEditor.hasFocus()
+            ) {
+                if (captionFocusRecovery === recovery) {
+                    captionFocusRecovery = null
+                }
+                return@Runnable
+            }
+
+            requestCaptionEditorFocus(showKeyboard = false, restartInput = true)
+            attempts++
+
+            if (captionEditor.hasFocus() || attempts >= 3) {
+                if (captionFocusRecovery === recovery) {
+                    captionFocusRecovery = null
+                }
+            } else {
+                captionEditor.postDelayed(recovery, 180L)
+            }
+        }
+
+        captionFocusRecovery = recovery
+        captionEditor.post(recovery)
+    }
+
+    private fun cancelCaptionFocusRecovery() {
+        captionFocusRecovery?.let(binding.captionET::removeCallbacks)
+        captionFocusRecovery = null
+    }
+
+    private fun requestCaptionEditorFocus(
+        showKeyboard: Boolean,
+        restartInput: Boolean = false
+    ) {
+        if (!shouldKeepCaptionFocus || binding.captionLayout.visibility != View.VISIBLE) {
+            return
+        }
+
+        val captionEditor = binding.captionET
+        if (!captionEditor.isAttachedToWindow) return
+
+        captionEditor.isFocusableInTouchMode = true
+        captionEditor.isCursorVisible = true
+        if (!captionEditor.hasFocus()) {
+            focusCaptionEditor(captionEditor)
+        }
+        captionEditor.setSelection(captionEditor.text?.length ?: 0)
+
+        captionEditor.post {
+            if (!shouldKeepCaptionFocus ||
+                !captionEditor.isAttachedToWindow ||
+                binding.captionLayout.visibility != View.VISIBLE
+            ) {
+                return@post
+            }
+
+            if (!captionEditor.hasFocus()) {
+                focusCaptionEditor(captionEditor)
+            }
+            captionEditor.isCursorVisible = true
+            captionEditor.setSelection(captionEditor.text?.length ?: 0)
+
+            val inputMethodManager = context
+                ?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                ?: return@post
+
+            if (showKeyboard) {
+                ViewCompat.getWindowInsetsController(binding.root)
+                    ?.show(WindowInsetsCompat.Type.ime())
+                inputMethodManager.showSoftInput(
+                    captionEditor,
+                    InputMethodManager.SHOW_IMPLICIT
+                )
+            } else if (restartInput && captionEditor.hasFocus()) {
+                inputMethodManager.restartInput(captionEditor)
+            }
+        }
+    }
+
+    private fun focusCaptionEditor(captionEditor: TextInputEditText): Boolean {
+        captionEditor.isFocusable = true
+        captionEditor.isFocusableInTouchMode = true
+        val focusedFromTouch = captionEditor.requestFocusFromTouch()
+        val focused = captionEditor.requestFocus()
+        return focusedFromTouch || focused || captionEditor.hasFocus()
+    }
+
+    private fun freezeCaptionWidth() {
+        val captionEditor = binding.captionET
+        val measuredWidth = captionEditor.width
+        if (measuredWidth <= 0) return
+
+        val layoutParams = captionEditor.layoutParams
+        if (layoutParams.width != measuredWidth) {
+            layoutParams.width = measuredWidth
+            captionEditor.layoutParams = layoutParams
+        }
+    }
+
+    private fun closeCaptionEditor() {
+        cancelCaptionFocusRecovery()
+        shouldKeepCaptionFocus = false
+        isCaptionImeVisible = false
+
+        val captionEditor = binding.captionET
+        captionEditor.clearFocus()
+        ViewCompat.getWindowInsetsController(binding.root)
+            ?.hide(WindowInsetsCompat.Type.ime())
+        (context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
+            ?.hideSoftInputFromWindow(captionEditor.windowToken, 0)
     }
 
     private fun updateCaptureButton(
@@ -612,6 +854,11 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     override fun onDestroyView() {
+        cancelCaptionFocusRecovery()
+        shouldKeepCaptionFocus = false
+        isCaptionImeVisible = false
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
+
         videoIndicatorAnimator?.cancel()
         videoIndicatorAnimator = null
         releaseVideoPreview()

@@ -8,6 +8,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
@@ -50,6 +51,7 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
             }
 
             isUserInputEnabled = false
+            post { disablePagerKeyboardFocus() }
         }
     }
 
@@ -140,5 +142,18 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
             position != PAGE_MAP &&
                 !(position == PAGE_CAMERA && isCameraInSendMode) &&
                 !(position == PAGE_POST_REEL && isPostReelMessageComposerOpen)
+
+        disablePagerKeyboardFocus()
+    }
+
+    private fun disablePagerKeyboardFocus() {
+        val pagerRecyclerView = binding.verticalViewPager.getChildAt(0) as? RecyclerView
+            ?: return
+
+        if (pagerRecyclerView.isFocused) {
+            pagerRecyclerView.clearFocus()
+        }
+        pagerRecyclerView.isFocusable = false
+        pagerRecyclerView.isFocusableInTouchMode = false
     }
 }

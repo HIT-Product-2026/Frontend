@@ -3,7 +3,6 @@ package com.pando.app.features.home.ui.center.map
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.PointF
-import android.graphics.RectF
 import android.location.Location
 import android.view.LayoutInflater
 import androidx.appcompat.content.res.AppCompatResources
@@ -81,7 +80,6 @@ class MapMarkerRenderer(
         private const val FOCUSED_FRIEND_MARKER_SIZE = 0.85f
         private const val DOUBLE_FRIEND_DISTANCE_METERS = 30f
         private const val FRIEND_CLUSTER_RADIUS = 30
-        private const val DOUBLE_MARKER_CLUSTER_QUERY_RADIUS = 72f
         private const val FRIEND_CLUSTER_MAX_ZOOM = 15
     }
 
@@ -480,24 +478,12 @@ class MapMarkerRenderer(
             LatLng(marker.latitude, marker.longitude)
         )
 
-        // Query the actual rendered cluster as well as the source positions.
-        // A double marker is wider than a normal marker, so its anchor can be
-        // farther from the cluster center even though the visuals touch.
-        val clusterBounds = RectF(
-            markerPoint.x - DOUBLE_MARKER_CLUSTER_QUERY_RADIUS,
-            markerPoint.y - DOUBLE_MARKER_CLUSTER_QUERY_RADIUS,
-            markerPoint.x + DOUBLE_MARKER_CLUSTER_QUERY_RADIUS,
-            markerPoint.y + DOUBLE_MARKER_CLUSTER_QUERY_RADIUS
-        )
-        val hasNearbyCluster = map.queryRenderedFeatures(
-            clusterBounds,
-            friendClusterCircleLayerId,
-            friendClusterCountLayerId
-        ).any { feature ->
-            (feature.getNumberProperty("point_count")?.toInt() ?: 0) > 2
-        }
-        if (hasNearbyCluster) return true
-
+        // Do not call MapLibre's queryRenderedFeatures here. It is a synchronous
+        // native round-trip that waits for the renderer and can block the UI
+        // thread for several seconds while a style or tile is being rendered.
+        // The source already contains every marker, so projected screen
+        // distances are enough to decide whether the pair visually touches a
+        // neighboring marker.
         val touchesSingleMarker = renderedSingleMarkers.any { otherMarker ->
             screenDistance(map, markerPoint, otherMarker) <= FRIEND_CLUSTER_RADIUS
         }

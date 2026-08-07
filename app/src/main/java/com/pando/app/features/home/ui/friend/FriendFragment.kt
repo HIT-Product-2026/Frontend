@@ -519,6 +519,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             true
         ).apply {
             isOutsideTouchable = true
+            elevation = 8f * resources.displayMetrics.density
 
             setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
 
@@ -545,7 +546,12 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             View.MeasureSpec.UNSPECIFIED
         )
 
+        // sdp values can become very wide on high-density phones. Keep this
+        // action menu compact and leave enough room for the labels/icons.
+        val maxPopupWidth = (view.root.width * 0.64f).toInt()
         val popupWidth = popupBinding.root.measuredWidth
+            .coerceAtMost(maxPopupWidth)
+        popupWindow.width = popupWidth
 
         val xOffset = view.root.width - popupWidth
 
