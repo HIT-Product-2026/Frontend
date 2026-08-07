@@ -20,7 +20,7 @@ class OnboardingFragment :
     private val pages by lazy {
         listOf(
             OnboardingPage(
-                R.drawable.ic_app,
+                R.mipmap.ic_launcher,
                 "Chào mừng đến với PanDo",
                 "Chia sẻ những khoảnh khắc và giữ kết nối với bạn bè."
             ),

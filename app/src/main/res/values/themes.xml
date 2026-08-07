@@ -20,7 +20,7 @@
         <item name="windowSplashScreenBackground">@color/white</item>
 
         <!-- Icon giữa màn hình -->
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_app</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
 
         <!-- Theme thật của app sau khi splash biến mất -->
         <item name="postSplashScreenTheme">@style/Base.Theme.Frontend</item>
