@@ -26,18 +26,18 @@
 
         <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/profileIcon"
-            android:layout_width="55dp"
-            android:layout_height="55dp"
+            android:layout_width="@dimen/_50sdp"
+            android:layout_height="@dimen/_50sdp"
             android:layout_alignParentStart="true"
             android:layout_marginStart="@dimen/_16sdp"
             android:layout_marginTop="@dimen/_16sdp"
             android:layout_marginBottom="@dimen/_16sdp"
-            android:padding="2dp"
+            android:padding="@dimen/_2sdp"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_default_avatar"
             app:shapeAppearanceOverlay="@style/circle"
             app:strokeColor="@color/accent6"
-            app:strokeWidth="2dp" />
+            app:strokeWidth="@dimen/_2sdp" />
 
         <!--        <com.google.android.material.button.MaterialButton-->
         <!--            android:id="@+id/friendBtn"-->
@@ -49,92 +49,85 @@
         <!--            android:textColor="@color/white"-->
         <!--            android:textSize="@dimen/_12sdp"-->
         <!--            app:backgroundTint="@color/accent6"-->
-        <!--            app:cornerRadius="50dp"-->
+        <!--            app:cornerRadius="@dimen/_50sdp"-->
         <!--            app:icon="@drawable/user_profile_group"-->
         <!--            app:iconSize="@dimen/_16sdp"-->
         <!--            app:iconTint="@color/white" />-->
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/notificationBtn"
-            android:layout_width="50dp"
-            android:layout_height="50dp"
-            android:layout_marginBottom="10dp"
-            android:insetLeft="0dp"
-            android:insetTop="0dp"
-            android:insetRight="0dp"
-            android:layout_marginTop="@dimen/_16sdp"
-            android:insetBottom="0dp"
-            app:icon="@drawable/bellring"
-            app:iconGravity="textStart"
-            app:iconPadding="0dp"
-            android:layout_alignParentEnd="true"
-            android:layout_marginEnd="@dimen/_20sdp" />
 
-        <ImageButton
-            android:id="@+id/friendBtn"
-            android:layout_width="50dp"
-            android:layout_height="50dp"
-            android:layout_marginBottom="40dp"
-            android:background="@drawable/bg_btn"
-            android:src="@drawable/_2user"
-            android:tint="@color/white"
-            android:layout_below="@+id/notificationBtn"
-            android:layout_alignParentEnd="true"
-            android:layout_marginEnd="@dimen/_20sdp" />
     </RelativeLayout>
 
-    <com.google.android.material.button.MaterialButton
+    <ImageButton
         android:id="@+id/btnCurrentLocation"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
-        android:layout_marginEnd="30dp"
-        android:layout_marginBottom="40dp"
-        android:insetLeft="0dp"
-        android:insetTop="0dp"
-        android:insetRight="0dp"
-        android:insetBottom="0dp"
-        app:icon="@drawable/pointer"
-        app:iconGravity="textStart"
-        app:iconPadding="0dp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_30sdp"
+        android:layout_marginEnd="@dimen/_20sdp"
+        android:layout_marginBottom="@dimen/_18sdp"
+        android:background="@drawable/bg_map_utility_button"
+        android:contentDescription="Về vị trí hiện tại"
+        android:elevation="@dimen/_3sdp"
+        android:padding="@dimen/_7sdp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/current_point"
         app:layout_constraintBottom_toTopOf="@+id/allFunctionsBar"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <RelativeLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/allFunctionsBar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="@dimen/_40sdp"
-        android:layout_marginBottom="@dimen/_50sdp"
+        android:layout_height="@dimen/_72sdp"
+        android:layout_marginHorizontal="@dimen/_20sdp"
+        android:layout_marginBottom="@dimen/_30sdp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <ImageView
-            android:id="@+id/btnGallery"
-            android:layout_width="@dimen/_32sdp"
-            android:layout_height="@dimen/_32sdp"
-            android:layout_alignParentStart="true"
-            android:layout_centerVertical="true"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/all_image"
-            app:tint="@android:color/white" />
-
-        <ImageView
-            android:id="@+id/btnCapture"
-            android:layout_width="@dimen/_60sdp"
-            android:layout_height="@dimen/_60sdp"
-            android:layout_centerHorizontal="true"
-            android:layout_centerVertical="true"
-            android:src="@drawable/capture_btn" />
-
         <ImageButton
             android:id="@+id/chatBtn"
-            android:layout_width="@dimen/_55sdp"
-            android:layout_height="@dimen/_55sdp"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:background="@drawable/message_icon" />
+            android:layout_width="@dimen/_52sdp"
+            android:layout_height="@dimen/_52sdp"
+            android:background="@drawable/bg_map_floating_button"
+            android:contentDescription="Tin nhắn"
+            android:elevation="@dimen/_3sdp"
+            android:padding="@dimen/_14sdp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/message_circle_filled"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-    </RelativeLayout>
+        <ImageButton
+            android:id="@+id/btnCapture"
+            android:layout_width="@dimen/_108sdp"
+            android:layout_height="@dimen/_60sdp"
+            android:background="@drawable/bg_map_accent_button"
+            android:contentDescription="Mở camera"
+            android:elevation="@dimen/_3sdp"
+            android:padding="@dimen/_16sdp"
+            android:scaleType="centerInside"
+            android:src="@drawable/camera"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="@color/white" />
+
+        <ImageButton
+            android:id="@+id/friendBtn"
+            android:layout_width="@dimen/_52sdp"
+            android:layout_height="@dimen/_52sdp"
+            android:background="@drawable/bg_map_floating_button"
+            android:contentDescription="Bạn bè"
+            android:elevation="@dimen/_3sdp"
+            android:padding="@dimen/_13sdp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/user_plus"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

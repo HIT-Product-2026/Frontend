@@ -19,7 +19,7 @@ class ConversationRepository @Inject constructor(
     private val conversationApi: ConversationApi
 ) : BaseRepository() {
 
-    private val imageCache = ConcurrentHashMap<UUID, ApiResponse<String>>()
+//    private val imageCache = ConcurrentHashMap<UUID, ApiResponse<String>>()
 
     suspend fun getConversation(): DataResult<ApiResponse<ConversationsResponse>> {
         return safeApiCall {
@@ -36,28 +36,28 @@ class ConversationRepository @Inject constructor(
         }
     }
 
-    suspend fun getImageMessage(messageId: UUID): DataResult<ApiResponse<String>> {
-        imageCache[messageId]?.let { cachedAvatar ->
-            return DataResult.Success(cachedAvatar)
-        }
-
-        return when (val result = safeApiCall { conversationApi.getImageMessage(messageId) }) {
-            is DataResult.Success -> {
-                imageCache[messageId] = result.data
-                DataResult.Success(result.data)
-            }
-
-            is DataResult.Error -> result
-        }
-    }
-
-    fun getCachedImage(messageId: UUID): ApiResponse<String>? {
-        return imageCache[messageId]
-    }
-
-    fun clearCache() {
-        imageCache.clear()
-    }
+//    suspend fun getImageMessage(messageId: UUID): DataResult<ApiResponse<String>> {
+//        imageCache[messageId]?.let { cachedAvatar ->
+//            return DataResult.Success(cachedAvatar)
+//        }
+//
+//        return when (val result = safeApiCall { conversationApi.getImageMessage(messageId) }) {
+//            is DataResult.Success -> {
+//                imageCache[messageId] = result.data
+//                DataResult.Success(result.data)
+//            }
+//
+//            is DataResult.Error -> result
+//        }
+//    }
+//
+//    fun getCachedImage(messageId: UUID): ApiResponse<String>? {
+//        return imageCache[messageId]
+//    }
+//
+//    fun clearCache() {
+//        imageCache.clear()
+//    }
 
     suspend fun sendTextMessage(
         conversationId: UUID,

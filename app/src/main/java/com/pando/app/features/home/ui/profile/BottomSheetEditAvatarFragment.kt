@@ -3,6 +3,7 @@ package com.pando.app.features.home.ui.profile
 import android.os.Bundle
 import androidx.core.os.bundleOf
 import com.pando.app.core.base.BaseBottomSheet
+import com.pando.app.core.extensions.showComingSoon
 import com.pando.app.databinding.FragmentBottomSheetEditAvatarBinding
 
 class BottomSheetEditAvatarFragment
@@ -19,6 +20,12 @@ class BottomSheetEditAvatarFragment
     }
 
     override fun initActionView() {
+        listOf(binding.captureImage, binding.removeImage).forEach { view ->
+            view.setOnClickListener {
+                requireContext().showComingSoon()
+            }
+        }
+
         binding.chooseImage.setOnClickListener {
             parentFragmentManager.setFragmentResult(
                 REQUEST_KEY,

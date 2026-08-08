@@ -1,15 +1,12 @@
 package com.pando.app.features.home.ui.chat
 
-import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.pando.app.core.base.BaseVM
-import com.pando.app.core.extensions.formatDateTime
 import com.pando.app.core.extensions.toLocalDateTime
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.entity.ChatMessageItemModel
-import com.pando.app.features.home.data.model.entity.DataChatMessageItem
 import com.pando.app.features.home.data.model.entity.enumEntity.MessageType
 import com.pando.app.features.home.data.model.response.ChatMessageResponse
 import com.pando.app.features.home.data.model.response.MessagePageResponse
@@ -20,7 +17,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
 import java.util.UUID
 import javax.inject.Inject
 
@@ -31,8 +27,8 @@ class ChatViewModel @Inject constructor(
     private val messagesSocket: MessagesSocket
 ) : BaseVM<ApiResponse<MessagePageResponse>>() {
 
-    private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
-    val images = _images.asStateFlow()
+//    private val _images = MutableStateFlow<Map<UUID, String>>(emptyMap())
+//    val images = _images.asStateFlow()
 
     val socketConnectionState = socketConnectionManager.connectionState
 
@@ -43,8 +39,8 @@ class ChatViewModel @Inject constructor(
     private lateinit var currentRecipientId: UUID
 
     private var isLoading = false
-
-    private val loadingIds = mutableSetOf<UUID>()
+    private var hasLoadedFirstPage = false
+    private var nextCursor: String? = null
 
     init {
         viewModelScope.launch {
@@ -75,71 +71,86 @@ class ChatViewModel @Inject constructor(
     }
 
     fun updateMessages(message: ChatMessageResponse) {
-        Log.d("MessageSocket", "Dang cap nhat")
+        if (!::currentConversationId.isInitialized ||
+            message.conversationId != currentConversationId
+        ) {
+            return
+        }
+
         _messages.update { currentList ->
-            val newMessage = ChatMessageItemModel(
-                id = message.id,
-                senderId = message.sender.id,
-                content = message.content,
-                createdAt = message.createdAt.toLocalDateTime(),
-                type = message.type,
-                conversationId = currentConversationId,
-                recipientId = currentRecipientId
-            )
+            val newMessage = when (message.type) {
+                MessageType.TEXT -> {
+                    ChatMessageItemModel(
+                        id = message.id,
+                        conversationId = currentConversationId,
+                        senderId = message.sender.id,
+                        recipientId = currentRecipientId,
+                        content = message.content,
+                        type = message.type,
+                        createdAt = message.createdAt.toLocalDateTime()
+                    )
+                }
+
+                MessageType.IMAGE -> {
+                    ChatMessageItemModel(
+                        id = message.id,
+                        senderId = message.sender.id,
+                        conversationId = currentConversationId,
+                        content = message.imageUrl,
+                        createdAt = message.createdAt.toLocalDateTime(),
+                        type = message.type,
+                        recipientId = currentRecipientId,
+                    )
+                }
+            }
 
             val list = (currentList + newMessage)
                 .associateBy { it.id }
                 .values
                 .sortedBy { it.createdAt }
 
-            Log.d("MessageSocket", "Đã tạo danh sách messages mới")
             list
         }
-        Log.d("MessageSocket", "Cập nhật thành công lên data")
     }
 
-    fun loadImageMessage(messageId: UUID) {
-        if (_images.value.containsKey(messageId)) {
-            return
-        }
-        if (!loadingIds.add(messageId)) return
+//    fun loadImageMessage(messageId: UUID) {
+//        if (_images.value.containsKey(messageId)) {
+//            return
+//        }
+//        if (!loadingIds.add(messageId)) return
+//
+//        viewModelScope.launch {
+//            when (val result = conversationRepository.getImageMessage(messageId)) {
+//                is DataResult.Success -> {
+//                    _images.update { current ->
+//                        current + (messageId to result.data.data)
+//                    }
+//                }
+//
+//                is DataResult.Error -> {
+//                    // Emit event
+//                }
+//            }
+//
+//            loadingIds.remove(messageId)
+//        }
+//    }
 
-        viewModelScope.launch {
-            when (val result = conversationRepository.getImageMessage(messageId)) {
-                is DataResult.Success -> {
-                    _images.update { current ->
-                        current + (messageId to result.data.data)
-                    }
-                }
-
-                is DataResult.Error -> {
-                    // Emit event
-                }
-            }
-
-            loadingIds.remove(messageId)
-        }
-    }
-
-    fun loadImageMessages(messageIds: Collection<UUID>) {
-        messageIds.distinct().forEach(::loadImageMessage)
-    }
+//    fun loadImageMessages(messageIds: Collection<UUID>) {
+//        messageIds.distinct().forEach(::loadImageMessage)
+//    }
 
     fun getMessageList(conversationId: UUID, recipientId: UUID) {
         if (isLoading) {
-            Log.d("OkHttp", "Đang load danh sách tin ")
             return
         }
 
-        if (DataChatMessageItem.hasLoadedFirstPage &&
-            DataChatMessageItem.nextCursor?.isBlank() == true
-        ) {
-            Log.d("OkHttp", "Đã hết trang")
+        if (hasLoadedFirstPage && nextCursor.isNullOrBlank()) {
             return
         }
 
         isLoading = true
-        val requestedCursor = DataChatMessageItem.nextCursor
+        val requestedCursor = nextCursor
 
         getData {
             val result =
@@ -148,9 +159,7 @@ class ChatViewModel @Inject constructor(
             if (result is DataResult.Success) {
                 val response = result.data.data
 
-                DataChatMessageItem.total = DataChatMessageItem.total?.plus(response.total)
-
-                val existingIds = DataChatMessageItem.data
+                val existingIds = _messages.value
                     .mapTo(hashSetOf()) { it.id }
 
                 val newMessages = response.items
@@ -175,6 +184,7 @@ class ChatViewModel @Inject constructor(
                                     conversationId = conversationId,
                                     senderId = message.sender.id,
                                     recipientId = recipientId,
+                                    imageUrl = message.imageUrl,
                                     type = MessageType.IMAGE,
                                     createdAt = message.createdAt.toLocalDateTime()
                                 )
@@ -192,20 +202,24 @@ class ChatViewModel @Inject constructor(
                         )
                 }
 
-                loadImageMessages(
-                    newMessages
-                        .filter { it.type == MessageType.IMAGE }
-                        .map { it.id }
-                )
+//                loadImageMessages(
+//                    newMessages
+//                        .filter { it.type == MessageType.IMAGE }
+//                        .map { it.id }
+//                )
 
-                DataChatMessageItem.hasLoadedFirstPage = true
-                DataChatMessageItem.nextCursor = result.data.data.cursor
+                hasLoadedFirstPage = true
+                nextCursor = result.data.data.cursor
             }
 
             isLoading = false
 
             result
         }
+    }
+
+    fun canLoadMoreMessages(): Boolean {
+        return !hasLoadedFirstPage || !nextCursor.isNullOrBlank()
     }
 
 //    fun sendTextMessage(conversationId: UUID, content: String) {

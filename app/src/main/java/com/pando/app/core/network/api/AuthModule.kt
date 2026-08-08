@@ -1,6 +1,7 @@
 package com.pando.app.core.network.api
 
 import android.content.Context
+import com.pando.app.BuildConfig
 import com.pando.app.core.data.local.AuthPreferences
 import com.pando.app.core.session.UserSession
 import dagger.Module
@@ -24,7 +25,13 @@ object AuthModule {
     @Singleton
     fun provideLoggingInterceptor(): HttpLoggingInterceptor {
         return HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BASIC
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+            redactHeader("Authorization")
+            redactHeader("Cookie")
         }
     }
 

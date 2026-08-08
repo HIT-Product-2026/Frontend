@@ -5,10 +5,6 @@ import com.pando.app.core.base.BaseVM
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.dto.FriendshipDto
-import com.pando.app.features.home.data.model.entity.DataFriendItem
-import com.pando.app.features.home.data.model.entity.DataReceivedRequestItem
-import com.pando.app.features.home.data.model.entity.DataSearchItem
-import com.pando.app.features.home.data.model.entity.DataSentRequestItem
 import com.pando.app.features.home.data.model.entity.FriendItemModel
 import com.pando.app.features.home.data.model.entity.ReceivedRequestItemModel
 import com.pando.app.features.home.data.model.entity.SearchItemModel
@@ -28,6 +24,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
@@ -37,6 +34,21 @@ class FriendViewModel @Inject constructor(
     private val friendshipRepository: FriendshipRepository
 ) : BaseVM<FriendResult>() {
     private val searchQuery = MutableStateFlow("")
+
+    private val _friends = MutableStateFlow<List<FriendItemModel>>(emptyList())
+    val friends = _friends.asStateFlow()
+
+    private val _friendTotal = MutableStateFlow(0)
+    val friendTotal = _friendTotal.asStateFlow()
+
+    private val _searchResults = MutableStateFlow<List<SearchItemModel>>(emptyList())
+    val searchResults = _searchResults.asStateFlow()
+
+    private val _sentRequests = MutableStateFlow<List<SentRequestItemModel>>(emptyList())
+    val sentRequests = _sentRequests.asStateFlow()
+
+    private val _receivedRequests = MutableStateFlow<List<ReceivedRequestItemModel>>(emptyList())
+    val receivedRequests = _receivedRequests.asStateFlow()
 
     private val _actionStates = MutableStateFlow<Map<UUID, FriendActionState>>(emptyMap())
     val actionStates = _actionStates.asStateFlow()
@@ -73,6 +85,8 @@ class FriendViewModel @Inject constructor(
         getData {
             when (val result = friendshipRepository.unfriend(friendId)) {
                 is DataResult.Success -> {
+                    _friends.update { friends -> friends.filterNot { it.id == friendId } }
+                    _friendTotal.update { it.coerceAtLeast(1) - 1 }
                     DataResult.Success(FriendResult.UnfriendSuccess(result.data))
                 }
                 is DataResult.Error -> {
@@ -98,7 +112,8 @@ class FriendViewModel @Inject constructor(
             .distinctUntilChanged()
             .onEach { keyword ->
                 if (keyword.isBlank()) {
-                    clearResult()
+                    _searchResults.value = emptyList()
+                    super.clearResult()
                 } else {
                     searchUser(keyword)
                 }
@@ -110,24 +125,12 @@ class FriendViewModel @Inject constructor(
         getData {
             when (val result = friendshipRepository.searchUsers(keyword)) {
                 is DataResult.Success -> {
-                    DataSearchItem.apply {
-                        data.clear()
-                        total = 0
-                    }
-
-                    val total = result.data.data.total
-                    DataSearchItem.total = total
-
-                    val data = result.data.data.items
-                    if (total > 0) {
-                        data.forEach { item ->
-                            DataSearchItem.data.add(
-                                SearchItemModel(
-                                    item.id,
-                                    item.displayName
-                                )
-                            )
-                        }
+                    _searchResults.value = result.data.data.items.map { item ->
+                        SearchItemModel(
+                            item.id,
+                            item.displayName,
+                            avatarUrl = item.avatarUrl
+                        )
                     }
 
                     DataResult.Success(FriendResult.SearchState(result.data))
@@ -151,25 +154,15 @@ class FriendViewModel @Inject constructor(
         getData {
             when (val result = friendshipRepository.getFriendList()) {
                 is DataResult.Success -> {
-                    DataFriendItem.apply {
-                        data.clear()
-                        total = 0
+                    val friendList = result.data.data.items.map { item ->
+                        FriendItemModel(
+                            item.id,
+                            item.displayName.ifEmpty { item.username },
+                            avatarUrl = item.avatarUrl
+                        )
                     }
-
-                    val total = result.data.data.total
-                    DataFriendItem.total = total
-
-                    val data = result.data.data.items
-                    if (total > 0) {
-                        data.forEach { item ->
-                            DataFriendItem.data.add(
-                                FriendItemModel(
-                                    item.id,
-                                    item.displayName.ifEmpty { item.username }
-                                )
-                            )
-                        }
-                    }
+                    _friends.value = friendList
+                    _friendTotal.value = result.data.data.total
 
                     DataResult.Success(FriendResult.FriendListSuccess(result.data))
                 }
@@ -183,25 +176,13 @@ class FriendViewModel @Inject constructor(
         getData {
             when (val result = friendshipRepository.getSentRequestedUsers()) {
                 is DataResult.Success -> {
-                    DataSentRequestItem.apply {
-                        data.clear()
-                        total = 0
-                    }
-
-                    val total = result.data.data.total
-                    DataSentRequestItem.total = total
-
-                    val data = result.data.data.items
-                    if (total > 0) {
-                        data.forEach { item ->
-                            DataSentRequestItem.data.add(
-                                SentRequestItemModel(
-                                    item.receiver.id,
-                                    item.receiver.displayName.ifEmpty { item.receiver.username },
-                                    item.id
-                                )
-                            )
-                        }
+                    _sentRequests.value = result.data.data.items.map { item ->
+                        SentRequestItemModel(
+                            item.receiver.id,
+                            item.receiver.displayName.ifEmpty { item.receiver.username },
+                            item.id,
+                            avatarUrl = item.receiver.avatarUrl
+                        )
                     }
                     DataResult.Success(FriendResult.SentRequestedUsersSuccess(result.data))
                 }
@@ -215,25 +196,13 @@ class FriendViewModel @Inject constructor(
         getData {
             when (val result = friendshipRepository.getReceivedRequestedUsers()) {
                 is DataResult.Success -> {
-                    DataReceivedRequestItem.apply {
-                        data.clear()
-                        total = 0
-                    }
-
-                    val total = result.data.data.total
-                    DataReceivedRequestItem.total = total
-
-                    val data = result.data.data.items
-                    if (total > 0) {
-                        data.forEach { item ->
-                            DataReceivedRequestItem.data.add(
-                                ReceivedRequestItemModel(
-                                    item.requester.id,
-                                    item.requester.displayName.ifEmpty { item.requester.username },
-                                    item.id
-                                )
-                            )
-                        }
+                    _receivedRequests.value = result.data.data.items.map { item ->
+                        ReceivedRequestItemModel(
+                            item.requester.id,
+                            item.requester.displayName.ifEmpty { item.requester.username },
+                            item.id,
+                            avatarUrl = item.requester.avatarUrl
+                        )
                     }
                     DataResult.Success(FriendResult.ReceivedRequestedUsersSuccess(result.data))
                 }
@@ -253,6 +222,24 @@ class FriendViewModel @Inject constructor(
 
             when (val result = friendshipRepository.requestFriend(userId)) {
                 is DataResult.Success -> {
+                    val request = result.data.data
+                    _searchResults.update { results ->
+                        results.filterNot { it.id == request.receiver.id }
+                    }
+                    _sentRequests.update { requests ->
+                        if (requests.any { it.friendshipId == request.id }) {
+                            requests
+                        } else {
+                            requests + SentRequestItemModel(
+                                id = request.receiver.id,
+                                name = request.receiver.displayName.ifEmpty {
+                                    request.receiver.username
+                                },
+                                friendshipId = request.id,
+                                avatarUrl = request.receiver.avatarUrl
+                            )
+                        }
+                    }
                     updateActionState(userId, FriendAction.REQUEST, false)
 
                     sendFriendEvent(FriendEvent.RequestFriendSuccess(result.data))
@@ -275,6 +262,27 @@ class FriendViewModel @Inject constructor(
 
             when (val result = friendshipRepository.acceptFriend(friendshipId)) {
                 is DataResult.Success -> {
+                    val request = result.data.data
+                    _receivedRequests.update { requests ->
+                        requests.filterNot {
+                            it.friendshipId == friendshipId || it.id == request.requester.id
+                        }
+                    }
+                    val friendAlreadyExists = _friends.value.any {
+                        it.id == request.requester.id
+                    }
+                    if (!friendAlreadyExists) {
+                        _friends.update { friends ->
+                            friends + FriendItemModel(
+                                id = request.requester.id,
+                                name = request.requester.displayName.ifEmpty {
+                                    request.requester.username
+                                },
+                                avatarUrl = request.requester.avatarUrl
+                            )
+                        }
+                        _friendTotal.update { it + 1 }
+                    }
                     updateActionState(friendshipId, FriendAction.ACCEPT, false)
 
                     sendFriendEvent(FriendEvent.AcceptFriendSuccess(result.data))
@@ -297,9 +305,23 @@ class FriendViewModel @Inject constructor(
 
             when (val result = friendshipRepository.rejectFriend(friendshipId)) {
                 is DataResult.Success -> {
+                    val request = result.data.data
+                    val wasOutgoing = _sentRequests.value.any {
+                        it.friendshipId == friendshipId || it.id == request.receiver.id
+                    }
+                    _receivedRequests.update { requests ->
+                        requests.filterNot {
+                            it.friendshipId == friendshipId || it.id == request.requester.id
+                        }
+                    }
+                    _sentRequests.update { requests ->
+                        requests.filterNot {
+                            it.friendshipId == friendshipId || it.id == request.receiver.id
+                        }
+                    }
                     updateActionState(friendshipId, FriendAction.REJECT, false)
 
-                    sendFriendEvent(FriendEvent.RejectFriendSuccess(result.data))
+                    sendFriendEvent(FriendEvent.RejectFriendSuccess(result.data, wasOutgoing))
                 }
 
                 is DataResult.Error -> {
@@ -326,7 +348,10 @@ sealed interface FriendEvent {
 
     data class AcceptFriendSuccess(val response: ApiResponse<FriendshipDto>) : FriendEvent
 
-    data class RejectFriendSuccess(val response: ApiResponse<FriendshipDto>) : FriendEvent
+    data class RejectFriendSuccess(
+        val response: ApiResponse<FriendshipDto>,
+        val wasOutgoing: Boolean
+    ) : FriendEvent
 }
 
 enum class FriendAction {

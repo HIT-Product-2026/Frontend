@@ -7,12 +7,6 @@ data class SearchItemModel (
     override val id: UUID,
     val name: String,
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val avatarUrl: String? = null
 ) : BaseItemModel
-
-class DataSearchItem {
-    companion object {
-        var total : Int? = null
-        val data : MutableList<SearchItemModel> = mutableListOf()
-    }
-}

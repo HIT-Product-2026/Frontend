@@ -28,7 +28,6 @@
                     android:layout_width="@dimen/_48sdp"
                     android:layout_height="@dimen/_48sdp"
                     android:layout_marginStart="@dimen/_12sdp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
                     android:focusable="true"
                     android:padding="@dimen/_12sdp"
@@ -86,7 +85,7 @@
                         android:layout_gravity="center"
                         android:contentDescription="Chỉnh sửa ảnh đại diện"
                         android:src="@drawable/edit"
-                        app:tint="#1976D2" />
+                        app:tint="@color/accent5" />
 
                 </com.google.android.material.card.MaterialCardView>
 

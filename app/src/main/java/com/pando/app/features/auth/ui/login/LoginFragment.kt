@@ -9,10 +9,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
-import com.google.android.material.snackbar.Snackbar
 import com.pando.app.R
 import com.pando.app.core.base.BaseBottomSheet
 import com.pando.app.core.base.BaseVM
+import com.pando.app.core.extensions.showShortToast
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentLoginBinding
 import dagger.hilt.android.AndroidEntryPoint
@@ -119,7 +119,7 @@ class LoginFragment : BaseBottomSheet<FragmentLoginBinding>(FragmentLoginBinding
                 viewModel.event.collect { event ->
                     when (event) {
                         is BaseVM.ViewModelEvent.ShowSnackbar -> {
-                            Snackbar.make(binding.root, event.message, Snackbar.LENGTH_LONG).show()
+                            requireContext().showShortToast(event.message)
                         }
 
                         is BaseVM.ViewModelEvent.Navigate -> {

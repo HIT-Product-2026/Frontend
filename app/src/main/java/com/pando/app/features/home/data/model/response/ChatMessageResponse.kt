@@ -7,6 +7,8 @@ import java.util.UUID
 data class ChatMessageResponse(
     val id: UUID,
     val sender: UserDto,
+    val conversationId: UUID,
+    val imageUrl: String?,
     val content: String?,
     val type: MessageType,
     val createdAt: String

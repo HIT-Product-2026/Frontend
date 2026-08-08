@@ -51,9 +51,12 @@ android {
 
     buildTypes {
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
             optimization {
-                enable = false
+                enable = true
             }
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
         }
     }
     compileOptions {
@@ -91,7 +94,10 @@ dependencies {
     implementation("io.coil-kt.coil3:coil:3.5.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
     implementation("androidx.viewpager2:viewpager2:1.1.0")
+    implementation("com.google.android.exoplayer:exoplayer:2.19.1")
+    implementation("androidx.media3:media3-transformer:1.9.0")
     implementation("com.auth0.android:jwtdecode:2.0.2")
+    implementation("androidx.core:core-splashscreen:1.2.0")
 
     val lifecycle_version = "2.11.0"
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version")
@@ -106,6 +112,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.4.0")
+    implementation("com.squareup.okhttp3:okhttp-sse:5.4.0")
 
     val nav_version = "2.9.8"
     implementation("androidx.navigation:navigation-fragment-ktx:$nav_version")

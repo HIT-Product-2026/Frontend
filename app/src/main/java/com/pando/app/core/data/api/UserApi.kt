@@ -2,6 +2,7 @@ package com.pando.app.core.data.api
 
 import com.pando.app.core.network.api.ApiConstants
 import com.pando.app.core.network.api.ApiResponse
+import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
 import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.GET
@@ -24,4 +25,6 @@ interface UserApi {
     @Multipart
     @POST(ApiConstants.User.UPDATE_AVATAR)
     suspend fun updateAvatar(@Part file: MultipartBody.Part) : Response<ApiResponse<Void>>
+    @PUT(ApiConstants.User.UPDATE_USER_MODE)
+    suspend fun updateUserMode(@Query("mode") mode: UserMode) : Response<ApiResponse<Void>>
 }

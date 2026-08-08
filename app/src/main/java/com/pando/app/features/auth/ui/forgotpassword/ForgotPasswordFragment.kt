@@ -6,7 +6,9 @@ import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
+import com.pando.app.core.extensions.showShortToast
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentForgotPasswordBinding
 import dagger.hilt.android.AndroidEntryPoint
@@ -54,6 +56,7 @@ class ForgotPasswordFragment : BaseFragment<FragmentForgotPasswordBinding>(Fragm
                     is UiState.Success -> {
                         binding.forgotPasswordText.visibility = View.VISIBLE
                         binding.forgotPasswordProgressBar.visibility = View.GONE
+                        requireContext().showShortToast(R.string.otp_sent_success)
 
                         val action = ForgotPasswordFragmentDirections.actionForgotPasswordFragmentToVerifyOtpFragment(
                             receiveEmail = email

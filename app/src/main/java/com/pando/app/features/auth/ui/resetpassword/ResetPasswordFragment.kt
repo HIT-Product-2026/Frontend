@@ -6,9 +6,9 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
-import com.google.android.material.snackbar.Snackbar
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
+import com.pando.app.core.extensions.showShortToast
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentResetPasswordBinding
 import dagger.hilt.android.AndroidEntryPoint
@@ -63,11 +63,7 @@ class ResetPasswordFragment :
                     is UiState.Success -> {
                         binding.resetPasswordText.visibility = View.VISIBLE
                         binding.resetPasswordProgressBar.visibility = View.GONE
-                        Snackbar.make(
-                            binding.root,
-                            "Thay đổi mật khẩu thành công!",
-                            Snackbar.LENGTH_SHORT
-                        ).show()
+                        requireContext().showShortToast(R.string.password_changed_success)
 
                         findNavController().getBackStackEntry(R.id.startFragment)
                             .savedStateHandle

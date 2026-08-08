@@ -1,9 +1,29 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.Frontend" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/accent5</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/accent4</item>
+        <item name="colorOnPrimaryContainer">@color/primary1</item>
+        <item name="colorSecondary">@color/accent_secondary</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSecondaryContainer">@color/accent_secondary_soft</item>
+        <item name="colorOnSecondaryContainer">@color/primary1</item>
+        <item name="android:colorAccent">@color/accent5</item>
     </style>
 
     <style name="Theme.Frontend" parent="Base.Theme.Frontend" />
+
+    <style name="Theme.PanDo.Starting" parent="Theme.SplashScreen">
+
+        <!-- Màu nền splash -->
+        <item name="windowSplashScreenBackground">@color/white</item>
+
+        <!-- Icon giữa màn hình -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+
+        <!-- Theme thật của app sau khi splash biến mất -->
+        <item name="postSplashScreenTheme">@style/Base.Theme.Frontend</item>
+
+    </style>
 </resources>

@@ -19,12 +19,14 @@ object ApiConstants {
         const val CREATE_POST = "post"
         const val GET_POST = "post"
         const val GET_POST_IMAGE = "post/{post_id}/image"
+        const val DELETE_POST = "post/{post_id}"
     }
     object User {
         const val SEND_FCM_TOKEN = "user/fcm-token"
         const val GET_USER_AVATAR = "user/{user_id}/avatar"
         const val UPDATE_DISPLAY_NAME = "user/display-name"
         const val UPDATE_AVATAR = "user/avatar"
+        const val UPDATE_USER_MODE = "user/mode"
     }
 
     object FriendShip {
@@ -46,10 +48,15 @@ object ApiConstants {
     object Message {
         const val SEND_TEXT_MESSAGE = "message/text"
         const val SEND_IMAGE_MESSAGE = "message/image"
-        const val GET_IMAGE_MESSAGE = "message/{message_id}/image"
     }
 
     object Profile {
         const val UPDATE_PROFILE = "profile"
+        const val GET_PROFILE = "profile/{user_id}"
+    }
+
+    object Location {
+        const val GET_LOCATION_PROVINCE = "location/province"
+        const val GET_LOCATION_FRIENDS = "location/friends"
     }
 }

@@ -2,54 +2,31 @@ package com.pando.app.features.home.ui.center.map
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
+import android.graphics.PointF
+import android.graphics.RectF
+import android.location.Location
 import android.os.Bundle
-import android.os.Looper
-import android.provider.ContactsContract
 import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.createBitmap
-import androidx.core.graphics.drawable.toBitmap
-import androidx.core.graphics.scale
-import androidx.core.graphics.toColorInt
 import androidx.fragment.app.activityViewModels
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
-import com.auth0.android.jwt.DecodeException
-import com.auth0.android.jwt.JWT
-import com.bumptech.glide.Glide
-import com.bumptech.glide.request.target.CustomTarget
-import com.bumptech.glide.request.transition.Transition
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 import com.google.android.material.snackbar.Snackbar
 import com.pando.app.BuildConfig
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
-import com.pando.app.core.network.api.TokenManager
+import com.pando.app.core.location.LocationNavigationViewModel
+import com.pando.app.core.location.LocationSnapshot
+import com.pando.app.core.location.LocationSnapshotStore
+import com.pando.app.core.location.LocationTrackingController
 import com.pando.app.core.session.UserSession
-import com.pando.app.core.state.SocketConnectionState
-import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentMapBinding
-import com.pando.app.features.home.data.model.entity.CurrentUser
-import com.pando.app.features.home.data.model.entity.DataFriendItem
-import com.pando.app.features.home.data.model.entity.FriendItemModel
-import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
 import com.pando.app.features.home.ui.center.CenterFragment
 import com.pando.app.features.shared.AvatarViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -59,27 +36,7 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
-import org.maplibre.android.style.expressions.Expression.coalesce
-import org.maplibre.android.style.expressions.Expression.get
-import org.maplibre.android.style.expressions.Expression.literal
-import org.maplibre.android.style.expressions.Expression.match
-import org.maplibre.android.style.expressions.Expression.stop
-import org.maplibre.android.style.layers.CircleLayer
-import org.maplibre.android.style.layers.Property.ICON_ANCHOR_BOTTOM
-import org.maplibre.android.style.layers.PropertyFactory.circleColor
-import org.maplibre.android.style.layers.PropertyFactory.circleRadius
-import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
-import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
-import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
-import org.maplibre.android.style.layers.PropertyFactory.iconAnchor
-import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
-import org.maplibre.android.style.layers.PropertyFactory.iconImage
-import org.maplibre.android.style.layers.PropertyFactory.iconSize
-import org.maplibre.android.style.layers.PropertyFactory.textField
-import org.maplibre.android.style.layers.SymbolLayer
-import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
-import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
 import java.util.UUID
 import javax.inject.Inject
@@ -87,18 +44,24 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate) {
     companion object {
-        private const val TAG = "SOCKET_CONNECTION"
+        private const val FRIEND_FOCUS_ZOOM = 16.0
+        private const val FRIEND_MARKER_HIT_RADIUS_DP = 48f
+        private const val FOLLOW_CAMERA_ANIMATION_MILLIS = 250
+        private const val MAX_LOCATION_SNAPSHOT_AGE_MILLIS = 30_000L
     }
-
-    @Inject
-    lateinit var tokenManager: TokenManager
 
     @Inject
     lateinit var userSession: UserSession
 
-    private var avatarMap: Map<UUID, String> = emptyMap()
+    @Inject
+    lateinit var locationSnapshotStore: LocationSnapshotStore
+
     private val avatarViewModel: AvatarViewModel by activityViewModels()
-    private val mapViewModel: MapViewModel by viewModels()
+    private val locationNavigationViewModel: LocationNavigationViewModel by activityViewModels()
+
+    // MapViewModel giữ snapshot bạn bè và socket subscription khi Fragment bị recreate.
+    private val mapViewModel: MapViewModel by activityViewModels()
+    private val markerRenderer = MapMarkerRenderer(this)
 
     private val styleUrl: String
         get() {
@@ -109,45 +72,55 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             return "https://maps.geo.$region.amazonaws.com/v2/styles/$style/descriptor?key=$apiKey"
         }
 
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private lateinit var locationCallback: LocationCallback
+    private lateinit var locationController: MapLocationController
     private var currentLat: Double? = null
     private var currentLng: Double? = null
+    private var avatarMap: Map<UUID, String> = emptyMap()
+    private var currentUserId: UUID? = null
+    private var currentUserName: String = "Bạn"
+    private var currentUserAvatar: String? = null
 
-    // lưu map và style sau khi tải xong
     private var mapLibreMap: MapLibreMap? = null
     private var loadedStyle: Style? = null
-
-    // để lấy source và layer marker
-    private val currentLocationSourceId = "current-location-source"
-    private val currentLocationLayerId = "current-location-layer"
-
-    private val friendLocationSourceId = "friend-location-source"
-    private val friendLocationLayerId = "friend-location-layer"
+    private var focusedFriendZoom: Double? = null
+    private var isAnimatingToFriend = false
+    private data class FollowTarget(val personIds: Set<String>)
+    private var followTarget: FollowTarget? = null
+    private var lastFollowLocation: MarkerFollowLocation? = null
 
     private val multiplePermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
-        val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        val notificationGranted =
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                permissions[Manifest.permission.POST_NOTIFICATIONS] == true
+            } else {
+                true
+            }
 
         if (!cameraGranted) {
             Snackbar.make(binding.root, "Cần cấp quyền Camera!", Snackbar.LENGTH_SHORT).show()
         }
 
-        if (locationGranted) {
-            captureLocation()
-        } else {
+        if (!(fineGranted || coarseGranted)) {
             Toast.makeText(
-                requireContext(), "Hãy cấp quyền Vị trí để ghim tọa độ ảnh!", Toast.LENGTH_SHORT
+                requireContext(),
+                "Cần quyền vị trí để sử dụng bản đồ",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
+        if (!notificationGranted) {
+            Toast.makeText(
+                requireContext(),
+                "Cần quyền thông báo để chạy chia sẻ vị trí",
+                Toast.LENGTH_SHORT
             ).show()
         }
     }
-
-    private val locationRequest = LocationRequest
-        .Builder(Priority.PRIORITY_HIGH_ACCURACY, 5_000L)
-        .setMinUpdateIntervalMillis(2_000L)
-        .build()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         binding.mapView.onCreate(savedInstanceState)
@@ -155,131 +128,26 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     }
 
     override fun initData() {
-        if (userSession.getCurrentUser() == null) {
-            decodeToken(tokenManager.getAccessToken())
-        }
+        requestMissingPermissions()
 
-        mapViewModel.getFriendList()
-
-        val hasCamera = ContextCompat.checkSelfPermission(
-            requireContext(), Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
-        val hasLocation = ContextCompat.checkSelfPermission(
-            requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (!(hasCamera && hasLocation)) {
-            multiplePermissionsLauncher.launch(
-                arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
-            )
-        }
-
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
-
-        locationCallback = object : LocationCallback() {
-            override fun onLocationResult(
-                locationResult: LocationResult
-            ) {
-                val location = locationResult.lastLocation ?: return
-
-                currentLat = location.latitude
-                currentLng = location.longitude
-
-                Log.d("LOCATION_UPDATE", "Lat=$currentLat, Lng=$currentLng")
-
-                updateCurrentLocationPoint()
-                mapViewModel.sendLocation(currentLng, currentLat)
+        locationController = MapLocationController(
+            context = requireContext(),
+            locationSnapshotStore = locationSnapshotStore,
+            onLocationUpdate = ::handleLocationUpdate,
+            onCapturedLocation = ::handleCapturedLocation,
+            onPermissionDenied = {
+                currentLat = null
+                currentLng = null
+            },
+            onBearingChanged = { bearing ->
+                markerRenderer.updateBearing(loadedStyle, bearing)
             }
-        }
+        )
     }
 
     override fun initView() {
-        mapViewModel.socketConnect()
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                userSession.currentUser.collect { user ->
-                    binding.profileIcon.loadAvatar(user?.avatar)
-                }
-            }
-        }
-
-        binding.mapView.getMapAsync { map ->
-            mapLibreMap = map
-
-            map.addOnMapClickListener { latLng ->
-
-                val screenPoint =
-                    map.projection.toScreenLocation(latLng)
-
-                val features = map.queryRenderedFeatures(
-                    screenPoint,
-                    friendLocationLayerId
-                )
-
-                val feature = features.firstOrNull()
-
-                if (feature != null) {
-                    val friendId =
-                        feature.getStringProperty("id")
-
-                    val friendName =
-                        feature.getStringProperty("name")
-
-                    Toast.makeText(
-                        requireContext(),
-                        "Bạn vừa chọn $friendName",
-                        Toast.LENGTH_SHORT
-                    ).show()
-
-                    Log.d(
-                        "FRIEND_MARKER",
-                        "id=$friendId, name=$friendName"
-                    )
-
-                    true
-                } else {
-                    false
-                }
-            }
-
-            map.setStyle(styleUrl) { style ->
-                loadedStyle = style
-
-                // credit góc dưới bên trái
-                map.uiSettings.isAttributionEnabled = true
-
-                setVietnameseLabels(style)
-
-                updateCurrentLocationPoint()
-
-                val defaultAvatarDrawable = AppCompatResources.getDrawable(
-                    requireContext(),
-                    R.drawable.ic_default_avatar
-                )
-
-                val defaultAvatarBitmap = defaultAvatarDrawable?.toBitmap(
-                    width = 96,
-                    height = 96,
-                    config = Bitmap.Config.ARGB_8888
-                )
-
-                if (defaultAvatarBitmap != null) {
-                    style.addImage(
-                        "friend-avatar-default",
-                        createAvatarMarkerBitmap(defaultAvatarBitmap)
-                    )
-                } else {
-                    Log.e("MAP_MARKER", "Không thể chuyển avatar mặc định thành Bitmap")
-                }
-
-                showFriendLocations(
-                    style = style,
-                    friends = DataFriendItem.data.toList()
-                )
-            }
-        }
-        captureLocation()
+        observeCurrentUser()
+        setupMap()
     }
 
     override fun initActionView() {
@@ -296,85 +164,18 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         }
 
         binding.btnCurrentLocation.setOnClickListener {
-            if (currentLat == null && currentLng == null) {
+            if (currentLat == null || currentLng == null) {
                 captureLocation()
             } else {
                 moveCameraToCurrentLocation()
             }
         }
 
-        lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch {
-                    combine(
-                        mapViewModel.connectionState,
-                        mapViewModel.friendState,
-                        avatarViewModel.avatars
-                    ) { connectionState, friendState, avatarState ->
-                        Triple(connectionState, friendState, avatarState)
-                    }.collect { (connectionState, friendState, avatarState) ->
-                        when (connectionState) {
-                            SocketConnectionState.Connecting -> {
-                                Log.d(TAG, "Đang kết nối")
-                            }
-
-                            SocketConnectionState.Connected -> {
-                                Log.d(TAG, "Đã kết nối")
-                                when (friendState) {
-                                    is UiState.Loading -> {}
-                                    is UiState.Success -> {
-                                        val avatarMap = avatarState
-                                        val friendList = DataFriendItem.data.toList()
-
-                                        val updatedFriendList = friendList.map { item ->
-                                            item.copy(avatarUrl = if (avatarMap.containsKey(item.id)) avatarMap[item.id] else null)
-                                        }
-
-                                        DataFriendItem.data.apply {
-                                            clear()
-                                            addAll(updatedFriendList)
-                                        }
-
-                                        mapViewModel.subscribeLocationTopic(updatedFriendList)
-                                    }
-
-                                    is UiState.Error -> {}
-                                    is UiState.Idle -> {}
-                                }
-                            }
-
-                            SocketConnectionState.Disconnected -> {
-                                mapViewModel.unsubscribeAllLocationTopic()
-                                mapViewModel.socketDisconnect()
-                                Log.d(TAG, "Đã ngắt kết nối")
-                            }
-
-                            is SocketConnectionState.Error -> {
-                                mapViewModel.unsubscribeAllLocationTopic()
-                                mapViewModel.socketDisconnect()
-                                Log.e(TAG, connectionState.message)
-                            }
-                        }
-                    }
-                }
-                launch {
-                    avatarViewModel.avatars.collect { avatars ->
-                        avatarMap = avatars
-                    }
-                }
-                launch {
-                    mapViewModel.friends.collect { friends ->
-                        avatarViewModel.loadAvatars(
-                            friends.map { it.id }
-                        )
-
-                        loadedStyle?.let { style ->
-                            showFriendLocations(style, friends)
-                        }
-                    }
-                }
-            }
+        binding.friendBtn.setOnClickListener {
+            findNavController().navigate(R.id.action_centerFragment_to_friendFragment)
         }
+
+        observeMapData()
     }
 
     override fun onStart() {
@@ -386,14 +187,32 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         super.onResume()
         binding.mapView.onResume()
 
-        if (::locationCallback.isInitialized) {
-            startLocationUpdates()
+        if (::locationController.isInitialized) {
+            // The foreground service already owns the high-accuracy stream
+            // while sharing is enabled. The map observes the shared snapshot
+            // instead of opening a second GPS request.
+            if (!LocationTrackingController.isServiceRunning()) {
+                locationController.startLocationUpdates()
+            }
+            if (locationController.hasAnyLocationPermission()) {
+                locationController.requestCurrentLocation()
+            }
+            locationController.registerBearingUpdates()
         }
+
+        applyLocationSnapshot(locationSnapshotStore.fresh(MAX_LOCATION_SNAPSHOT_AGE_MILLIS))
+
+        // Chỉ tải friendship list lần đầu; khi quay lại chỉ lấy snapshot vị trí mới.
+        mapViewModel.refreshForMapResume()
+        renderMapState()
     }
 
     override fun onPause() {
-        if (::locationCallback.isInitialized) {
-            fusedLocationClient.removeLocationUpdates(locationCallback)
+        clearFollowTarget()
+
+        if (::locationController.isInitialized) {
+            locationController.stopLocationUpdates()
+            locationController.unregisterBearingUpdates()
         }
 
         binding.mapView.onPause()
@@ -411,50 +230,381 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     }
 
     override fun onDestroyView() {
+        clearFollowTarget()
+        markerRenderer.clearStyle(loadedStyle)
         mapLibreMap = null
         loadedStyle = null
-        currentLat = null
-        currentLng = null
 
         binding.mapView.onDestroy()
         super.onDestroyView()
     }
 
-    private fun setVietnameseLabels(style: Style) {
-        style.layers.filterIsInstance<SymbolLayer>().forEach { layer ->
-            if (layer.textField.expression == null) return@forEach
+    override fun onDestroy() {
+        if (::locationController.isInitialized) {
+            locationController.release()
+        }
+        super.onDestroy()
+    }
 
-            val originalName = coalesce(
-                get("name:vi"),
-                get("name_vi"),
-                get("name"),
-                get("name:en")
-            )
+    private fun requestMissingPermissions() {
+        val hasCamera = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        val hasLocation = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        val hasNotification = if (
+            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+        ) {
+            ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
 
-            val displayName = match(
-                originalName,
-                originalName,
-                stop(
-                    "Paracel Islands",
-                    literal("Quần đảo Hoàng Sa")
-                ),
-                stop(
-                    "Paracel Is.",
-                    literal("Quần đảo Hoàng Sa")
-                ),
-                stop(
-                    "Spratly Islands",
-                    literal("Quần đảo Trường Sa")
-                ),
-                stop(
-                    "Spratly Is.",
-                    literal("Quần đảo Trường Sa")
-                )
-            )
+        if (hasCamera && hasLocation && hasNotification) return
 
-            layer.setProperties(
-                textField(displayName)
+        val requestedPermissions = mutableListOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            requestedPermissions += Manifest.permission.POST_NOTIFICATIONS
+        }
+        multiplePermissionsLauncher.launch(requestedPermissions.toTypedArray())
+    }
+
+    private fun observeCurrentUser() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                userSession.currentUser.collect { user ->
+                    currentUserId = user?.id
+                    currentUserName = user?.displayName
+                        ?.takeIf(String::isNotBlank)
+                        ?: user?.username
+                            ?.takeIf(String::isNotBlank)
+                        ?: "Bạn"
+                    currentUserAvatar = user?.avatar?.toString()
+                    binding.profileIcon.loadAvatar(user?.avatar)
+                    updateCurrentLocationPoint()
+                    renderFriendsState()
+                }
+            }
+        }
+    }
+
+    private fun setupMap() {
+        binding.mapView.getMapAsync { map ->
+            mapLibreMap = map
+            setupMapInteractions(map)
+
+            map.setStyle(styleUrl) { style ->
+                loadedStyle = style
+                map.uiSettings.isAttributionEnabled = true
+
+                markerRenderer.setVietnameseLabels(style)
+                markerRenderer.addDirectionIcon(style)
+                renderMapState()
+                focusCurrentLocationFromNotificationIfReady()
+            }
+        }
+    }
+
+    private fun setupMapInteractions(map: MapLibreMap) {
+        map.addOnMapClickListener { latLng ->
+            val screenPoint = map.projection.toScreenLocation(latLng)
+            val feature = queryFriendFeature(map, screenPoint)
+
+            if (feature == null) {
+                setFocusedFriendMarker(null)
+                clearFollowTarget()
+                return@addOnMapClickListener false
+            }
+
+            val markerType = feature.getStringProperty("markerType")
+
+            if (markerType == "current") {
+                focusCurrentMarker(map, feature)
+                return@addOnMapClickListener true
+            }
+
+            if (
+                feature.getNumberProperty("point_count") != null ||
+                markerType == "nearbyGroupProxy"
+            ) {
+                zoomIntoCluster(map, feature)
+                return@addOnMapClickListener true
+            }
+
+            if (markerType == "nearbyGroup") {
+                focusNearbyGroupMarker(map, feature)
+                return@addOnMapClickListener true
+            }
+
+            focusFriendMarker(map, feature)
+            true
+        }
+
+        map.addOnCameraMoveStartedListener { reason ->
+            if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+                // Pan, pinch and rotate are explicit user intent. Stop only
+                // the automatic camera-follow; keep the visual marker focus.
+                clearFollowTarget()
+            }
+        }
+
+        map.addOnCameraIdleListener {
+            loadedStyle?.let { style ->
+                markerRenderer.updateNearbyGroupVisibility(map, style)
+            }
+
+            if (isAnimatingToFriend) {
+                isAnimatingToFriend = false
+                return@addOnCameraIdleListener
+            }
+
+            val focusZoom = focusedFriendZoom ?: return@addOnCameraIdleListener
+            if (map.cameraPosition.zoom < focusZoom) {
+                setFocusedFriendMarker(null)
+            }
+        }
+    }
+
+    /**
+     * Marker icons are anchored at their pointer, while the visible avatar is
+     * rendered above it. Query a small screen rectangle instead of a single
+     * pixel so tapping the avatar body still resolves the marker. When more
+     * than one layer returns the same/nearby feature, prefer the closest
+     * feature to the tap point.
+     */
+    private fun queryFriendFeature(
+        map: MapLibreMap,
+        screenPoint: PointF
+    ): Feature? {
+        val hitRadius = FRIEND_MARKER_HIT_RADIUS_DP * resources.displayMetrics.density
+        val bounds = RectF(
+            screenPoint.x - hitRadius,
+            screenPoint.y - hitRadius,
+            screenPoint.x + hitRadius,
+            screenPoint.y + hitRadius
+        )
+
+        return map.queryRenderedFeatures(
+            bounds,
+            *markerRenderer.interactiveLayerIds
+        ).minByOrNull { feature ->
+            val point = feature.geometry() as? Point ?: return@minByOrNull Float.MAX_VALUE
+            val featureScreenPoint = map.projection.toScreenLocation(
+                LatLng(point.latitude(), point.longitude())
             )
+            val dx = featureScreenPoint.x - screenPoint.x
+            val dy = featureScreenPoint.y - screenPoint.y
+            dx * dx + dy * dy
+        }
+    }
+
+    private fun zoomIntoCluster(map: MapLibreMap, feature: Feature) {
+        setFollowTarget(
+            loadedStyle?.let { style -> markerRenderer.personIdsForFeature(style, feature) }
+                .orEmpty()
+        )
+        setFocusedFriendMarker(null)
+
+        val clusterPoint = feature.geometry() as? Point ?: return
+        val nextZoom = (map.cameraPosition.zoom + 2.0).coerceAtMost(FRIEND_FOCUS_ZOOM)
+
+        map.animateCamera(
+            CameraUpdateFactory.newLatLngZoom(
+                LatLng(clusterPoint.latitude(), clusterPoint.longitude()),
+                zoom = nextZoom
+            ),
+            350
+        )
+    }
+
+    private fun focusFriendMarker(map: MapLibreMap, feature: Feature) {
+        val friendId = feature.getStringProperty("id")
+        val friendName = feature.getStringProperty("name")
+        val personIds = loadedStyle?.let { style ->
+            markerRenderer.personIdsForFeature(style, feature)
+        }.orEmpty()
+
+        setFollowTarget(personIds)
+        setFocusedFriendMarker(friendId)
+
+        val friendPoint = feature.geometry() as? Point
+        if (friendPoint != null) {
+            focusedFriendZoom = FRIEND_FOCUS_ZOOM
+            isAnimatingToFriend = true
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(
+                    LatLng(friendPoint.latitude(), friendPoint.longitude()),
+                    zoom = FRIEND_FOCUS_ZOOM
+                ),
+                500
+            )
+        }
+
+        Toast.makeText(
+            requireContext(),
+            "Bạn vừa chọn $friendName",
+            Toast.LENGTH_SHORT
+        ).show()
+        Log.d("FRIEND_MARKER", "id=$friendId, name=$friendName")
+    }
+
+    private fun focusNearbyGroupMarker(map: MapLibreMap, feature: Feature) {
+        val personIds = loadedStyle?.let { style ->
+            markerRenderer.personIdsForFeature(style, feature)
+        }.orEmpty()
+
+        setFollowTarget(personIds)
+        setFocusedFriendMarker(null)
+
+        val point = feature.geometry() as? Point
+        if (point != null) {
+            focusedFriendZoom = FRIEND_FOCUS_ZOOM
+            isAnimatingToFriend = true
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(
+                    LatLng(point.latitude(), point.longitude()),
+                    zoom = FRIEND_FOCUS_ZOOM
+                ),
+                500
+            )
+        }
+
+        Toast.makeText(
+            requireContext(),
+            "Bạn vừa chọn ${feature.getStringProperty("name")}",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun focusCurrentMarker(map: MapLibreMap, feature: Feature) {
+        val currentId = feature.getStringProperty("id")
+            .takeIf(String::isNotBlank)
+            ?: currentUserId?.toString()
+            ?: return
+
+        setFollowTarget(setOf(currentId))
+        setFocusedFriendMarker(null)
+
+        val point = feature.geometry() as? Point
+        if (point != null) {
+            focusedFriendZoom = FRIEND_FOCUS_ZOOM
+            isAnimatingToFriend = true
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(
+                    LatLng(point.latitude(), point.longitude()),
+                    zoom = FRIEND_FOCUS_ZOOM
+                ),
+                500
+            )
+        }
+
+        Toast.makeText(
+            requireContext(),
+            "Bạn vừa chọn ${feature.getStringProperty("name") ?: currentUserName}",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun observeMapData() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    locationNavigationViewModel.focusCurrentLocation.collect { shouldFocus ->
+                        if (shouldFocus) focusCurrentLocationFromNotificationIfReady()
+                    }
+                }
+
+                launch {
+                    combine(
+                        avatarViewModel.avatars,
+                        mapViewModel.friends
+                    ) { avatars, friends ->
+                        avatarMap = avatars
+                        friends.map { friend ->
+                            friend.copy(avatarUrl = avatars[friend.id] ?: friend.avatarUrl)
+                        }
+                    }.collect { friends ->
+                        renderFriendsState(friends)
+                    }
+                }
+
+                launch {
+                    locationSnapshotStore.snapshot.collect { snapshot ->
+                        if (LocationTrackingController.isServiceRunning() &&
+                            ::locationController.isInitialized
+                        ) {
+                            locationController.stopLocationUpdates()
+                        }
+                        applyLocationSnapshot(snapshot?.takeIf {
+                            snapshotAgeMillis(it) <= MAX_LOCATION_SNAPSHOT_AGE_MILLIS
+                        })
+                    }
+                }
+
+                launch {
+                    mapViewModel.friends.collect { friends ->
+                        // DTO mới đã có URL; chỉ fallback API cho bạn cũ chưa có URL.
+                        avatarViewModel.loadAvatars(
+                            friends
+                                .filter { it.avatarUrl.isNullOrBlank() }
+                                .map { it.id }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun handleLocationUpdate(location: Location) {
+        val latitude = location.latitude
+        val longitude = location.longitude
+
+        if (currentLat == latitude && currentLng == longitude) return
+
+        currentLat = latitude
+        currentLng = longitude
+        updateCurrentLocationPoint()
+        renderFriendsState()
+    }
+
+    private fun applyLocationSnapshot(snapshot: LocationSnapshot?) {
+        snapshot ?: return
+        if (currentLat == snapshot.latitude && currentLng == snapshot.longitude) return
+
+        currentLat = snapshot.latitude
+        currentLng = snapshot.longitude
+        updateCurrentLocationPoint()
+        renderFriendsState()
+    }
+
+    private fun snapshotAgeMillis(snapshot: LocationSnapshot): Long {
+        return android.os.SystemClock.elapsedRealtime() - snapshot.capturedAtElapsedMillis
+    }
+
+    private fun handleCapturedLocation(location: Location, fromCache: Boolean) {
+        // Cached location chỉ dùng để hiển thị/camera ngay; không ghi đè live location.
+        if (fromCache && currentLat != null && currentLng != null) return
+
+        currentLat = location.latitude
+        currentLng = location.longitude
+        updateCurrentLocationPoint()
+        renderFriendsState()
+        if (followTarget == null) {
+            moveCameraToCurrentLocation(animate = false)
         }
     }
 
@@ -463,320 +613,137 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         val latitude = currentLat ?: return
         val longitude = currentLng ?: return
 
-        showCurrentLocationPoint(
+        markerRenderer.renderCurrentLocation(
             style = style,
+            latitude = latitude,
+            longitude = longitude,
+            currentUserId = currentUserId?.toString(),
+            currentUserName = currentUserName
+        )
+    }
+
+    private fun renderMapState() {
+        val style = loadedStyle ?: return
+
+        updateCurrentLocationPoint()
+        renderFriendsState()
+
+        // Khi quay lại Fragment, camera luôn cố gắng focus vị trí hiện tại.
+        moveCameraToCurrentLocation(animate = false)
+    }
+
+    private fun renderFriendsState(
+        synchronizedFriends: List<com.pando.app.features.home.data.model.entity.FriendItemModel>? = null
+    ) {
+        val style = loadedStyle ?: return
+        val friends = synchronizedFriends ?: mapViewModel.friends.value.map { friend ->
+            friend.copy(avatarUrl = avatarMap[friend.id] ?: friend.avatarUrl)
+        }
+
+        markerRenderer.renderFriends(
+            style = style,
+            friends = friends,
+            currentUser = currentUserMapMarker()
+        )
+        mapLibreMap?.let { map ->
+            markerRenderer.updateNearbyGroupVisibility(map, style)
+        }
+        updateCameraForFollowTarget()
+    }
+
+    private fun currentUserMapMarker(): CurrentUserMapMarker? {
+        val id = currentUserId ?: return null
+        val latitude = currentLat ?: return null
+        val longitude = currentLng ?: return null
+
+        return CurrentUserMapMarker(
+            id = id,
+            name = currentUserName,
+            avatarUrl = currentUserAvatar,
             latitude = latitude,
             longitude = longitude
         )
     }
 
-    private fun moveCameraToCurrentLocation() {
-        val latitude = currentLat ?: return
-        val longitude = currentLng ?: return
-
-        mapLibreMap?.animateCamera(
-            CameraUpdateFactory.newLatLngZoom(LatLng(latitude, longitude), zoom = 16.0),
-            800
-        )
+    private fun setFocusedFriendMarker(friendId: String?) {
+        if (friendId == null) {
+            focusedFriendZoom = null
+            isAnimatingToFriend = false
+        }
+        markerRenderer.setFocusedFriendMarker(loadedStyle, friendId)
     }
 
-    private fun captureLocation() {
-        if (ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            fusedLocationClient.getCurrentLocation(
-                Priority.PRIORITY_HIGH_ACCURACY,
-                null
-            ).addOnSuccessListener { location ->
-                if (location != null) {
-                    currentLat = location.latitude
-                    currentLng = location.longitude
-                    Log.d("LOCATION", "Đã lấy tọa độ: Lat=$currentLat, Lng=$currentLng")
-                    updateCurrentLocationPoint()
-                    moveCameraToCurrentLocation()
-                } else {
-                    Log.d("LOCATION", "Không thể lấy tọa độ (Có thể do đang ở trong nhà quá kín)")
-                }
-            }
-        } else {
-            currentLat = null
-            currentLng = null
-        }
-    }
-
-    private fun showCurrentLocationPoint(
-        style: Style,
-        latitude: Double,
-        longitude: Double
-    ) {
-        val feature = Feature.fromGeometry(
-            Point.fromLngLat(longitude, latitude)
-        )
-
-        val source = style.getSourceAs<GeoJsonSource>(currentLocationSourceId)
-
-        if (source == null) {
-            style.addSource(GeoJsonSource(currentLocationSourceId, feature))
-        } else {
-            source.setGeoJson(feature)
-        }
-
-        if (style.getLayer(currentLocationLayerId) == null) {
-            style.addLayer(
-                CircleLayer(currentLocationLayerId, currentLocationSourceId).withProperties(
-                    circleRadius(8f),
-                    circleColor("#1976D2"),
-                    circleStrokeWidth(3f),
-                    circleStrokeColor("#FFFFFF")
-                )
-            )
-        }
-    }
-
-    fun decodeToken(token: String?) {
-        if (token.isNullOrEmpty()) {
-            Log.e("JWT_DECODE", "Token null")
+    private fun setFollowTarget(personIds: Set<String>) {
+        if (personIds.isEmpty()) {
+            clearFollowTarget()
             return
         }
 
-        try {
-            val jwt = JWT(token)
-
-            val isTokenExpired = jwt.isExpired(10)
-            if (isTokenExpired) {
-                Log.e("JWT_DECODE", "Token đã hết hạn sử dụng. Vui lòng đăng nhập lại")
-                return
-            }
-
-            val id = jwt.getClaim("id").asString()
-            val userName = jwt.getClaim("username").asString()
-            val displayName = jwt.getClaim("displayName").asString()
-            val userMode = jwt.getClaim("mode").asString()
-
-            val uuid = try {
-                UUID.fromString(id)
-            } catch (e: IllegalArgumentException) {
-                Log.e("JWT_DECODE", "ID từ Token không đúng định dạng UUID: $id")
-                return
-            }
-
-            val mode: UserMode? = try {
-                if (userMode != null) {
-                    UserMode.valueOf(userMode.uppercase())
-                } else {
-                    null
-                }
-            } catch (e: IllegalArgumentException) {
-                Log.e("JWT_DECODE", "mode từ Token không đúng định dạng: $userMode")
-                null
-            }
-
-            val currentAvatar = userSession.getCurrentUser()
-                ?.takeIf { it.id == uuid }
-                ?.avatar
-
-            userSession.setCurrentUser(
-                CurrentUser(
-                    id = uuid,
-                    username = userName,
-                    displayName = displayName,
-                    mode = mode,
-                    avatar = currentAvatar
-                )
-            )
-
-            if (currentAvatar == null) {
-                avatarViewModel.loadAvatar(uuid)
-            }
-            Log.d("JWT_DECODE", "Cập nhật User thành công")
-
-        } catch (e: DecodeException) {
-            Log.e("JWT_DECODE", "Token không hợp lệ hoặc bị lỗi cấu trúc: ${e.message}")
-        }
+        followTarget = FollowTarget(personIds)
+        lastFollowLocation = null
     }
 
-    private fun startLocationUpdates() {
-        val hasLocationPermission = ContextCompat.checkSelfPermission(
-            requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
+    private fun clearFollowTarget() {
+        followTarget = null
+        lastFollowLocation = null
+    }
 
-        if (!hasLocationPermission) return
+    private fun updateCameraForFollowTarget() {
+        val target = followTarget ?: return
+        val map = mapLibreMap ?: return
+        val location = markerRenderer.resolveFollowLocation(target.personIds)
 
-        fusedLocationClient.requestLocationUpdates(
-            locationRequest,
-            locationCallback,
-            Looper.getMainLooper()
+        if (location == null) {
+            clearFollowTarget()
+            return
+        }
+
+        if (location == lastFollowLocation) return
+        lastFollowLocation = location
+
+        map.animateCamera(
+            CameraUpdateFactory.newLatLng(
+                LatLng(location.latitude, location.longitude)
+            ),
+            FOLLOW_CAMERA_ANIMATION_MILLIS
         )
     }
 
-    private fun showFriendLocations(
-        style: Style,
-        friends: List<FriendItemModel>
-    ) {
-        val features = friends.mapNotNull { friend ->
-            val longitude = friend.longitude
-            val latitude = friend.latitude
+    private fun moveCameraToCurrentLocation(animate: Boolean = true) {
+        val latitude = currentLat ?: return
+        val longitude = currentLng ?: return
 
-            if (longitude == null || latitude == null) return@mapNotNull null
+        val cameraUpdate = CameraUpdateFactory.newLatLngZoom(
+            LatLng(latitude, longitude),
+            zoom = FRIEND_FOCUS_ZOOM
+        )
 
-            Feature.fromGeometry(
-                Point.fromLngLat(
-                    longitude,
-                    latitude
-                )
-            ).apply {
-                addStringProperty("id", friend.id.toString())
-                addStringProperty("name", friend.name)
-                addStringProperty(
-                    "iconId",
-                    "friend-avatar-default"
-                )
+        mapLibreMap?.let { map ->
+            if (animate) {
+                map.animateCamera(cameraUpdate, 500)
+            } else {
+                map.moveCamera(cameraUpdate)
             }
         }
+    }
 
-        val featureCollection = FeatureCollection.fromFeatures(features)
+    private fun focusCurrentLocationFromNotificationIfReady() {
+        if (!locationNavigationViewModel.focusCurrentLocation.value) return
+        if (mapLibreMap == null || loadedStyle == null) return
 
-        val existingSource = style.getSourceAs<GeoJsonSource>(friendLocationSourceId)
-
-        if (existingSource == null) {
-            style.addSource(GeoJsonSource(friendLocationSourceId, featureCollection))
+        if (currentLat == null || currentLng == null) {
+            captureLocation()
         } else {
-            existingSource.setGeoJson(featureCollection)
+            updateCurrentLocationPoint()
+            moveCameraToCurrentLocation()
         }
 
-        if (style.getLayer(friendLocationLayerId) == null) {
-            style.addLayer(
-                SymbolLayer(friendLocationLayerId, friendLocationSourceId)
-                    .withProperties(
-                        iconImage(get("iconId")),
-                        iconSize(0.7f),
-                        iconAnchor(ICON_ANCHOR_BOTTOM),
-                        iconAllowOverlap(true),
-                        iconIgnorePlacement(true)
-                    )
-            )
-        }
-
-        loadFriendAvatarImages(style, friends)
+        locationNavigationViewModel.currentLocationFocused()
     }
 
-    private fun createAvatarMarkerBitmap(
-        avatarBitmap: Bitmap
-    ): Bitmap {
-        val size = 120
-        val circleRadius = 46f
-        val circleCenterX = size / 2f
-        val circleCenterY = 50f
-
-        val result = createBitmap(size, size)
-
-        val canvas = Canvas(result)
-
-        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            style = Paint.Style.FILL
-        }
-
-        val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = "#ED9B15".toColorInt()
-            style = Paint.Style.FILL
-        }
-
-        // Phần đuôi marker.
-        val markerPath = android.graphics.Path().apply {
-            moveTo(circleCenterX - 18f, 82f)
-            lineTo(circleCenterX + 18f, 82f)
-            lineTo(circleCenterX, 112f)
-            close()
-        }
-
-        canvas.drawPath(markerPath, markerPaint)
-
-        // Viền ngoài.
-        canvas.drawCircle(
-            circleCenterX,
-            circleCenterY,
-            circleRadius + 6f,
-            markerPaint
-        )
-
-        canvas.drawCircle(
-            circleCenterX,
-            circleCenterY,
-            circleRadius,
-            borderPaint
-        )
-
-        val scaledAvatar =
-            avatarBitmap.scale((circleRadius * 2).toInt(), (circleRadius * 2).toInt())
-
-        val avatarShader = android.graphics.BitmapShader(
-            scaledAvatar,
-            android.graphics.Shader.TileMode.CLAMP,
-            android.graphics.Shader.TileMode.CLAMP
-        )
-
-        val avatarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = avatarShader
-        }
-
-        canvas.drawCircle(
-            circleCenterX,
-            circleCenterY,
-            circleRadius - 4f,
-            avatarPaint
-        )
-
-        return result
+    private fun captureLocation() {
+        if (!::locationController.isInitialized) return
+        locationController.requestCurrentLocation()
     }
 
-    private fun loadFriendAvatarImages(
-        style: Style,
-        friends: List<FriendItemModel>
-    ) {
-        friends.forEach { friend ->
-            val iconId = "friend-avatar-${friend.id}"
-
-            if (style.getImage(iconId) != null) {
-                return@forEach
-            }
-
-            Glide.with(this)
-                .asBitmap()
-                .load(friend.avatarUrl)
-                .placeholder(R.drawable.ic_default_avatar)
-                .error(R.drawable.ic_default_avatar)
-                .into(
-                    object : CustomTarget<Bitmap>() {
-
-                        override fun onResourceReady(
-                            resource: Bitmap,
-                            transition: Transition<in Bitmap>?
-                        ) {
-                            if (!isAdded || view == null) return
-
-                            val currentStyle = loadedStyle ?: return
-
-                            if (currentStyle !== style) return
-
-                            val markerBitmap =
-                                createAvatarMarkerBitmap(resource)
-
-                            if (currentStyle.getImage(iconId) == null) {
-                                currentStyle.addImage(
-                                    iconId,
-                                    markerBitmap
-                                )
-                            }
-                        }
-
-                        override fun onLoadCleared(
-                            placeholder: android.graphics.drawable.Drawable?
-                        ) = Unit
-                    }
-                )
-        }
-    }
 }

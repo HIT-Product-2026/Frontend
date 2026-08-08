@@ -1,11 +1,15 @@
 package com.pando.app.core.base
 
+import com.google.gson.Gson
 import com.pando.app.core.network.api.ApiResponse
 import com.pando.app.core.utils.DataResult
+import kotlinx.coroutines.CancellationException
 import okhttp3.ResponseBody
 import retrofit2.Response
 
 open class BaseRepository {
+    private val gson by lazy(::Gson)
+
     protected suspend fun <T> safeApiCall(call: suspend () -> Response<ApiResponse<T>>): DataResult<ApiResponse<T>> {
         return try {
             val response = call()
@@ -17,14 +21,24 @@ open class BaseRepository {
                     DataResult.Error(body?.message ?: "Response body is null")
                 }
             } else {
-                val body = response.errorBody()?.string()
-                val apiResponse = com.google.gson.Gson().fromJson(body, ApiResponse::class.java)
-                val message: String = apiResponse.message
+                val message = response.errorBody()
+                    ?.use { it.string() }
+                    ?.takeIf(String::isNotBlank)
+                    ?.let { errorBody ->
+                        runCatching {
+                            gson.fromJson(errorBody, ApiResponse::class.java)?.message
+                        }.getOrNull()
+                    }
+                    ?.takeIf(String::isNotBlank)
+                    ?: response.message().takeIf(String::isNotBlank)
+                    ?: "HTTP ${response.code()}"
                 DataResult.Error(
                     message = message,
                     code = response.code()
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             DataResult.Error(e.message ?: "Unknown error occurred")
         }
@@ -51,6 +65,8 @@ open class BaseRepository {
 
                 DataResult.Success(bytes)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             DataResult.Error(
                 message = e.message ?: "Không thể tải file"

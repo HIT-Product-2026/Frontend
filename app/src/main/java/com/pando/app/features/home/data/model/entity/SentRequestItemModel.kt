@@ -8,12 +8,6 @@ data class SentRequestItemModel (
     val name: String,
     val friendshipId: UUID,
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val avatarUrl: String? = null
 ) : BaseItemModel
-
-class DataSentRequestItem {
-    companion object {
-        var total : Int? = null
-        val data : MutableList<SentRequestItemModel> = mutableListOf()
-    }
-}

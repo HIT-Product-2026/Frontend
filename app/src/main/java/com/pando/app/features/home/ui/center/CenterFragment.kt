@@ -3,16 +3,21 @@ package com.pando.app.features.home.ui.center
 import android.os.Bundle
 import android.view.View
 import androidx.core.view.isVisible
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.location.LocationNavigationViewModel
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentCenterBinding
+import com.pando.app.features.shared.AvatarViewModel
+import com.pando.app.features.widget.WidgetNavigationViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,6 +33,13 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
     @Inject
     lateinit var userSession: UserSession
 
+    private val widgetNavigationViewModel: WidgetNavigationViewModel by activityViewModels()
+    private val locationNavigationViewModel: LocationNavigationViewModel by activityViewModels()
+    private val avatarViewModel: AvatarViewModel by activityViewModels()
+    private var isCameraInSendMode = false
+    private var isCameraZooming = false
+    private var isPostReelMessageComposerOpen = false
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -40,6 +52,7 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
             }
 
             isUserInputEnabled = false
+            post { disablePagerKeyboardFocus() }
         }
     }
 
@@ -47,7 +60,6 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
     }
 
     override fun initView() {
-        loadCurrentUser()
     }
 
     override fun initActionView() {
@@ -57,7 +69,7 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
 
-                binding.verticalViewPager.isUserInputEnabled = position != PAGE_MAP
+                updatePagerSwipeState(position)
                 binding.topBar.isVisible = position != PAGE_MAP
             }
         })
@@ -66,12 +78,41 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
             findNavController().navigate(R.id.action_centerFragment_to_chatMenuFragment)
         }
 
-        binding.friendBtn.setOnClickListener {
-            findNavController().navigate(R.id.action_centerFragment_to_friendFragment)
+        binding.mapBtn.setOnClickListener {
+            openMap()
         }
 
         binding.profileIcon.setOnClickListener {
             findNavController().navigate(R.id.action_centerFragment_to_settingFragment)
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    widgetNavigationViewModel.replyTarget.collect { shouldOpen ->
+                        if (shouldOpen) {
+                            binding.verticalViewPager.setCurrentItem(PAGE_POST_REEL, false)
+                            widgetNavigationViewModel.handledTarget()
+                        }
+                    }
+                }
+                launch {
+                    locationNavigationViewModel.focusCurrentLocation.collect { shouldFocus ->
+                        if (shouldFocus) {
+                            binding.verticalViewPager.setCurrentItem(PAGE_MAP, false)
+                        }
+                    }
+                }
+                launch {
+                    userSession.currentUser.collect { user ->
+                        if (user != null && user.avatar == null) {
+                            avatarViewModel.loadAvatar(user.id)
+                        }
+
+                        binding.profileIcon.loadAvatar(user?.avatar)
+                    }
+                }
+            }
         }
     }
 
@@ -83,13 +124,42 @@ class CenterFragment : BaseFragment<FragmentCenterBinding>(FragmentCenterBinding
         binding.verticalViewPager.setCurrentItem(PAGE_POST_REEL, true)
     }
 
-    private fun loadCurrentUser() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                userSession.currentUser.collect { user ->
-                    binding.profileIcon.loadAvatar(user?.avatar)
-                }
-            }
+    fun openMap() {
+        binding.verticalViewPager.setCurrentItem(PAGE_MAP, true)
+    }
+
+    fun setCameraSendMode(isSendMode: Boolean) {
+        isCameraInSendMode = isSendMode
+        updatePagerSwipeState(binding.verticalViewPager.currentItem)
+    }
+
+    fun setCameraZooming(isZooming: Boolean) {
+        isCameraZooming = isZooming
+        updatePagerSwipeState(binding.verticalViewPager.currentItem)
+    }
+
+    fun setPostReelMessageComposerOpen(isOpen: Boolean) {
+        isPostReelMessageComposerOpen = isOpen
+        updatePagerSwipeState(binding.verticalViewPager.currentItem)
+    }
+
+    private fun updatePagerSwipeState(position: Int) {
+        binding.verticalViewPager.isUserInputEnabled =
+            position != PAGE_MAP &&
+                !(position == PAGE_CAMERA && (isCameraInSendMode || isCameraZooming)) &&
+                !(position == PAGE_POST_REEL && isPostReelMessageComposerOpen)
+
+        disablePagerKeyboardFocus()
+    }
+
+    private fun disablePagerKeyboardFocus() {
+        val pagerRecyclerView = binding.verticalViewPager.getChildAt(0) as? RecyclerView
+            ?: return
+
+        if (pagerRecyclerView.isFocused) {
+            pagerRecyclerView.clearFocus()
         }
+        pagerRecyclerView.isFocusable = false
+        pagerRecyclerView.isFocusableInTouchMode = false
     }
 }

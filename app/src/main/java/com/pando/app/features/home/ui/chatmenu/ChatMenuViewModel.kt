@@ -10,7 +10,6 @@ import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.utils.DataResult
 import com.pando.app.features.home.data.model.dto.ConversationDto
 import com.pando.app.features.home.data.model.entity.ChatMenuItemModel
-import com.pando.app.features.home.data.model.entity.DataChatMenuItem
 import com.pando.app.features.home.data.model.response.ConversationsResponse
 import com.pando.app.features.home.data.repository.ConversationRepository
 import com.pando.app.features.home.data.socket.ConversationsSocket
@@ -59,9 +58,16 @@ class ChatMenuViewModel @Inject constructor(
             item.id == response.id
         } ?: return
 
+        val recipient = if (getCurrentUserId() == response.user1.id) {
+            response.user2
+        } else {
+            response.user1
+        }
+
         val updatedItem = oldItem.copy(
             previewChat = response.lastMessageContent,
-            time = response.lastMessageTime?.toLocalDateTime()
+            time = response.lastMessageTime?.toLocalDateTime(),
+            avatarUrl = recipient.avatarUrl ?: oldItem.avatarUrl
         )
 
         val updatedList = _conversations.value
@@ -70,11 +76,6 @@ class ChatMenuViewModel @Inject constructor(
         val sortedItems = updatedList
             .distinctBy { it.id }
             .sortedByDescending { it.time }
-
-        DataChatMenuItem.data.apply {
-            clear()
-            addAll(sortedItems)
-        }
 
         _conversations.value = sortedItems
     }
@@ -86,41 +87,41 @@ class ChatMenuViewModel @Inject constructor(
 
             if (result is DataResult.Success) {
 
-                DataChatMenuItem.apply {
-                    data.clear()
-                    total = 0
-                }
-
                 val total = result.data.data.total
-                DataChatMenuItem.total = total
 
                 val data = result.data.data.items
                 if (total > 0) {
                     val conversations = data.map { item ->
                         ChatMenuItemModel(
                             id = item.id,
-                            senderId =
-                                if (getCurrentUserId()?.equals(item.user1.id) == true) item.user1.id else item.user2.id,
-                            recipientId =
-                                if (getCurrentUserId()?.equals(item.user1.id) == true) item.user2.id else item.user1.id,
+                            senderId = if (getCurrentUserId()?.equals(item.user1.id) == true) {
+                                item.user1.id
+                            } else {
+                                item.user2.id
+                            },
+                            recipientId = if (getCurrentUserId()?.equals(item.user1.id) == true) {
+                                item.user2.id
+                            } else {
+                                item.user1.id
+                            },
                             name = if (getCurrentUserId()?.equals(item.user1.id) == true) {
                                 item.user2.displayName.ifEmpty { item.user2.username }
                             } else {
                                 item.user1.displayName.ifEmpty { item.user1.username }
                             },
                             previewChat = item.lastMessageContent,
-                            time = item.lastMessageTime?.toLocalDateTime()
+                            time = item.lastMessageTime?.toLocalDateTime(),
+                            avatarUrl = if (getCurrentUserId()?.equals(item.user1.id) == true) {
+                                item.user2.avatarUrl
+                            } else {
+                                item.user1.avatarUrl
+                            }
                         )
                     }
 
                     val sortedItems = conversations
                         .distinctBy { it.id }
                         .sortedByDescending { it.time }
-
-                    DataChatMenuItem.data.apply {
-                        clear()
-                        addAll(sortedItems)
-                    }
 
                     _conversations.value = sortedItems
                 }

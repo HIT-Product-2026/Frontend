@@ -9,12 +9,6 @@ data class ReceivedRequestItemModel (
     val name: String,
     val friendshipId: UUID,
     val loadingAction: FriendAction? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val avatarUrl: String? = null
 ) : BaseItemModel
-
-class DataReceivedRequestItem {
-    companion object {
-        var total : Int? = null
-        val data : MutableList<ReceivedRequestItemModel> = mutableListOf()
-    }
-}

@@ -16,13 +16,17 @@ import androidx.navigation.fragment.findNavController
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.extensions.showShortToast
 import com.pando.app.core.session.UserSession
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentProfileBinding
+import com.pando.app.features.home.data.model.entity.CurrentUserProfile
 import com.pando.app.features.home.data.model.entity.enumEntity.Gender
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.io.File
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import javax.inject.Inject
 
@@ -36,6 +40,8 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
 
     private var selectedAvatarUri: Uri? = null
     private var selectedAvatarFile: File? = null
+    private var pendingDisplayName: String? = null
+    private var pendingProfile: CurrentUserProfile? = null
 
     private val pickAvatarLauncher = registerForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -89,33 +95,36 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
             findNavController().navigateUp()
         }
 
-        var displayName = binding.displayNameET.text.toString()
-        var phoneNumber: String
-        var birthday: String
-        var gender: String
-
         binding.saveButton.setOnClickListener {
-            displayName = binding.displayNameET.text.toString()
-            phoneNumber = binding.phoneET.text.toString()
-            birthday = binding.birthDateTV.text.toString()
-            gender = binding.genderTV.text.toString()
-
-            profileViewModel.updateDisplayName(displayName)
-            if (gender != "Giới tính") {
-                when (gender) {
-                    "Nam" -> {
-                        profileViewModel.updateProfile(birthday, Gender.MALE, phoneNumber)
-                    }
-
-                    "Nữ" -> {
-                        profileViewModel.updateProfile(birthday, Gender.FEMALE, phoneNumber)
-                    }
-
-                    else -> {
-                        profileViewModel.updateProfile(birthday, Gender.OTHER, phoneNumber)
-                    }
-                }
+            val displayName = binding.displayNameET.text.toString().trim()
+            val phoneNumber = binding.phoneET.text.toString().trim()
+            val birthday = binding.birthDateTV.text.toString().trim()
+            val gender = when (binding.genderTV.text.toString()) {
+                "Nam" -> Gender.MALE
+                "Nữ" -> Gender.FEMALE
+                "Khác" -> Gender.OTHER
+                else -> null
             }
+
+            if (gender == null) {
+                Toast.makeText(requireContext(), "Vui lòng chọn giới tính", Toast.LENGTH_SHORT)
+                    .show()
+                return@setOnClickListener
+            }
+
+            pendingDisplayName = displayName
+            pendingProfile = CurrentUserProfile(
+                birthday = birthday,
+                gender = gender,
+                phoneNumber = phoneNumber
+            )
+
+            profileViewModel.updateProfile(
+                displayName = displayName,
+                birthday = birthday,
+                gender = gender,
+                phoneNumber = phoneNumber
+            )
         }
 
         binding.btnEditAvatar.setOnClickListener {
@@ -124,70 +133,84 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
 
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                profileViewModel.uiState.collect { state ->
-                    when (state) {
-                        is UiState.Idle -> {}
+                launch {
+                    profileViewModel.uiState.collect { state ->
+                        when (state) {
+                            is UiState.Idle -> {}
 
-                        is UiState.Loading -> {
-                            binding.saveButton.isEnabled = false
-                            binding.saveText.visibility = View.GONE
-                            binding.saveProgressBar.visibility = View.VISIBLE
-                        }
-
-                        is UiState.Success -> {
-                            binding.saveButton.isEnabled = true
-                            binding.saveText.visibility = View.VISIBLE
-                            binding.saveProgressBar.visibility = View.GONE
-
-                            userSession.updateCurrentUser { user ->
-                                user.copy(
-                                    displayName = displayName
-                                )
+                            is UiState.Loading -> {
+                                binding.saveButton.isEnabled = false
+                                binding.saveText.visibility = View.GONE
+                                binding.saveProgressBar.visibility = View.VISIBLE
                             }
 
-                            findNavController().navigateUp()
-                        }
+                            is UiState.Success -> {
+                                binding.saveButton.isEnabled = true
+                                binding.saveText.visibility = View.VISIBLE
+                                binding.saveProgressBar.visibility = View.GONE
 
-                        is UiState.Error -> {
-                            binding.saveButton.isEnabled = true
-                            binding.saveText.visibility = View.VISIBLE
-                            binding.saveProgressBar.visibility = View.GONE
+                                val updatedDisplayName = pendingDisplayName
+                                val updatedProfile = pendingProfile
+
+                                if (updatedDisplayName != null && updatedProfile != null) {
+                                    userSession.updateCurrentUser { user ->
+                                        user.copy(
+                                            displayName = updatedDisplayName,
+                                            profile = updatedProfile
+                                        )
+                                    }
+                                }
+
+                                pendingDisplayName = null
+                                pendingProfile = null
+                                requireContext().showShortToast(R.string.profile_updated_success)
+                                findNavController().navigateUp()
+                            }
+
+                            is UiState.Error -> {
+                                binding.saveButton.isEnabled = true
+                                binding.saveText.visibility = View.VISIBLE
+                                binding.saveProgressBar.visibility = View.GONE
+                                Toast.makeText(
+                                    requireContext(),
+                                    state.message,
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
                         }
                     }
                 }
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                profileViewModel.avatarResult.collect { state ->
-                    when (state) {
-                        is UiState.Loading -> {
-                            binding.btnEditAvatar.isEnabled = false
-                        }
-
-                        is UiState.Success -> {
-                            val avatarBytes = selectedAvatarFile
-                            if (avatarBytes != null) {
-                                userSession.updateAvatar(selectedAvatarUri)
+                launch {
+                    profileViewModel.avatarResult.collect { state ->
+                        when (state) {
+                            is UiState.Loading -> {
+                                binding.btnEditAvatar.isEnabled = false
                             }
 
-                            clearSelectedAvatarFile()
-                            binding.btnEditAvatar.isEnabled = true
-                            profileViewModel.clearAvatarResult()
-                        }
+                            is UiState.Success -> {
+                                val avatarBytes = selectedAvatarFile
+                                if (avatarBytes != null) {
+                                    userSession.updateAvatar(selectedAvatarUri)
+                                }
 
-                        is UiState.Error -> {
-                            Toast.makeText(requireContext(), state.message, Toast.LENGTH_SHORT)
-                                .show()
+                                clearSelectedAvatarFile()
+                                binding.btnEditAvatar.isEnabled = true
+                                requireContext().showShortToast(R.string.avatar_updated_success)
+                                profileViewModel.clearAvatarResult()
+                            }
 
-                            clearSelectedAvatarFile()
-                            binding.btnEditAvatar.isEnabled = true
-                            profileViewModel.clearAvatarResult()
-                        }
+                            is UiState.Error -> {
+                                Toast.makeText(requireContext(), state.message, Toast.LENGTH_SHORT)
+                                    .show()
 
-                        is UiState.Idle -> {
-                            binding.btnEditAvatar.isEnabled = true
+                                clearSelectedAvatarFile()
+                                binding.btnEditAvatar.isEnabled = true
+                                profileViewModel.clearAvatarResult()
+                            }
+
+                            is UiState.Idle -> {
+                                binding.btnEditAvatar.isEnabled = true
+                            }
                         }
                     }
                 }
@@ -202,7 +225,7 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
 
             val date: String = makeDateString(formattedDay, formattedMonth, year)
 
-            binding.birthDateTV.setText(date)
+            binding.birthDateTV.setText(date, false)
         }
 
         binding.birthDateTV.setOnClickListener {
@@ -230,6 +253,25 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
                 userSession.currentUser.collect { user ->
                     binding.profileIcon.loadAvatar(user?.avatar)
                     binding.displayNameET.setText(user?.displayName.orEmpty())
+
+                    val profile = user?.profile
+                    val birthday = profile?.birthday.orEmpty()
+                    val displayBirthday = runCatching {
+                        val birthdayParsed = LocalDate.parse(birthday)
+                        makeDateString(birthdayParsed.dayOfMonth.toString(), birthdayParsed.monthValue.toString(), birthdayParsed.year)
+                    }.getOrDefault(birthday)
+
+                    binding.birthDateTV.setText(displayBirthday, false)
+                    binding.phoneET.setText(profile?.phoneNumber.orEmpty())
+                    binding.genderTV.setText(
+                        when (profile?.gender) {
+                            Gender.MALE -> "Nam"
+                            Gender.FEMALE -> "Nữ"
+                            Gender.OTHER -> "Khác"
+                            null -> ""
+                        },
+                        false
+                    )
                 }
             }
         }

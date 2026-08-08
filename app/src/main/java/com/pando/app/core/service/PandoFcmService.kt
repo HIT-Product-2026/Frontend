@@ -3,31 +3,57 @@ package com.pando.app.core.service
 import android.util.Log
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.pando.app.features.widget.FcmPostPayload
+import com.pando.app.features.widget.WidgetUpdater
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class PandoFcmService : FirebaseMessagingService() {
+    companion object {
+        private const val TAG = "PandoFcmService"
+    }
+
+    @Inject
+    lateinit var fcmTokenSyncManager: FcmTokenSyncManager
+
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
-        Log.d("FCM_RECEIVE", "Có thông báo từ Server!")
+        Log.d(TAG, "Có thông báo từ Server!")
 
-        if (message.data.isNotEmpty()) {
-            val action = message.data["action"]
+        if (message.data.isEmpty()) {
+            Log.w(TAG, "FCM không có data payload")
+            return
+        }
 
-            if (action == "WIDGET_UPDATE") {
-                val imageUrl = message.data["newImageUrl"]
-                Log.d("FCM_RECEIVE", "Cần tải ảnh lên Widget: $imageUrl")
-            }
-            else if (action == "NEW_CHAT_MESSAGE") {
-                val senderName = message.data["senderName"]
-                Log.d("FCM_RECEIVE", "Tin nhắn từ $senderName")
+        val payload = FcmPostPayload.from(message.data)
+
+        if (payload == null) {
+            Log.e(TAG, "Không thể chuyển FCM data thành FcmPostPayload")
+            Log.e(TAG, "FCM data: ${message.data}")
+            return
+        }
+
+        when (payload.type) {
+            "POST" -> {
+                Log.d(TAG, "Đã nhận thông báo bài viết mới")
+
+                updatePostWidget(payload)
             }
         }
+    }
+
+    private fun updatePostWidget(payload: FcmPostPayload) {
+        WidgetUpdater(applicationContext).updatePost(payload)
     }
 
     @Deprecated("Deprecated in Java")
     @Suppress("DEPRECATION")
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        Log.d("FCM_TOKEN", "Mã thiết bị mới: $token")
+        Log.d(TAG, "FCM token đã được làm mới")
+
+        fcmTokenSyncManager.onNewToken(token)
     }
 }

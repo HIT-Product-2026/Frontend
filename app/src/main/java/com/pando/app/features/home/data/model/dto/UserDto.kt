@@ -7,5 +7,6 @@ data class UserDto (
     val id: UUID,
     val username: String,
     val displayName: String,
-    val mode: UserMode
+    val mode: UserMode,
+    val avatarUrl: String? = null
 )

@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.viewbinding.ViewBinding
+import com.pando.app.core.extensions.applyButtonPressFeedbackRecursively
 
 abstract class BaseFragment<B : ViewBinding>(
     private val inflate: (LayoutInflater, ViewGroup?, Boolean) -> B
@@ -28,6 +29,7 @@ abstract class BaseFragment<B : ViewBinding>(
         initData()
         initView()
         initActionView()
+        view.applyButtonPressFeedbackRecursively()
     }
 
     override fun onDestroyView() {

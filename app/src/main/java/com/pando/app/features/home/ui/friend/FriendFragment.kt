@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.PopupWindow
 import androidx.appcompat.widget.SearchView
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -13,6 +14,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.pando.app.core.base.BaseAdapter
 import com.pando.app.core.base.BaseDiffCallBack
 import com.pando.app.core.base.BaseFragment
@@ -24,28 +26,41 @@ import com.pando.app.databinding.ItemReceivedFriendRequestRvBinding
 import com.pando.app.databinding.ItemSearchResultRvBinding
 import com.pando.app.databinding.ItemSentFriendRequestRvBinding
 import com.pando.app.databinding.PopupFriendActionBinding
-import com.pando.app.features.home.data.model.entity.DataFriendItem
-import com.pando.app.features.home.data.model.entity.DataInviteItem
-import com.pando.app.features.home.data.model.entity.DataReceivedRequestItem
-import com.pando.app.features.home.data.model.entity.DataSearchItem
-import com.pando.app.features.home.data.model.entity.DataSentRequestItem
 import com.pando.app.features.home.data.model.entity.FriendItemModel
 import com.pando.app.features.home.data.model.entity.InviteItemModel
 import com.pando.app.features.home.data.model.entity.ReceivedRequestItemModel
 import com.pando.app.features.home.data.model.entity.SearchItemModel
 import com.pando.app.features.home.data.model.entity.SentRequestItemModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.UUID
 import androidx.core.graphics.drawable.toDrawable
 import androidx.fragment.app.activityViewModels
 import androidx.viewbinding.ViewBinding
+import com.pando.app.R
+import com.pando.app.core.extensions.applyButtonPressFeedbackRecursively
 import com.pando.app.core.extensions.loadAvatar
+import com.pando.app.core.extensions.showComingSoon
+import com.pando.app.core.extensions.showShortToast
 import com.pando.app.features.shared.AvatarViewModel
 
 @AndroidEntryPoint
 class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding::inflate) {
+    private companion object {
+        const val COLLAPSED_FRIEND_COUNT = 3
+    }
+
+    private val inviteItems = listOf(
+        InviteItemModel("facebook_ic", "Facebook", R.drawable.facebook),
+        InviteItemModel("messenger_ic", "Messenger", R.drawable.messenger),
+        InviteItemModel("instagram_ic", "Instagram", R.drawable.instagram),
+        InviteItemModel("message_ic", "Message", R.drawable.message_ic),
+        InviteItemModel("more_ic", "More", R.drawable.more)
+    )
+
     private var avatarMap: Map<UUID, String> = emptyMap()
+    private var isFriendListExpanded = false
 
     //View Model
     private val friendViewModel: FriendViewModel by viewModels()
@@ -87,12 +102,20 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         binding.receivedFriendRequestLayout.visibility = View.GONE
         binding.btnToggleList.visibility = View.GONE
 
-        inviteItemAdapter.submitList(DataInviteItem.data)
+        inviteItemAdapter.submitList(inviteItems)
     }
 
     override fun initActionView() {
         binding.backButton.setOnClickListener {
             findNavController().navigateUp()
+        }
+
+        binding.btnToggleList.setOnClickListener {
+            isFriendListExpanded = !isFriendListExpanded
+            updateFriendRV(
+                friendViewModel.friends.value,
+                friendViewModel.friendTotal.value
+            )
         }
 
         binding.searchView.queryHint = "Nhập email hoặc username của bạn bè"
@@ -121,11 +144,10 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
                 avatarViewModel.avatars.collect { avatars ->
                     avatarMap = avatars
 
-                    friendsItemAdapter.notifyDataSetChanged()
-                    searchItemAdapter.notifyDataSetChanged()
-                    inviteItemAdapter.notifyDataSetChanged()
-                    receivedRequestedAdapter.notifyDataSetChanged()
-                    sentRequestedAdapter.notifyDataSetChanged()
+                    refreshVisibleItems(binding.friendsRV)
+                    refreshVisibleItems(binding.resultRV)
+                    refreshVisibleItems(binding.receivedFriendRequestRV)
+                    refreshVisibleItems(binding.sentFriendRequestRV)
                 }
             }
         }
@@ -139,40 +161,52 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
 
                         is UiState.Success -> {
                             when (state.data) {
-                                is FriendResult.FriendListSuccess -> {
-                                    updateFriendRV()
-                                }
-
-                                is FriendResult.SentRequestedUsersSuccess -> {
-                                    updateSentRV()
-                                }
-
-                                is FriendResult.ReceivedRequestedUsersSuccess -> {
-                                    updateReceivedRV()
-                                }
-
-                                is FriendResult.SearchState -> {
-                                    updateSearchRV()
-                                }
-
                                 is FriendResult.UnfriendSuccess -> {
-                                    val result = state.data.response.data
-                                    val friend = DataFriendItem.data.firstOrNull { item ->
-                                        result.receiver.id == item.id
-                                    }
-
-                                    if (friend != null) {
-                                        DataFriendItem.data.remove(friend)
-                                        DataFriendItem.total = DataFriendItem.total?.minus(1)
-                                        updateFriendRV()
-                                    }
+                                    requireContext().showShortToast(R.string.friend_removed)
                                 }
+
+                                is FriendResult.FriendListSuccess,
+                                is FriendResult.SentRequestedUsersSuccess,
+                                is FriendResult.ReceivedRequestedUsersSuccess,
+                                is FriendResult.SearchState -> Unit
                             }
                         }
 
                         is UiState.Error -> {
 
                         }
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    combine(
+                        friendViewModel.friends,
+                        friendViewModel.friendTotal
+                    ) { friends, total -> friends to total }
+                        .collect { (friends, total) ->
+                            updateFriendRV(friends, total)
+                        }
+                }
+
+                launch {
+                    friendViewModel.searchResults.collect { results ->
+                        updateSearchRV(results)
+                    }
+                }
+
+                launch {
+                    friendViewModel.sentRequests.collect { requests ->
+                        updateSentRV(requests)
+                    }
+                }
+
+                launch {
+                    friendViewModel.receivedRequests.collect { requests ->
+                        updateReceivedRV(requests)
                     }
                 }
             }
@@ -193,71 +227,22 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
                 friendViewModel.friendEvent.collect { event ->
                     when (event) {
                         is FriendEvent.RequestFriendSuccess -> {
-                            val requested = event.response.data
-                            val searchUser = DataSearchItem.data.firstOrNull { item ->
-                                requested.receiver.id == item.id
-                            }
+                            requireContext().showShortToast(R.string.friend_request_sent)
                             binding.searchView.clearFocus()
-
-                            if (searchUser != null) {
-                                DataSearchItem.data.remove(searchUser)
-                                DataSearchItem.total = DataSearchItem.total?.minus(1)
-
-                                DataSentRequestItem.data.add(
-                                    SentRequestItemModel(
-                                        searchUser.id,
-                                        searchUser.name,
-                                        requested.id
-                                    )
-                                )
-
-                                updateSearchRV()
-                                updateSentRV()
-                            }
                         }
 
                         is FriendEvent.RejectFriendSuccess -> {
-                            val result = event.response.data
-                            val received = DataReceivedRequestItem.data.firstOrNull { item ->
-                                result.requester.id == item.id
-                            }
-                            val requested = DataSentRequestItem.data.firstOrNull { item ->
-                                result.receiver.id == item.id
-                            }
-
-                            if (received != null) {
-                                DataReceivedRequestItem.data.remove(received)
-                                DataReceivedRequestItem.total = DataReceivedRequestItem.total?.minus(1)
-
-                                updateReceivedRV()
-                            } else if (requested != null) {
-                                DataSentRequestItem.data.remove(requested)
-                                DataSentRequestItem.total = DataSentRequestItem.total?.minus(1)
-
-                                updateSentRV()
-                            }
+                            requireContext().showShortToast(
+                                if (event.wasOutgoing) {
+                                    R.string.friend_request_cancelled
+                                } else {
+                                    R.string.friend_request_rejected
+                                }
+                            )
                         }
 
                         is FriendEvent.AcceptFriendSuccess -> {
-                            val result = event.response.data
-                            val requested = DataReceivedRequestItem.data.firstOrNull { item ->
-                                result.requester.id == item.id
-                            }
-
-                            if (requested != null) {
-                                DataReceivedRequestItem.data.remove(requested)
-                                DataReceivedRequestItem.total = DataReceivedRequestItem.total?.minus(1)
-
-                                DataFriendItem.data.add(
-                                    FriendItemModel(
-                                        requested.id,
-                                        requested.name
-                                    )
-                                )
-
-                                updateReceivedRV()
-                                updateFriendRV()
-                            }
+                            requireContext().showShortToast(R.string.friend_request_accepted)
                         }
                     }
                 }
@@ -272,6 +257,9 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
             itemBinding.appIcon.setImageResource(item.icon)
+            itemBinding.inviteCard.setOnClickListener {
+                requireContext().showComingSoon()
+            }
         }
 
         friendsItemAdapter = BaseAdapter(
@@ -280,7 +268,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            bindAvatar(itemBinding.profileIcon, item.id)
+            bindAvatar(itemBinding.profileIcon, item.id, item.avatarUrl)
 
             itemBinding.functionBtn.setOnClickListener {
                 showFriendActions(itemBinding, item)
@@ -293,7 +281,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            bindAvatar(itemBinding.profileIcon, item.id)
+            bindAvatar(itemBinding.profileIcon, item.id, item.avatarUrl)
 
             itemBinding.addFriendBtn.setOnClickListener {
                 friendViewModel.requestFriend(item.id)
@@ -306,7 +294,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            bindAvatar(itemBinding.profileIcon, item.id)
+            bindAvatar(itemBinding.profileIcon, item.id, item.avatarUrl)
 
             itemBinding.cancelBtn.setOnClickListener {
                 friendViewModel.rejectFriend(item.friendshipId)
@@ -319,7 +307,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         ) { itemBinding, item ->
             itemBinding.tvName.text = item.name
 
-            bindAvatar(itemBinding.profileIcon, item.id)
+            bindAvatar(itemBinding.profileIcon, item.id, item.avatarUrl)
 
             itemBinding.cancelBtn.setOnClickListener {
                 friendViewModel.rejectFriend(item.friendshipId)
@@ -358,81 +346,111 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
         }
     }
 
-    fun updateSentRV() {
-        val dataItems = DataSentRequestItem.data.toList()
+    private fun refreshVisibleItems(recyclerView: RecyclerView) {
+        val adapter = recyclerView.adapter ?: return
+        val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+            ?: return
+        val firstVisible = layoutManager.findFirstVisibleItemPosition()
+        val lastVisible = layoutManager.findLastVisibleItemPosition()
 
+        if (firstVisible == RecyclerView.NO_POSITION ||
+            lastVisible == RecyclerView.NO_POSITION ||
+            adapter.itemCount == 0
+        ) {
+            return
+        }
+
+        val lastPosition = lastVisible.coerceAtMost(adapter.itemCount - 1)
+        if (firstVisible <= lastPosition) {
+            adapter.notifyItemRangeChanged(
+                firstVisible,
+                lastPosition - firstVisible + 1
+            )
+        }
+    }
+
+    private fun updateSentRV(dataItems: List<SentRequestItemModel>) {
         if (dataItems.isNotEmpty()) {
             binding.sentFriendRequestLayout.visibility = View.VISIBLE
 
             sentRequestedAdapter.submitList(dataItems)
-
-            avatarViewModel.loadAvatars(
-                dataItems.map { it.id }
-            )
         } else {
             binding.sentFriendRequestLayout.visibility = View.GONE
             sentRequestedAdapter.submitList(emptyList())
         }
     }
 
-    fun updateReceivedRV() {
-        val dataItems = DataReceivedRequestItem.data.toList()
-
+    private fun updateReceivedRV(dataItems: List<ReceivedRequestItemModel>) {
         if (dataItems.isNotEmpty()) {
             binding.receivedFriendRequestLayout.visibility =
                 View.VISIBLE
 
             receivedRequestedAdapter.submitList(dataItems)
-
-            avatarViewModel.loadAvatars(
-                dataItems.map { it.id }
-            )
         } else {
             binding.receivedFriendRequestLayout.visibility = View.GONE
             receivedRequestedAdapter.submitList(emptyList())
         }
     }
 
-    fun updateSearchRV() {
-        val searchItems = DataSearchItem.data.toList()
-
+    private fun updateSearchRV(searchItems: List<SearchItemModel>) {
         if (searchItems.isNotEmpty()) {
             binding.resultLayout.visibility = View.VISIBLE
 
             searchItemAdapter.submitList(searchItems)
-
-            avatarViewModel.loadAvatars(
-                searchItems.map { it.id }
-            )
         } else {
             binding.resultLayout.visibility = View.GONE
             searchItemAdapter.submitList(emptyList())
         }
     }
 
-    fun updateFriendRV() {
-        val dataItems = DataFriendItem.data.toList()
-
+    private fun updateFriendRV(
+        dataItems: List<FriendItemModel>,
+        total: Int
+    ) {
         if (dataItems.isNotEmpty()) {
             binding.friendNumberText.visibility = View.VISIBLE
             binding.friendsLayout.visibility = View.VISIBLE
-            binding.friendNumberText.text =
-                "${DataFriendItem.total} người bạn"
-
-            friendsItemAdapter.submitList(dataItems)
-
-            avatarViewModel.loadAvatars(
-                dataItems.map { it.id }
+            binding.btnToggleList.visibility =
+                if (dataItems.size > COLLAPSED_FRIEND_COUNT) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
+            binding.btnToggleList.text =
+                if (isFriendListExpanded) "Thu gọn" else "Xem thêm"
+            binding.btnToggleList.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                null,
+                null,
+                ContextCompat.getDrawable(
+                    requireContext(),
+                    if (isFriendListExpanded) {
+                        R.drawable.outline_arrow_drop_up_24
+                    } else {
+                        R.drawable.outline_arrow_drop_down_24
+                    }
+                ),
+                null
             )
+            binding.friendNumberText.text =
+                "$total người bạn"
+
+            val displayedItems = if (isFriendListExpanded) {
+                dataItems
+            } else {
+                dataItems.take(COLLAPSED_FRIEND_COUNT)
+            }
+
+            friendsItemAdapter.submitList(displayedItems)
         } else {
             binding.friendNumberText.visibility = View.GONE
             binding.friendsLayout.visibility = View.GONE
+            binding.btnToggleList.visibility = View.GONE
             friendsItemAdapter.submitList(emptyList())
         }
     }
 
     private fun updateSearchActionStates(states: Map<UUID, FriendActionState>) {
-        val updatedItems = DataSearchItem.data.map { item ->
+        val updatedItems = friendViewModel.searchResults.value.map { item ->
             val state = states[item.id]
 
             item.copy(
@@ -445,7 +463,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
     }
 
     private fun updateSentActionStates(states: Map<UUID, FriendActionState>) {
-        val updatedItems = DataSentRequestItem.data.map { item ->
+        val updatedItems = friendViewModel.sentRequests.value.map { item ->
             val state = states[item.friendshipId]
 
             item.copy(
@@ -458,7 +476,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
     }
 
     private fun updateReceivedActionStates(states: Map<UUID, FriendActionState>) {
-        val updatedItems = DataReceivedRequestItem.data.map { item ->
+        val updatedItems = friendViewModel.receivedRequests.value.map { item ->
             val state = states[item.friendshipId]
 
             item.copy(
@@ -485,6 +503,7 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             true
         ).apply {
             isOutsideTouchable = true
+            elevation = 8f * resources.displayMetrics.density
 
             setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
 
@@ -499,24 +518,34 @@ class FriendFragment : BaseFragment<FragmentFriendBinding>(FragmentFriendBinding
             friendViewModel.unfriend(friend.id)
         }
 
+        popupBinding.btnBlockFriend.setOnClickListener {
+            popupWindow.dismiss()
+            requireContext().showComingSoon()
+        }
+
+        popupBinding.root.applyButtonPressFeedbackRecursively()
+
         popupBinding.root.measure(
             View.MeasureSpec.UNSPECIFIED,
             View.MeasureSpec.UNSPECIFIED
         )
 
+        val maxPopupWidth = (view.root.width * 0.64f).toInt()
         val popupWidth = popupBinding.root.measuredWidth
+            .coerceAtMost(maxPopupWidth)
+        popupWindow.width = popupWidth
 
         val xOffset = view.root.width - popupWidth
 
         popupWindow.showAsDropDown(view.root, xOffset, -20)
     }
 
-    private fun bindAvatar(imageView: ImageView, userId: UUID) {
-        val avatar = avatarMap[userId]
+    private fun bindAvatar(imageView: ImageView, userId: UUID, avatarUrl: String?) {
+        val avatar = avatarUrl?.takeIf(String::isNotBlank) ?: avatarMap[userId]
 
         imageView.loadAvatar(avatar)
 
-        if (avatar == null) {
+        if (avatar.isNullOrBlank()) {
             avatarViewModel.loadAvatar(userId)
         }
     }

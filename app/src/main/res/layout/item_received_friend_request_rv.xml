@@ -5,7 +5,8 @@
     android:layout_height="wrap_content"
     android:layout_marginTop="@dimen/_6sdp"
     android:layout_marginEnd="@dimen/_6sdp"
-    app:cardCornerRadius="@dimen/_5sdp">
+    app:cardCornerRadius="@dimen/_5sdp"
+    app:cardElevation="0dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -75,8 +76,7 @@
                 android:id="@+id/cancelBtn"
                 android:layout_width="@dimen/_32sdp"
                 android:layout_height="@dimen/_32sdp"
-                android:layout_gravity="center"
-                android:background="?attr/selectableItemBackgroundBorderless">
+                android:layout_gravity="center">
 
                 <ImageView
                     android:id="@+id/iconBtn"
