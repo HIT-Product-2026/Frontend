@@ -22,6 +22,9 @@ import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.location.LocationNavigationViewModel
+import com.pando.app.core.location.LocationSnapshot
+import com.pando.app.core.location.LocationSnapshotStore
+import com.pando.app.core.location.LocationTrackingController
 import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.FragmentMapBinding
 import com.pando.app.features.home.ui.center.CenterFragment
@@ -44,10 +47,14 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         private const val FRIEND_FOCUS_ZOOM = 16.0
         private const val FRIEND_MARKER_HIT_RADIUS_DP = 48f
         private const val FOLLOW_CAMERA_ANIMATION_MILLIS = 250
+        private const val MAX_LOCATION_SNAPSHOT_AGE_MILLIS = 30_000L
     }
 
     @Inject
     lateinit var userSession: UserSession
+
+    @Inject
+    lateinit var locationSnapshotStore: LocationSnapshotStore
 
     private val avatarViewModel: AvatarViewModel by activityViewModels()
     private val locationNavigationViewModel: LocationNavigationViewModel by activityViewModels()
@@ -125,6 +132,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
         locationController = MapLocationController(
             context = requireContext(),
+            locationSnapshotStore = locationSnapshotStore,
             onLocationUpdate = ::handleLocationUpdate,
             onCapturedLocation = ::handleCapturedLocation,
             onPermissionDenied = {
@@ -180,12 +188,19 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         binding.mapView.onResume()
 
         if (::locationController.isInitialized) {
-            locationController.startLocationUpdates()
+            // The foreground service already owns the high-accuracy stream
+            // while sharing is enabled. The map observes the shared snapshot
+            // instead of opening a second GPS request.
+            if (!LocationTrackingController.isServiceRunning()) {
+                locationController.startLocationUpdates()
+            }
             if (locationController.hasAnyLocationPermission()) {
                 locationController.requestCurrentLocation()
             }
             locationController.registerBearingUpdates()
         }
+
+        applyLocationSnapshot(locationSnapshotStore.fresh(MAX_LOCATION_SNAPSHOT_AGE_MILLIS))
 
         // Chỉ tải friendship list lần đầu; khi quay lại chỉ lấy snapshot vị trí mới.
         mapViewModel.refreshForMapResume()
@@ -239,22 +254,33 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         val hasLocation = ContextCompat.checkSelfPermission(
             requireContext(),
             Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val hasNotification = ContextCompat.checkSelfPermission(
-            requireContext(),
-            Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED
+        ) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        val hasNotification = if (
+            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+        ) {
+            ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
 
         if (hasCamera && hasLocation && hasNotification) return
 
-        multiplePermissionsLauncher.launch(
-            arrayOf(
-                Manifest.permission.CAMERA,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.POST_NOTIFICATIONS,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
+        val requestedPermissions = mutableListOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
         )
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            requestedPermissions += Manifest.permission.POST_NOTIFICATIONS
+        }
+        multiplePermissionsLauncher.launch(requestedPermissions.toTypedArray())
     }
 
     private fun observeCurrentUser() {
@@ -517,6 +543,19 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                 }
 
                 launch {
+                    locationSnapshotStore.snapshot.collect { snapshot ->
+                        if (LocationTrackingController.isServiceRunning() &&
+                            ::locationController.isInitialized
+                        ) {
+                            locationController.stopLocationUpdates()
+                        }
+                        applyLocationSnapshot(snapshot?.takeIf {
+                            snapshotAgeMillis(it) <= MAX_LOCATION_SNAPSHOT_AGE_MILLIS
+                        })
+                    }
+                }
+
+                launch {
                     mapViewModel.friends.collect { friends ->
                         // DTO mới đã có URL; chỉ fallback API cho bạn cũ chưa có URL.
                         avatarViewModel.loadAvatars(
@@ -540,6 +579,20 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         currentLng = longitude
         updateCurrentLocationPoint()
         renderFriendsState()
+    }
+
+    private fun applyLocationSnapshot(snapshot: LocationSnapshot?) {
+        snapshot ?: return
+        if (currentLat == snapshot.latitude && currentLng == snapshot.longitude) return
+
+        currentLat = snapshot.latitude
+        currentLng = snapshot.longitude
+        updateCurrentLocationPoint()
+        renderFriendsState()
+    }
+
+    private fun snapshotAgeMillis(snapshot: LocationSnapshot): Long {
+        return android.os.SystemClock.elapsedRealtime() - snapshot.capturedAtElapsedMillis
     }
 
     private fun handleCapturedLocation(location: Location, fromCache: Boolean) {
@@ -692,4 +745,5 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         if (!::locationController.isInitialized) return
         locationController.requestCurrentLocation()
     }
+
 }

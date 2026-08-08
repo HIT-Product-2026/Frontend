@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.PointF
 import android.graphics.drawable.GradientDrawable
+import android.util.LruCache
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.widget.FrameLayout
@@ -134,6 +135,7 @@ class MapMarkerRenderer(
 
     private data class CachedGroupMarkerBitmap(
         val avatarUrls: List<String?>,
+        val totalAvatarCount: Int,
         val bitmap: Bitmap
     )
 
@@ -185,8 +187,14 @@ class MapMarkerRenderer(
         val markerType: String
     )
 
-    private val markerBitmapCache = mutableMapOf<String, CachedMarkerBitmap>()
-    private val nearbyGroupBitmapCache = mutableMapOf<String, CachedGroupMarkerBitmap>()
+    private val markerBitmapCache = object : LruCache<String, CachedMarkerBitmap>(4 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: CachedMarkerBitmap): Int = value.bitmap.byteCount
+    }
+    private val nearbyGroupBitmapCache =
+        object : LruCache<String, CachedGroupMarkerBitmap>(4 * 1024 * 1024) {
+            override fun sizeOf(key: String, value: CachedGroupMarkerBitmap): Int =
+                value.bitmap.byteCount
+        }
     private val pendingNearbyGroupLoads = mutableSetOf<String>()
     private var activeStyle: Style? = null
     private var currentBearing = 0f
@@ -200,6 +208,7 @@ class MapMarkerRenderer(
     private var visibleNearbyGroupIds: Set<String>? = null
     private var visibleNearbyMemberIds: Set<String>? = null
     private var visibleNearbyRadiusIds: Set<String>? = null
+    private var lastRenderKey: String? = null
 
     fun addDirectionIcon(style: Style) {
         if (style.getImage(currentDirectionIconId) != null) return
@@ -324,6 +333,10 @@ class MapMarkerRenderer(
         activeStyle = style
 
         val markerGroups = buildNearbyGroups(friends, currentUser)
+        val renderKey = markerGroups.renderKey()
+        if (renderKey == lastRenderKey) return
+        lastRenderKey = renderKey
+
         val nearbyGroups = markerGroups.filter(NearbyGroup::isNearbyGroup)
         val singleMarkers = markerGroups.filterNot(NearbyGroup::isNearbyGroup)
         val singleFriendMarkers = singleMarkers.filterNot(NearbyGroup::containsCurrentUser)
@@ -878,16 +891,26 @@ class MapMarkerRenderer(
         }
     }
 
+    private fun List<NearbyGroup>.renderKey(): String = joinToString(";") { group ->
+        group.people.joinToString(",") { person ->
+            "${person.id}:${person.latitude}:${person.longitude}:" +
+                "${person.avatarUrl.orEmpty()}:${person.isCurrentUser}"
+        }
+    }
+
     private fun loadNearbyGroupAvatarImages(
         style: Style,
         markers: List<NearbyGroup>
     ) {
         markers.filter(NearbyGroup::isNearbyGroup).forEach { marker ->
             val iconId = marker.iconId
-            val avatarUrls = marker.people.map(MarkerPerson::avatarUrl)
-            val cachedMarker = nearbyGroupBitmapCache[iconId]
+            val displayedPeople = marker.people.take(MAX_VISIBLE_GROUP_AVATARS)
+            val avatarUrls = displayedPeople.map(MarkerPerson::avatarUrl)
+            val cachedMarker = nearbyGroupBitmapCache.get(iconId)
 
-            if (cachedMarker?.avatarUrls == avatarUrls) {
+            if (cachedMarker?.avatarUrls == avatarUrls &&
+                cachedMarker.totalAvatarCount == marker.people.size
+            ) {
                 if (style.getImage(iconId) == null) {
                     style.addImage(iconId, cachedMarker.bitmap)
                 }
@@ -899,7 +922,8 @@ class MapMarkerRenderer(
                 style.addImage(
                     iconId,
                     createGroupFriendMarkerBitmap(
-                        avatars = List(marker.people.size) { defaultAvatar }
+                        avatars = List(displayedPeople.size) { defaultAvatar },
+                        totalAvatarCount = marker.people.size
                     )
                 )
             } else if (cachedMarker != null) {
@@ -909,8 +933,8 @@ class MapMarkerRenderer(
             val loadKey = "$iconId|${avatarUrls.joinToString("|")}"
             if (!pendingNearbyGroupLoads.add(loadKey)) return@forEach
 
-            val loadedBitmaps = arrayOfNulls<Bitmap>(marker.people.size)
-            marker.people.forEachIndexed { index, person ->
+            val loadedBitmaps = arrayOfNulls<Bitmap>(displayedPeople.size)
+            displayedPeople.forEachIndexed { index, person ->
                 loadFriendAvatarBitmap(
                     person = person,
                     onReady = { bitmap ->
@@ -922,12 +946,14 @@ class MapMarkerRenderer(
                         if (currentStyle !== style) return@loadFriendAvatarBitmap
 
                         val markerBitmap = createGroupFriendMarkerBitmap(
-                            avatars = loadedBitmaps.map { it!! }
+                            avatars = loadedBitmaps.map { it!! },
+                            totalAvatarCount = marker.people.size
                         )
-                        nearbyGroupBitmapCache[iconId] = CachedGroupMarkerBitmap(
+                        nearbyGroupBitmapCache.put(iconId, CachedGroupMarkerBitmap(
                             avatarUrls = avatarUrls,
+                            totalAvatarCount = marker.people.size,
                             bitmap = markerBitmap
-                        )
+                        ))
                         currentStyle.addImage(iconId, markerBitmap)
                     },
                     onCleared = {
@@ -990,7 +1016,8 @@ class MapMarkerRenderer(
     }
 
     private fun createGroupFriendMarkerBitmap(
-        avatars: List<Bitmap>
+        avatars: List<Bitmap>,
+        totalAvatarCount: Int = avatars.size
     ): Bitmap {
         val markerBinding = LayoutDoubleFriendMarkerBinding.inflate(
             LayoutInflater.from(fragment.requireContext())
@@ -1030,7 +1057,7 @@ class MapMarkerRenderer(
             )
         }
 
-        val hiddenAvatarCount = avatars.size - displayedAvatars.size
+        val hiddenAvatarCount = totalAvatarCount - displayedAvatars.size
         if (hiddenAvatarCount > 0) {
             val badgeSize = 30.dpToPx()
             val badge = TextView(fragment.requireContext()).apply {
@@ -1098,6 +1125,7 @@ class MapMarkerRenderer(
             visibleNearbyGroupIds = null
             visibleNearbyMemberIds = null
             visibleNearbyRadiusIds = null
+            lastRenderKey = null
         }
     }
 
@@ -1114,7 +1142,13 @@ class MapMarkerRenderer(
         markers: List<NearbyGroup>
     ) {
         markers
-            .flatMap(NearbyGroup::people)
+            .flatMap { marker ->
+                if (marker.isNearbyGroup) {
+                    marker.people.take(MAX_VISIBLE_GROUP_AVATARS)
+                } else {
+                    marker.people
+                }
+            }
             .filterNot(MarkerPerson::isCurrentUser)
             .distinctBy(MarkerPerson::id)
             .forEach { person ->
@@ -1122,7 +1156,7 @@ class MapMarkerRenderer(
 
             if (style.getImage(iconId) != null) return@forEach
 
-            markerBitmapCache[person.id]
+            markerBitmapCache.get(person.id)
                 ?.takeIf { it.avatarUrl == person.avatarUrl }
                 ?.let { cachedMarker ->
                     style.addImage(iconId, cachedMarker.bitmap)
@@ -1136,10 +1170,10 @@ class MapMarkerRenderer(
                     if (currentStyle !== style) return@loadFriendAvatarBitmap
 
                     val markerBitmap = createFriendMarkerBitmap(bitmap)
-                    markerBitmapCache[person.id] = CachedMarkerBitmap(
+                    markerBitmapCache.put(person.id, CachedMarkerBitmap(
                         avatarUrl = person.avatarUrl,
                         bitmap = markerBitmap
-                    )
+                    ))
                     currentStyle.addImage(iconId, markerBitmap)
                 },
                 onCleared = {}

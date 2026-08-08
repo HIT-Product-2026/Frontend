@@ -76,10 +76,12 @@ class MapViewModel @Inject constructor(
                         }
                     }
 
+                    // MapSocket keeps the desired friend IDs and recreates
+                    // subscriptions on the next Connected state. Clearing
+                    // them here created a race where a reconnect had no
+                    // subscriptions left to restore.
                     SocketConnectionState.Disconnected,
-                    is SocketConnectionState.Error -> {
-                        clearLocationSubscriptions()
-                    }
+                    is SocketConnectionState.Error -> Unit
 
                     SocketConnectionState.Connecting -> Unit
                 }

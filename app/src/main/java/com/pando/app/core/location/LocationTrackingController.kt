@@ -12,6 +12,15 @@ object LocationTrackingController {
     const val ACTION_OPEN_CURRENT_LOCATION =
         "com.pando.app.location.OPEN_CURRENT_LOCATION"
 
+    @Volatile
+    private var serviceRunning = false
+
+    fun isServiceRunning(): Boolean = serviceRunning
+
+    internal fun markServiceRunning(running: Boolean) {
+        serviceRunning = running
+    }
+
     fun hasLocationPermission(context: Context): Boolean {
         val fineGranted = ContextCompat.checkSelfPermission(
             context,

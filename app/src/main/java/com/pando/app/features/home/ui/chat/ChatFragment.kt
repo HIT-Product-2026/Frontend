@@ -156,12 +156,10 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
 
                             SocketConnectionState.Disconnected -> {
                                 Log.d(TAG, "Đã ngắt kết nối")
-                                chatViewModel.unsubscribeMessage()
                             }
 
                             is SocketConnectionState.Error -> {
                                 Log.e(TAG, state.message)
-                                chatViewModel.unsubscribeMessage()
                             }
                         }
                     }

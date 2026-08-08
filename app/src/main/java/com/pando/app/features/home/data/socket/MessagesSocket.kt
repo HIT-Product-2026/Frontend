@@ -11,13 +11,13 @@ import com.pando.app.features.home.data.model.request.SendImageRequest
 import com.pando.app.features.home.data.model.request.SendMessageRequest
 import com.pando.app.features.home.data.model.response.ChatMessageResponse
 import io.reactivex.disposables.Disposable
-import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import ua.naiksoftware.stomp.StompClient
 import java.util.UUID
@@ -35,12 +35,13 @@ class MessagesSocket @Inject constructor(
     }
 
     private val conversationSubscriptions = ConcurrentHashMap<UUID, ActiveSubscription>()
+    private val desiredConversationIds = ConcurrentHashMap.newKeySet<UUID>()
+    private val subscriptionRetryJobs = ConcurrentHashMap<UUID, kotlinx.coroutines.Job>()
 
-    private val _message = MutableSharedFlow<ChatMessageResponse>(
-        extraBufferCapacity = 64,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val message = _message.asSharedFlow()
+    // Chat events must not use DROP_OLDEST: losing a message is worse than
+    // briefly buffering it while RecyclerView catches up.
+    private val messageChannel = Channel<ChatMessageResponse>(capacity = 256)
+    val message = messageChannel.receiveAsFlow()
 
     private val pendingMessages = PendingSocketMessageQueue()
     private val queueScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -51,7 +52,10 @@ class MessagesSocket @Inject constructor(
         queueScope.launch {
             connectionManager.connectionState.collectLatest { state ->
                 if (state == SocketConnectionState.Connected) {
-                    flushPendingMessages()
+                    desiredConversationIds.toList().forEach(::subscribeConversation)
+                    requestFlush()
+                } else {
+                    clearActiveSubscriptions()
                 }
             }
         }
@@ -59,8 +63,9 @@ class MessagesSocket @Inject constructor(
 
     @Synchronized
     fun subscribeConversation(conversationId: UUID) {
+        desiredConversationIds.add(conversationId)
+
         val client = connectionManager.getConnectedClient() ?: run {
-            Log.e(TAG, "Chưa kết nối")
             return
         }
 
@@ -89,11 +94,14 @@ class MessagesSocket @Inject constructor(
                     }
 
                     message?.let {
-                        _message.tryEmit(it)
+                        if (!messageChannel.trySend(it).isSuccess) {
+                            Log.e(TAG, "Bộ đệm message đã đầy")
+                        }
                     }
                 },
                 { throwable ->
                     Log.e(TAG, "Lỗi subscribe conversation $conversationId", throwable)
+                    handleSubscriptionFailure(conversationId, client)
                 }
             )
 
@@ -105,6 +113,8 @@ class MessagesSocket @Inject constructor(
 
     @Synchronized
     fun unsubscribeConversation(conversationId: UUID) {
+        desiredConversationIds.remove(conversationId)
+        subscriptionRetryJobs.remove(conversationId)?.cancel()
         conversationSubscriptions.remove(conversationId)?.disposable?.dispose()
 
         Log.d(TAG, "Đã unsubscribe conversation $conversationId")
@@ -112,6 +122,9 @@ class MessagesSocket @Inject constructor(
 
     @Synchronized
     fun unsubscribeAllConversation() {
+        desiredConversationIds.clear()
+        subscriptionRetryJobs.values.forEach { it.cancel() }
+        subscriptionRetryJobs.clear()
         conversationSubscriptions.values.forEach {
             it.disposable.dispose()
         }
@@ -164,9 +177,12 @@ class MessagesSocket @Inject constructor(
 
     private fun enqueueMessage(message: PendingSocketMessage) {
         synchronized(flushLock) {
-            pendingMessages.addLast(message)
+            if (!pendingMessages.addLast(message)) {
+                Log.e(TAG, "Hàng đợi message đã đầy, không thể xếp message mới")
+                return
+            }
         }
-        flushPendingMessages()
+        requestFlush()
     }
 
     /**
@@ -175,57 +191,83 @@ class MessagesSocket @Inject constructor(
      * to send; failed attempts are put back at the front for the next
      * reconnect.
      */
-    private fun flushPendingMessages() {
+    private fun requestFlush() {
         synchronized(flushLock) {
             if (isFlushing) return
             isFlushing = true
         }
 
-        var stopAfterCurrentMessage = false
-
-        try {
-            while (true) {
-                val message = pendingMessages.pollFirst() ?: return
-                val client = connectionManager.getConnectedClient()
-                if (client == null) {
-                    pendingMessages.addFirst(message)
-                    return
-                }
-
-                try {
-                    var failedSynchronously = false
-                    client.send(message.destination, message.payload).subscribe(
-                        {
-                            Log.d(TAG, "Đã gửi message lên STOMP")
-                        },
-                        { throwable ->
-                            pendingMessages.addFirst(message)
-                            failedSynchronously = true
-                            Log.e(TAG, "Không thể gửi message, sẽ thử lại khi reconnect", throwable)
-                        }
-                    )
-                    if (failedSynchronously) {
-                        stopAfterCurrentMessage = true
-                        return
+        queueScope.launch {
+            var shouldRetry = false
+            try {
+                while (true) {
+                    val message = pendingMessages.pollFirst() ?: break
+                    val client = connectionManager.getConnectedClient()
+                    if (client == null) {
+                        pendingMessages.addFirst(message)
+                        shouldRetry = true
+                        break
                     }
-                } catch (throwable: Throwable) {
-                    pendingMessages.addFirst(message)
-                    Log.e(TAG, "Không thể gửi message, sẽ thử lại khi reconnect", throwable)
-                    stopAfterCurrentMessage = true
-                    return
+
+                    try {
+                        // A Completable subscription used to be discarded here,
+                        // allowing the next item to overtake it and losing async
+                        // errors. blockingAwait is safe on this dedicated IO
+                        // queue and gives us strict FIFO semantics.
+                        client.send(message.destination, message.payload).blockingAwait()
+                        Log.d(TAG, "Đã gửi message lên STOMP")
+                    } catch (throwable: Throwable) {
+                        pendingMessages.addFirst(message)
+                        shouldRetry = true
+                        Log.e(TAG, "Không thể gửi message, sẽ thử lại khi reconnect", throwable)
+                        break
+                    }
                 }
-            }
-        } finally {
-            val shouldFlushAgain: Boolean
-            synchronized(flushLock) {
-                isFlushing = false
-                shouldFlushAgain = !stopAfterCurrentMessage &&
+            } finally {
+                synchronized(flushLock) {
+                    isFlushing = false
+                }
+
+                if (shouldRetry &&
                     !pendingMessages.isEmpty() &&
                     connectionManager.getConnectedClient() != null
+                ) {
+                    // Avoid a tight loop when the broker is connected but is
+                    // temporarily refusing writes. A reconnect event will also
+                    // call requestFlush, and the guard keeps them serialized.
+                    queueScope.launch {
+                        delay(1_000L)
+                        requestFlush()
+                    }
+                }
             }
+        }
+    }
 
-            if (shouldFlushAgain) {
-                flushPendingMessages()
+    @Synchronized
+    private fun clearActiveSubscriptions() {
+        conversationSubscriptions.values.forEach { it.disposable.dispose() }
+        conversationSubscriptions.clear()
+    }
+
+    private fun handleSubscriptionFailure(conversationId: UUID, client: StompClient) {
+        synchronized(this) {
+            val active = conversationSubscriptions[conversationId]
+            if (active?.client === client) {
+                conversationSubscriptions.remove(conversationId)?.disposable?.dispose()
+            }
+        }
+
+        if (!desiredConversationIds.contains(conversationId)) return
+        if (subscriptionRetryJobs[conversationId]?.isActive == true) return
+
+        subscriptionRetryJobs[conversationId] = queueScope.launch {
+            delay(1_000L)
+            subscriptionRetryJobs.remove(conversationId)
+            if (desiredConversationIds.contains(conversationId) &&
+                connectionManager.getConnectedClient() != null
+            ) {
+                subscribeConversation(conversationId)
             }
         }
     }

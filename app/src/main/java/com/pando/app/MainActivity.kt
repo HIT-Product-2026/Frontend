@@ -27,10 +27,12 @@ import com.pando.app.core.session.UserSession
 import com.pando.app.databinding.ActivityMainBinding
 import com.pando.app.features.onboarding.OnboardingPreferences
 import com.pando.app.features.home.data.model.entity.enumEntity.UserMode
+import com.pando.app.features.auth.data.repository.AuthRepository
 import com.pando.app.features.widget.WidgetNavigationViewModel
 import com.pando.app.features.widget.WidgetPendingIntentFactory
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -47,6 +49,9 @@ class MainActivity : AppCompatActivity() {
     @Inject
     lateinit var trackingPreferences: TrackingPreferences
 
+    @Inject
+    lateinit var authRepository: AuthRepository
+
     private val viewModel: MainViewModel by viewModels()
 
     private lateinit var binding: ActivityMainBinding
@@ -55,6 +60,7 @@ class MainActivity : AppCompatActivity() {
     private val locationNavigationViewModel: LocationNavigationViewModel by viewModels()
 
     private lateinit var navController: NavController
+    private var lastSentFcmToken: String? = null
 
     //    override fun onCreate(savedInstanceState: Bundle?) {
 //        installSplashScreen()
@@ -280,13 +286,16 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 launch {
-                    userSession.currentUser.collect { user ->
+                    userSession.currentUser
+                        .distinctUntilChangedBy { user -> user?.id to user?.mode }
+                        .collect { user ->
                         val onboardingCompleted = OnboardingPreferences.isCompleted(this@MainActivity)
 
                         if (user != null && onboardingCompleted) {
                             viewModel.socketConnect()
                             sseManager.connect()
                             viewModel.loadCurrentUserProfile(user.id)
+                            sendFCMToken()
 
                             if (user.mode == UserMode.PUBLIC) {
                                 // PUBLIC là mặc định: khôi phục tracking ngay cả
@@ -378,7 +387,19 @@ class MainActivity : AppCompatActivity() {
                 return@addOnCompleteListener
             }
 
-            Log.d("FCM_INIT", "FCM token đã được lấy thành công")
+            val token = task.result
+            if (token.isNullOrBlank() || userSession.getCurrentUser() == null) return@addOnCompleteListener
+            if (token == lastSentFcmToken) return@addOnCompleteListener
+
+            lifecycleScope.launch {
+                val result = authRepository.sendFcmToken(token)
+                if (result is com.pando.app.core.utils.DataResult.Success) {
+                    lastSentFcmToken = token
+                    Log.d("FCM_INIT", "FCM token đã được gửi thành công")
+                } else {
+                    Log.w("FCM_INIT", "Gửi FCM token thất bại")
+                }
+            }
         }
     }
 

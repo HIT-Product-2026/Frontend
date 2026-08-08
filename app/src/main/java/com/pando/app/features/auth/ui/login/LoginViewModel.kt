@@ -13,7 +13,9 @@ import com.pando.app.features.auth.data.repository.AuthRepository
 import com.pando.app.features.home.data.model.entity.CurrentUser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
@@ -35,7 +37,11 @@ class LoginViewModel @Inject constructor(
 
                 sendEvent(ViewModelEvent.ShowSnackbar("Đăng nhập thành công!"))
 
-                getAndSendFcmToken()
+                // Token upload is best-effort and must not delay navigation
+                // after a successful login.
+                viewModelScope.launch {
+                    getAndSendFcmToken()
+                }
 
                 sendEvent(ViewModelEvent.Navigate(R.id.action_loginBottomSheet_to_centerFragment))
             }

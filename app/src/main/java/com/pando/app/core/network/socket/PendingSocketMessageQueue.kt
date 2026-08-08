@@ -9,16 +9,25 @@ internal data class PendingSocketMessage(
 )
 
 internal class PendingSocketMessageQueue {
+    companion object {
+        const val DEFAULT_MAX_SIZE = 256
+    }
+
     private val messages = ArrayDeque<PendingSocketMessage>()
 
     @Synchronized
-    fun addLast(message: PendingSocketMessage) {
+    fun addLast(message: PendingSocketMessage): Boolean {
+        if (messages.size >= DEFAULT_MAX_SIZE) return false
         messages.addLast(message)
+        return true
     }
 
     @Synchronized
-    fun addFirst(message: PendingSocketMessage) {
+    fun addFirst(message: PendingSocketMessage): Boolean {
+        // A failed item was already accepted by the queue. It must never be
+        // dropped just because new items filled the bounded tail meanwhile.
         messages.addFirst(message)
+        return true
     }
 
     @Synchronized
@@ -28,4 +37,7 @@ internal class PendingSocketMessageQueue {
 
     @Synchronized
     fun isEmpty(): Boolean = messages.isEmpty()
+
+    @Synchronized
+    fun size(): Int = messages.size
 }
