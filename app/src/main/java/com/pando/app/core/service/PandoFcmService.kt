@@ -5,11 +5,17 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.pando.app.features.widget.FcmPostPayload
 import com.pando.app.features.widget.WidgetUpdater
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class PandoFcmService : FirebaseMessagingService() {
     companion object {
         private const val TAG = "PandoFcmService"
     }
+
+    @Inject
+    lateinit var fcmTokenSyncManager: FcmTokenSyncManager
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
@@ -47,5 +53,7 @@ class PandoFcmService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         Log.d(TAG, "FCM token đã được làm mới")
+
+        fcmTokenSyncManager.onNewToken(token)
     }
 }

@@ -64,6 +64,9 @@ class LocationTrackingService : Service() {
     @Inject
     lateinit var userSession: UserSession
 
+    @Inject
+    lateinit var locationSnapshotStore: LocationSnapshotStore
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val sendDisposables = CompositeDisposable()
 
@@ -84,6 +87,7 @@ class LocationTrackingService : Service() {
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult) {
             val location = locationResult.lastLocation ?: return
+            locationSnapshotStore.update(location)
             pendingLocation = location
             sendPendingLocationIfPossible()
         }
@@ -108,6 +112,7 @@ class LocationTrackingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        LocationTrackingController.markServiceRunning(false)
         removeLocationUpdates()
         connectionObserverJob?.cancel()
         sendDisposables.clear()
@@ -133,6 +138,7 @@ class LocationTrackingService : Service() {
             return
         }
 
+        LocationTrackingController.markServiceRunning(true)
         promoteToForeground()
         socketConnectionManager.connect()
         requestLocationUpdates()
@@ -246,6 +252,14 @@ class LocationTrackingService : Service() {
             { throwable ->
                 isSendingLocation = false
                 Log.e(TAG, "Could not send location; keeping the latest point", throwable)
+                // A write can fail while the STOMP lifecycle is still marked
+                // Connected. Retry the latest point without waiting for the
+                // next GPS callback; the state/connection guards prevent a
+                // busy loop while the socket is actually offline.
+                serviceScope.launch {
+                    kotlinx.coroutines.delay(1_000L)
+                    sendPendingLocationIfPossible()
+                }
             }
         )
         sendDisposables.add(disposable)

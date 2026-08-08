@@ -2,7 +2,6 @@ package com.pando.app
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -15,11 +14,11 @@ import androidx.navigation.NavController
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.firebase.messaging.FirebaseMessaging
 import com.pando.app.core.network.sse.SseManager
 import com.pando.app.core.location.LocationTrackingController
 import com.pando.app.core.location.LocationNavigationViewModel
 import com.pando.app.core.location.TrackingPreferences
+import com.pando.app.core.service.FcmTokenSyncManager
 import com.pando.app.core.session.SessionStartupManager
 import com.pando.app.core.session.SessionState
 import com.pando.app.core.session.StartupSessionResult
@@ -31,6 +30,7 @@ import com.pando.app.features.widget.WidgetNavigationViewModel
 import com.pando.app.features.widget.WidgetPendingIntentFactory
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -46,6 +46,9 @@ class MainActivity : AppCompatActivity() {
 
     @Inject
     lateinit var trackingPreferences: TrackingPreferences
+
+    @Inject
+    lateinit var fcmTokenSyncManager: FcmTokenSyncManager
 
     private val viewModel: MainViewModel by viewModels()
 
@@ -143,7 +146,6 @@ class MainActivity : AppCompatActivity() {
 
         navController = navHostFragment.navController
 
-        sendFCMToken()
         observeUiEvents()
 
         if (savedInstanceState == null) {
@@ -280,13 +282,16 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 launch {
-                    userSession.currentUser.collect { user ->
+                    userSession.currentUser
+                        .distinctUntilChangedBy { user -> user?.id to user?.mode }
+                        .collect { user ->
                         val onboardingCompleted = OnboardingPreferences.isCompleted(this@MainActivity)
 
                         if (user != null && onboardingCompleted) {
                             viewModel.socketConnect()
                             sseManager.connect()
                             viewModel.loadCurrentUserProfile(user.id)
+                            fcmTokenSyncManager.syncAfterAuthentication()
 
                             if (user.mode == UserMode.PUBLIC) {
                                 // PUBLIC là mặc định: khôi phục tracking ngay cả
@@ -368,18 +373,6 @@ class MainActivity : AppCompatActivity() {
         setIntent(intent)
 
         handleNavigationIntent(intent)
-    }
-
-    @Suppress("DEPRECATION")
-    private fun sendFCMToken() {
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                Log.w("FCM_INIT", "Lấy FCM token thất bại", task.exception)
-                return@addOnCompleteListener
-            }
-
-            Log.d("FCM_INIT", "FCM token đã được lấy thành công")
-        }
     }
 
     private fun handleNavigationIntent(intent: Intent?) {

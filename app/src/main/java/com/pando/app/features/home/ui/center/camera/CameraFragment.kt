@@ -59,6 +59,7 @@ import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.showComingSoon
 import com.pando.app.core.extensions.toLocalDateTime
+import com.pando.app.core.location.LocationSnapshotStore
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentCameraBinding
 import com.pando.app.features.home.data.model.entity.PostReelItemModel
@@ -68,6 +69,7 @@ import com.pando.app.features.home.ui.center.CenterFragment
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -80,6 +82,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     @Inject
     lateinit var postFeedStore: PostFeedStore
 
+    @Inject
+    lateinit var locationSnapshotStore: LocationSnapshotStore
+
     private var imageCapture: ImageCapture? = null
 
     private var lensFacing = CameraSelector.LENS_FACING_BACK
@@ -89,6 +94,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var currentLat: Double? = null
     private var currentLng: Double? = null
+    private var locationCaptureJob: Job? = null
 
     private var orientationEventListener: OrientationEventListener? = null
     private var rotation = Surface.ROTATION_0
@@ -194,29 +200,34 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
 
         binding.btnCapture.setOnClickListener {
-            viewLifecycleOwner.lifecycleScope.launch {
-                when (captureMode) {
-                    CaptureMode.PHOTO -> {
+            when (captureMode) {
+                CaptureMode.PHOTO -> {
+                    // Do not delay the shutter while waiting for GPS. The map
+                    // snapshot is used immediately and a one-shot GPS request
+                    // only runs when that snapshot is missing or stale.
+                    locationCaptureJob?.cancel()
+                    locationCaptureJob = viewLifecycleOwner.lifecycleScope.launch {
                         captureLocation()
-                        takePhoto()
                     }
+                    takePhoto()
+                }
 
-                    CaptureMode.VIDEO -> {
-                        if (activeRecording != null) {
-                            // Cho phép bấm lần hai để dừng trước 10 giây
-                            activeRecording?.stop()
-                        } else if (!isStartingRecording) {
-                            // Không chờ lấy vị trí trước khi bắt đầu quay.
-                            // Chặn các lần bấm liên tiếp trong lúc CameraX khởi tạo.
-                            isStartingRecording = true
-                            binding.btnCapture.isEnabled = false
-                            requestAudioAndRecord()
+                CaptureMode.VIDEO -> {
+                    if (activeRecording != null) {
+                        // Cho phép bấm lần hai để dừng trước 10 giây
+                        activeRecording?.stop()
+                    } else if (!isStartingRecording) {
+                        // Không chờ lấy vị trí trước khi bắt đầu quay.
+                        // Chặn các lần bấm liên tiếp trong lúc CameraX khởi tạo.
+                        isStartingRecording = true
+                        binding.btnCapture.isEnabled = false
+                        requestAudioAndRecord()
 
-                            currentLat = null
-                            currentLng = null
-                            viewLifecycleOwner.lifecycleScope.launch {
-                                captureLocation()
-                            }
+                        currentLat = null
+                        currentLng = null
+                        locationCaptureJob?.cancel()
+                        locationCaptureJob = viewLifecycleOwner.lifecycleScope.launch {
+                            captureLocation()
                         }
                     }
                 }
@@ -226,6 +237,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         binding.btnCancel.setOnClickListener {
             binding.captionET.text?.clear()
             savedMediaFile?.delete()
+            locationCaptureJob?.cancel()
+            locationCaptureJob = null
             currentLat = null
             currentLng = null
             viewModel.setCaptureMode()
@@ -236,11 +249,15 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         }
 
         binding.btnSend.setOnClickListener {
-            val caption = binding.captionET.text.toString()
-                .trim()
-                .takeIf { it.isNotEmpty() }
+            viewLifecycleOwner.lifecycleScope.launch {
+                locationCaptureJob?.join()
 
-            viewModel.sendPost(caption, currentLng, currentLat)
+                val caption = binding.captionET.text.toString()
+                    .trim()
+                    .takeIf { it.isNotEmpty() }
+
+                viewModel.sendPost(caption, currentLng, currentLat)
+            }
         }
 
         binding.captionET.setOnTouchListener { _, event ->
@@ -340,6 +357,8 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         closeCaptionEditor()
         releaseVideoPreview()
         zoomAnimator?.cancel()
+        locationCaptureJob?.cancel()
+        locationCaptureJob = null
         setZoomGestureActive(false)
         orientationEventListener?.disable()
         binding.cameraContainer.visibility = View.GONE
@@ -1049,6 +1068,21 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
     }
 
     private suspend fun captureLocation() {
+        val freshSnapshot = locationSnapshotStore.fresh(MAX_CAPTURE_LOCATION_AGE_MILLIS)
+        if (freshSnapshot != null) {
+            currentLat = freshSnapshot.latitude
+            currentLng = freshSnapshot.longitude
+            return
+        }
+
+        // Keep the last map point as a best-effort fallback while a fresh GPS
+        // fix is requested. A failed one-shot request should not erase a valid
+        // location that was already visible on the map.
+        locationSnapshotStore.latest()?.let { latest ->
+            currentLat = latest.latitude
+            currentLng = latest.longitude
+        }
+
         val context = requireContext()
         val fineGranted = ContextCompat.checkSelfPermission(
             context,
@@ -1060,8 +1094,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
         ) == PackageManager.PERMISSION_GRANTED
 
         if (!fineGranted && !coarseGranted) {
-            currentLat = null
-            currentLng = null
+            if (locationSnapshotStore.latest() == null) {
+                currentLat = null
+                currentLng = null
+            }
             return
         }
 
@@ -1081,8 +1117,11 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             null
         }
 
-        currentLat = location?.latitude
-        currentLng = location?.longitude
+        if (location != null) {
+            locationSnapshotStore.update(location)
+            currentLat = location.latitude
+            currentLng = location.longitude
+        }
     }
 
     private fun initOrientationListener() {
@@ -1336,5 +1375,6 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(FragmentCameraBinding
             MAX_RECORDING_DURATION_MILLIS * 1_000_000L
         private const val ZOOM_ANIMATION_DURATION_MILLIS = 220L
         private const val ZOOM_EPSILON = 0.01f
+        private const val MAX_CAPTURE_LOCATION_AGE_MILLIS = 30_000L
     }
 }

@@ -39,7 +39,6 @@ import com.pando.app.core.base.BaseFragment
 import com.pando.app.core.extensions.formatDateTime
 import com.pando.app.core.extensions.loadAvatar
 import com.pando.app.core.session.UserSession
-import com.pando.app.core.state.SocketConnectionState
 import com.pando.app.core.state.UiState
 import com.pando.app.databinding.FragmentPostReelBinding
 import com.pando.app.databinding.ItemPostReelBinding
@@ -68,7 +67,6 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
 
     @Inject
     lateinit var userSession: UserSession
-    private var isSocketConnected = false
     private var hasLoadedInitialData = false
     private var lastRenderedFirstPostId: UUID? = null
     private var activeNsfwDialogPostId: UUID? = null
@@ -269,25 +267,27 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         }
 
         binding.sendBtn.setOnClickListener {
-            if (isSocketConnected) {
-                val message = binding.sendMessageET.text.toString().trim()
-                val currentPosition = binding.postReelViewPager.currentItem
+            val message = binding.sendMessageET.text.toString().trim()
+            val currentPosition = binding.postReelViewPager.currentItem
 
-                val currentReel = postReelAdapter.currentList
-                    .getOrNull(currentPosition)
-                    ?: return@setOnClickListener
+            val currentReel = postReelAdapter.currentList
+                .getOrNull(currentPosition)
+                ?: return@setOnClickListener
 
-                val conversationId = currentReel.conversationId
-                    ?: return@setOnClickListener
+            val conversationId = currentReel.conversationId
+                ?: return@setOnClickListener
 
-                val postImageUrl = currentReel.imageUrl
-                    ?: return@setOnClickListener
+            val postImageUrl = currentReel.imageUrl
+                ?: return@setOnClickListener
 
-                postReelViewModel.sendImagePost(conversationId, postImageUrl)
+            // MessagesSocket queues both messages when STOMP is not ready;
+            // keeping this order ensures the image arrives before its text.
+            postReelViewModel.sendImagePost(conversationId, postImageUrl)
+            if (message.isNotBlank()) {
                 postReelViewModel.sendMessage(conversationId, message)
-
-                closeMessageComposer(clearText = true)
             }
+
+            closeMessageComposer(clearText = true)
         }
 
         binding.btnGoThere.setOnClickListener {
@@ -325,14 +325,6 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
                             }
                             checkCurrentNsfwReel()
                         }
-                    }
-                }
-
-                launch {
-                    postReelViewModel.connectionState
-                        .collect { connectionState ->
-                            isSocketConnected =
-                                connectionState is SocketConnectionState.Connected
                     }
                 }
 
@@ -592,9 +584,9 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         val messageEditor = binding.sendMessageET
         if (!shouldKeepMessageFocus && !messageEditor.hasFocus()) return
 
-        // Ấn ra ngoài phải đóng cả bàn phím lẫn composer. Giữ lại nội dung
-        // nháp để lần mở tiếp theo không làm mất phần người dùng đang gõ.
-        closeMessageComposer(clearText = false)
+        // Ấn ra ngoài phải đóng cả bàn phím, composer và xóa phần text đang
+        // nhập dở vì người dùng đã chủ động dismiss mà chưa bấm Gửi.
+        closeMessageComposer(clearText = true)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -602,11 +594,9 @@ class PostReelFragment : BaseFragment<FragmentPostReelBinding>(FragmentPostReelB
         val outsideViews = listOf(
             binding.root,
             binding.SendMessageBtn,
-            binding.bottomLayout,
             binding.btnGoThere,
             binding.btnCapture,
-            binding.btnMore,
-            binding.sendBtn
+            binding.btnMore
         )
 
         outsideViews.forEach { outsideView ->

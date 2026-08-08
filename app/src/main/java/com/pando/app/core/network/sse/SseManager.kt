@@ -4,15 +4,14 @@ import android.util.Log
 import com.pando.app.core.network.api.ApiConstants
 import com.pando.app.core.network.api.TokenManager
 import com.pando.app.core.state.SseConnectionState
-import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -51,13 +50,11 @@ class SseManager @Inject constructor(
 
     val connectionState = _connectionState.asStateFlow()
 
-    private val _events = MutableSharedFlow<SseEventData>(
-        replay = 0,
-        extraBufferCapacity = 64,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-
-    val events = _events.asSharedFlow()
+    // SSE events represent notifications and NSFW results; dropping the
+    // oldest event can make the UI permanently miss one. Keep a bounded FIFO
+    // instead and log only if an abnormal burst fills it.
+    private val eventChannel = Channel<SseEventData>(capacity = 256)
+    val events = eventChannel.receiveAsFlow()
 
     @Synchronized
     fun connect() {
@@ -126,7 +123,9 @@ class SseManager @Inject constructor(
                 data = data
             )
 
-            _events.tryEmit(event)
+            if (!eventChannel.trySend(event).isSuccess) {
+                Log.e(TAG, "Bộ đệm SSE đã đầy")
+            }
         }
 
         override fun onClosed(eventSource: EventSource) {
@@ -168,11 +167,10 @@ class SseManager @Inject constructor(
 
             _connectionState.value = SseConnectionState.Error(message)
 
-            // A 401/403 needs a new authenticated session; retrying the same
-            // request forever would only create a reconnect loop and spam BE.
-            if (response?.code != 401 && response?.code != 403) {
-                scheduleReconnect()
-            }
+            // Keep SSE self-healing even for an auth/permission response. The
+            // exponential backoff prevents a tight request loop while a
+            // refreshed token or backend permission propagates.
+            scheduleReconnect()
         }
     }
 

@@ -105,12 +105,10 @@ class ChatMenuFragment : BaseFragment<FragmentChatMenuBinding>(FragmentChatMenuB
 
                             SocketConnectionState.Disconnected -> {
                                 Log.d(TAG, "Đã ngắt kết nối")
-                                chatMenuViewModel.unsubscribeConversations()
                             }
 
                             is SocketConnectionState.Error -> {
                                 Log.e(TAG, state.message)
-                                chatMenuViewModel.unsubscribeConversations()
                             }
                         }
                     }

@@ -3,7 +3,7 @@
     android:layout_width="144dp"
     android:layout_height="86dp">
 
-    <!-- Avatar tròn -->
+    <!-- Khung marker có thể co giãn để chứa nhiều avatar chồng lên nhau. -->
     <ImageView
         android:id="@+id/markerFrame"
         android:layout_width="match_parent"
@@ -13,28 +13,11 @@
         android:scaleType="fitXY"
         android:src="@drawable/bg_double_friend_map_marker" />
 
-    <LinearLayout
+    <FrameLayout
+        android:id="@+id/avatarContainer"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="60dp"
         android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="7dp"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:id="@+id/avatarLeft"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:scaleType="centerCrop"
-            android:layout_marginEnd="5dp"
-            android:src="@drawable/ic_default_avatar_rectangle" />
-
-        <ImageView
-            android:id="@+id/avatarRight"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:scaleType="centerCrop"
-            android:layout_marginEnd="1dp"
-            android:src="@drawable/ic_default_avatar_rectangle" />
-    </LinearLayout>
+        android:layout_marginTop="7dp" />
 
 </FrameLayout>

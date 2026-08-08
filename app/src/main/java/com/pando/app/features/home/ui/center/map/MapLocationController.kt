@@ -1,6 +1,7 @@
 package com.pando.app.features.home.ui.center.map
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.Sensor
@@ -9,7 +10,6 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
 import android.os.Looper
-import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -17,9 +17,11 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.pando.app.core.location.LocationSnapshotStore
 
 class MapLocationController(
     context: Context,
+    private val locationSnapshotStore: LocationSnapshotStore,
     private val onLocationUpdate: (Location) -> Unit,
     private val onCapturedLocation: (Location, fromCache: Boolean) -> Unit,
     private val onPermissionDenied: () -> Unit,
@@ -41,17 +43,22 @@ class MapLocationController(
     private val rotationMatrix = FloatArray(9)
     private val orientationAngles = FloatArray(3)
     private var released = false
+    private var lastBearing: Float? = null
+    private var lastBearingDispatchAt = 0L
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult) {
             if (released) return
-            locationResult.lastLocation?.let(onLocationUpdate)
+            locationResult.lastLocation?.let { location ->
+                locationSnapshotStore.update(location)
+                onLocationUpdate(location)
+            }
         }
     }
 
-    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
+    @SuppressLint("MissingPermission")
     fun startLocationUpdates() {
-        if (released || !hasFineLocationPermission()) return
+        if (released || !hasAnyLocationPermission()) return
 
         fusedLocationClient.requestLocationUpdates(
             locationRequest,
@@ -65,7 +72,7 @@ class MapLocationController(
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
 
-    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
+    @SuppressLint("MissingPermission")
     fun requestCurrentLocation() {
         if (released) return
 
@@ -79,7 +86,10 @@ class MapLocationController(
 
         fusedLocationClient.lastLocation.addOnSuccessListener { lastLocation ->
             if (!released) {
-                lastLocation?.let { onCapturedLocation(it, true) }
+                lastLocation?.let {
+                    locationSnapshotStore.update(it)
+                    onCapturedLocation(it, true)
+                }
             }
         }
 
@@ -92,7 +102,10 @@ class MapLocationController(
             null
         ).addOnSuccessListener { location ->
             if (!released) {
-                location?.let { onCapturedLocation(it, false) }
+                location?.let {
+                    locationSnapshotStore.update(it)
+                    onCapturedLocation(it, false)
+                }
             }
         }
     }
@@ -137,7 +150,21 @@ class MapLocationController(
         var bearing = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
         if (bearing < 0f) bearing += 360f
 
-        onBearingChanged(bearing)
+        val previousBearing = lastBearing
+        val now = android.os.SystemClock.elapsedRealtime()
+        val delta = previousBearing?.let { shortestBearingDelta(it, bearing) }
+        if (previousBearing == null || (delta != null && delta >= MIN_BEARING_DELTA_DEGREES) ||
+            now - lastBearingDispatchAt >= MIN_BEARING_DISPATCH_INTERVAL_MILLIS
+        ) {
+            lastBearing = bearing
+            lastBearingDispatchAt = now
+            onBearingChanged(bearing)
+        }
+    }
+
+    private fun shortestBearingDelta(first: Float, second: Float): Float {
+        val difference = kotlin.math.abs(first - second) % 360f
+        return minOf(difference, 360f - difference)
     }
 
     private fun hasFineLocationPermission(): Boolean {
@@ -152,5 +179,10 @@ class MapLocationController(
             appContext,
             Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private companion object {
+        private const val MIN_BEARING_DELTA_DEGREES = 2f
+        private const val MIN_BEARING_DISPATCH_INTERVAL_MILLIS = 150L
     }
 }

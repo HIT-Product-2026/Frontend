@@ -6,9 +6,15 @@ import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.network.socket.SocketConstants
 import com.pando.app.features.home.data.model.dto.ConversationDto
 import io.reactivex.disposables.Disposable
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import ua.naiksoftware.stomp.StompClient
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,19 +29,38 @@ class ConversationsSocket @Inject constructor(
     }
 
     private var subscribedClient: StompClient? = null
+    private var shouldSubscribe = false
+    private var retryJob: Job? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val _conversationUpdates = MutableSharedFlow<ConversationDto>(
-        extraBufferCapacity = 64,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val conversationUpdates = _conversationUpdates.asSharedFlow()
+    private val conversationChannel = Channel<ConversationDto>(capacity = 256)
+    val conversationUpdates = conversationChannel.receiveAsFlow()
 
     private var subscription: Disposable? = null
 
+    init {
+        scope.launch {
+            connectionManager.connectionState.collectLatest { state ->
+                if (state == com.pando.app.core.state.SocketConnectionState.Connected &&
+                    shouldSubscribe
+                ) {
+                    subscribeInternal()
+                } else if (state != com.pando.app.core.state.SocketConnectionState.Connected) {
+                    clearActiveSubscription()
+                }
+            }
+        }
+    }
+
     @Synchronized
     fun subscribe() {
+        shouldSubscribe = true
+        subscribeInternal()
+    }
+
+    @Synchronized
+    private fun subscribeInternal() {
         val client = connectionManager.getConnectedClient() ?: run {
-            Log.e(TAG, "Socket chưa kết nối")
             return
         }
 
@@ -44,7 +69,7 @@ class ConversationsSocket @Inject constructor(
             return
         }
 
-        unsubscribe()
+        clearActiveSubscription()
 
         val destination = SocketConstants.Chat.USER_QUEUE_CONVERSATIONS
         Log.d(TAG, "Subscribe destination: $destination")
@@ -61,11 +86,14 @@ class ConversationsSocket @Inject constructor(
                     }
 
                     conversation?.let {
-                        _conversationUpdates.tryEmit(it)
+                        if (!conversationChannel.trySend(it).isSuccess) {
+                            Log.e(TAG, "Bộ đệm conversation đã đầy")
+                        }
                     }
                 },
                 { throwable ->
                     Log.e(TAG, "Lỗi subscribe $destination", throwable)
+                    handleSubscriptionFailure(client)
                 }
             )
 
@@ -75,10 +103,36 @@ class ConversationsSocket @Inject constructor(
 
     @Synchronized
     fun unsubscribe() {
+        shouldSubscribe = false
+        retryJob?.cancel()
+        retryJob = null
+        clearActiveSubscription()
+
+        Log.d(TAG, "Đã unsubscribe conversation")
+    }
+
+    @Synchronized
+    private fun clearActiveSubscription() {
         subscription?.dispose()
         subscription = null
         subscribedClient = null
+    }
 
-        Log.d(TAG, "Đã unsubscribe conversation")
+    private fun handleSubscriptionFailure(client: StompClient) {
+        synchronized(this) {
+            if (subscribedClient !== client) return
+            clearActiveSubscription()
+        }
+
+        if (!shouldSubscribe || retryJob?.isActive == true) return
+        retryJob = scope.launch {
+            delay(1_000L)
+            synchronized(this@ConversationsSocket) {
+                retryJob = null
+            }
+            if (shouldSubscribe && connectionManager.getConnectedClient() != null) {
+                subscribeInternal()
+            }
+        }
     }
 }

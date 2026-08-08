@@ -2,9 +2,15 @@ package com.pando.app.features.home.ui.center.map
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.PointF
-import android.location.Location
+import android.graphics.drawable.GradientDrawable
+import android.util.LruCache
+import android.view.Gravity
 import android.view.LayoutInflater
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.TextView
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
@@ -18,6 +24,7 @@ import com.pando.app.R
 import com.pando.app.databinding.LayoutDoubleFriendMarkerBinding
 import com.pando.app.databinding.LayoutMarkerBinding
 import com.pando.app.features.home.data.model.entity.FriendItemModel
+import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
@@ -42,6 +49,9 @@ import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.fillColor
+import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
+import org.maplibre.android.style.layers.PropertyFactory.fillOutlineColor
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconAnchor
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
@@ -61,8 +71,10 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
+import org.maplibre.geojson.Polygon
 import java.util.UUID
 import kotlin.math.hypot
+import kotlin.math.max
 
 data class CurrentUserMapMarker(
     val id: UUID,
@@ -78,9 +90,17 @@ class MapMarkerRenderer(
     companion object {
         private const val FRIEND_MARKER_SIZE = 0.75f
         private const val FOCUSED_FRIEND_MARKER_SIZE = 0.85f
-        private const val DOUBLE_FRIEND_DISTANCE_METERS = 30f
         private const val FRIEND_CLUSTER_RADIUS = 30
         private const val FRIEND_CLUSTER_MAX_ZOOM = 15
+        private const val NEARBY_GROUP_RADIUS_METERS = 30.0
+        private const val NEARBY_GROUP_CIRCLE_SEGMENTS = 48
+        private const val PERSON_COUNT_PROPERTY = "personCount"
+        private const val GROUP_MARKER_BASE_WIDTH_DP = 144
+        private const val GROUP_MARKER_HEIGHT_DP = 86
+        private const val GROUP_AVATAR_SIZE_DP = 60
+        private const val GROUP_AVATAR_OVERLAP_DP = 16
+        private const val GROUP_AVATAR_HORIZONTAL_PADDING_DP = 20
+        private const val MAX_VISIBLE_GROUP_AVATARS = 5
     }
 
     private val currentLocationSourceId = "current-location-source"
@@ -90,13 +110,19 @@ class MapMarkerRenderer(
 
     private val friendLocationSourceId = "friend-location-source"
     private val friendLocationLayerId = "friend-location-layer"
-    private val doubleFriendLocationSourceId = "double-friend-location-source"
-    private val doubleFriendLocationLayerId = "double-friend-location-layer"
+    private val nearbyGroupLocationSourceId = "nearby-group-location-source"
+    private val nearbyGroupLocationLayerId = "nearby-group-location-layer"
+    private val nearbyGroupMemberSourceId = "nearby-group-member-source"
+    private val nearbyGroupMemberLayerId = "nearby-group-member-layer"
+    private val nearbyGroupRadiusSourceId = "nearby-group-radius-source"
+    private val nearbyGroupRadiusLayerId = "nearby-group-radius-layer"
     private val friendClusterCircleLayerId = "friend-location-cluster-circle-layer"
     private val friendClusterCountLayerId = "friend-location-cluster-count-layer"
 
     val interactiveLayerIds = arrayOf(
-        doubleFriendLocationLayerId,
+        currentLocationLayerId,
+        nearbyGroupMemberLayerId,
+        nearbyGroupLocationLayerId,
         friendClusterCircleLayerId,
         friendClusterCountLayerId,
         friendLocationLayerId
@@ -107,8 +133,9 @@ class MapMarkerRenderer(
         val bitmap: Bitmap
     )
 
-    private data class CachedDoubleMarkerBitmap(
+    private data class CachedGroupMarkerBitmap(
         val avatarUrls: List<String?>,
+        val totalAvatarCount: Int,
         val bitmap: Bitmap
     )
 
@@ -121,25 +148,19 @@ class MapMarkerRenderer(
         val isCurrentUser: Boolean
     )
 
-    private data class LocatedFriend(
-        val person: MarkerPerson,
-        val latitude: Double,
-        val longitude: Double
-    )
-
-    private data class FriendMarker(
+    private data class NearbyGroup(
         val people: List<MarkerPerson>,
         val latitude: Double,
         val longitude: Double
     ) {
-        val isDouble: Boolean
-            get() = people.size == 2
+        val isNearbyGroup: Boolean
+            get() = people.size >= 2
 
         val containsCurrentUser: Boolean
             get() = people.any(MarkerPerson::isCurrentUser)
 
         val iconId: String
-            get() = if (isDouble) {
+            get() = if (isNearbyGroup) {
                 "friend-double-avatar-${people.joinToString("-") { it.id }}"
             } else {
                 "friend-avatar-${people.first().id}"
@@ -149,20 +170,45 @@ class MapMarkerRenderer(
             get() = people.joinToString(",") { it.id }
 
         val name: String
-            get() = people.joinToString(" & ") { it.name }
+            get() = if (people.size <= 2) {
+                people.joinToString(" & ") { it.name }
+            } else {
+                "${people.first().name} và ${people.size - 1} người khác"
+            }
+
+        val personCount: Int
+            get() = people.size
     }
 
-    private val markerBitmapCache = mutableMapOf<String, CachedMarkerBitmap>()
-    private val doubleMarkerBitmapCache = mutableMapOf<String, CachedDoubleMarkerBitmap>()
-    private val pendingDoubleMarkerLoads = mutableSetOf<String>()
+    /** One point fed into MapLibre's cluster source for one logical marker. */
+    private data class MarkerProxy(
+        val marker: NearbyGroup,
+        val personCount: Int,
+        val markerType: String
+    )
+
+    private val markerBitmapCache = object : LruCache<String, CachedMarkerBitmap>(4 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: CachedMarkerBitmap): Int = value.bitmap.byteCount
+    }
+    private val nearbyGroupBitmapCache =
+        object : LruCache<String, CachedGroupMarkerBitmap>(4 * 1024 * 1024) {
+            override fun sizeOf(key: String, value: CachedGroupMarkerBitmap): Int =
+                value.bitmap.byteCount
+        }
+    private val pendingNearbyGroupLoads = mutableSetOf<String>()
     private var activeStyle: Style? = null
     private var currentBearing = 0f
     private var focusedFriendId: String? = null
     private var currentMarkerHidden = false
     private var currentLocationFeature: Feature? = null
-    private var renderedSingleMarkers: List<FriendMarker> = emptyList()
-    private var renderedDoubleMarkers: List<FriendMarker> = emptyList()
-    private var visibleDoubleMarkerIds: Set<String>? = null
+    private var renderedSingleMarkers: List<NearbyGroup> = emptyList()
+    private var renderedNearbyGroups: List<NearbyGroup> = emptyList()
+    private var renderedStandaloneCurrentMarker: NearbyGroup? = null
+    private var renderedPeople: Map<String, MarkerPerson> = emptyMap()
+    private var visibleNearbyGroupIds: Set<String>? = null
+    private var visibleNearbyMemberIds: Set<String>? = null
+    private var visibleNearbyRadiusIds: Set<String>? = null
+    private var lastRenderKey: String? = null
 
     fun addDirectionIcon(style: Style) {
         if (style.getImage(currentDirectionIconId) != null) return
@@ -209,13 +255,19 @@ class MapMarkerRenderer(
     fun renderCurrentLocation(
         style: Style,
         latitude: Double,
-        longitude: Double
+        longitude: Double,
+        currentUserId: String? = null,
+        currentUserName: String? = null
     ) {
         activeStyle = style
 
         currentLocationFeature = Feature.fromGeometry(
             Point.fromLngLat(longitude, latitude)
-        )
+        ).apply {
+            addStringProperty("markerType", "current")
+            currentUserId?.let { addStringProperty("id", it) }
+            currentUserName?.let { addStringProperty("name", it) }
+        }
         val featureCollection = if (currentMarkerHidden) {
             FeatureCollection.fromFeatures(emptyList())
         } else {
@@ -259,6 +311,7 @@ class MapMarkerRenderer(
     }
 
     private fun setCurrentMarkerHidden(style: Style, hidden: Boolean) {
+        if (currentMarkerHidden == hidden && currentLocationFeature != null) return
         currentMarkerHidden = hidden
 
         val source = style.getSourceAs<GeoJsonSource>(currentLocationSourceId)
@@ -279,32 +332,57 @@ class MapMarkerRenderer(
     ) {
         activeStyle = style
 
-        val friendMarkers = buildFriendMarkers(friends, currentUser)
-        val singleMarkers = friendMarkers.filterNot(FriendMarker::isDouble)
-        val singleFriendMarkers = singleMarkers.filterNot(FriendMarker::containsCurrentUser)
-        val doubleMarkers = friendMarkers.filter(FriendMarker::isDouble)
+        val markerGroups = buildNearbyGroups(friends, currentUser)
+        val renderKey = markerGroups.renderKey()
+        if (renderKey == lastRenderKey) return
+        lastRenderKey = renderKey
+
+        val nearbyGroups = markerGroups.filter(NearbyGroup::isNearbyGroup)
+        val singleMarkers = markerGroups.filterNot(NearbyGroup::isNearbyGroup)
+        val singleFriendMarkers = singleMarkers.filterNot(NearbyGroup::containsCurrentUser)
+        val standaloneCurrentMarker = singleMarkers.firstOrNull(NearbyGroup::containsCurrentUser)
 
         renderedSingleMarkers = singleFriendMarkers
-        renderedDoubleMarkers = doubleMarkers
-        visibleDoubleMarkerIds = null
+        renderedNearbyGroups = nearbyGroups
+        renderedStandaloneCurrentMarker = standaloneCurrentMarker
+        renderedPeople = markerGroups
+            .flatMap(NearbyGroup::people)
+            .associateBy(MarkerPerson::id)
+        visibleNearbyGroupIds = null
+        visibleNearbyMemberIds = null
+        visibleNearbyRadiusIds = null
 
-        setCurrentMarkerHidden(
-            style,
-            doubleMarkers.any(FriendMarker::containsCurrentUser)
+        renderSingleFriendMarkers(
+            style = style,
+            markers = singleFriendMarkers,
+            nearbyGroups = nearbyGroups,
+            standaloneCurrentMarker = standaloneCurrentMarker
         )
-        renderSingleFriendMarkers(style, singleFriendMarkers, doubleMarkers)
-        renderDoubleFriendMarkers(style, doubleMarkers)
-        loadFriendAvatarImages(style, singleFriendMarkers)
-        loadDoubleFriendAvatarImages(style, doubleMarkers)
+        renderNearbyGroupMarkers(style, nearbyGroups)
+        loadFriendAvatarImages(style, singleFriendMarkers + nearbyGroups)
+        loadNearbyGroupAvatarImages(style, nearbyGroups)
     }
 
     private fun renderSingleFriendMarkers(
         style: Style,
-        markers: List<FriendMarker>,
-        doubleMarkers: List<FriendMarker>
+        markers: List<NearbyGroup>,
+        nearbyGroups: List<NearbyGroup>,
+        standaloneCurrentMarker: NearbyGroup?
     ) {
+        val proxies = markers.map {
+            MarkerProxy(it, it.personCount, markerType = "single")
+        } + nearbyGroups.map {
+            MarkerProxy(it, it.personCount, markerType = "nearbyGroupProxy")
+        } + listOfNotNull(
+            // The blue current-location marker has its own source. This
+            // weighted, icon-less proxy only lets a far-zoom cluster count the
+            // current user when it touches another logical marker.
+            standaloneCurrentMarker?.let {
+                MarkerProxy(it, it.personCount, markerType = "currentProxy")
+            }
+        )
         val featureCollection = FeatureCollection.fromFeatures(
-            markers.map(::createFriendFeature) + doubleMarkers.flatMap(::createDoubleProxyFeatures)
+            proxies.map(::createMarkerProxyFeature)
         )
         val existingSource = style.getSourceAs<GeoJsonSource>(friendLocationSourceId)
 
@@ -313,6 +391,11 @@ class MapMarkerRenderer(
                 .withCluster(true)
                 .withClusterRadius(FRIEND_CLUSTER_RADIUS)
                 .withClusterMaxZoom(FRIEND_CLUSTER_MAX_ZOOM)
+                .withClusterProperty(
+                    PERSON_COUNT_PROPERTY,
+                    literal("+"),
+                    get(PERSON_COUNT_PROPERTY)
+                )
 
             style.addSource(
                 GeoJsonSource(
@@ -326,10 +409,6 @@ class MapMarkerRenderer(
         }
 
         if (style.getLayer(friendClusterCircleLayerId) == null) {
-            // A double marker contributes two proxy points. Do not render a
-            // standalone pair as "+1"; render a cluster only after another
-            // person joins it (3+ points means a pair + someone else). The
-            // standalone double marker is kept in its own source below.
             style.addLayer(
                 CircleLayer(
                     friendClusterCircleLayerId,
@@ -340,10 +419,7 @@ class MapMarkerRenderer(
                     circleStrokeWidth(3f),
                     circleStrokeColor("#FFFFFF")
                 ).withFilter(
-                    all(
-                        has("point_count"),
-                        gt(get("point_count"), literal(2))
-                    )
+                    friendClusterFilter()
                 )
             )
         }
@@ -359,7 +435,11 @@ class MapMarkerRenderer(
                             literal("+"),
                             toString(
                                 subtract(
-                                    coalesce(get("point_count"), literal(2)),
+                                    coalesce(
+                                        get(PERSON_COUNT_PROPERTY),
+                                        get("point_count"),
+                                        literal(2)
+                                    ),
                                     literal(1)
                                 )
                             )
@@ -371,10 +451,7 @@ class MapMarkerRenderer(
                     textAllowOverlap(true),
                     textIgnorePlacement(true)
                 ).withFilter(
-                    all(
-                        has("point_count"),
-                        gt(get("point_count"), literal(2))
-                    )
+                    friendClusterFilter()
                 )
             )
         }
@@ -397,26 +474,32 @@ class MapMarkerRenderer(
                     .withFilter(
                         all(
                             not(has("point_count")),
-                            neq(get("markerType"), literal("doubleProxy"))
+                            neq(get("markerType"), literal("nearbyGroupProxy")),
+                            neq(get("markerType"), literal("currentProxy"))
                         )
                     )
             )
         }
     }
 
-    private fun renderDoubleFriendMarkers(
+    private fun friendClusterFilter() = all(
+        has("point_count"),
+        gt(get("point_count"), literal(1))
+    )
+
+    private fun renderNearbyGroupMarkers(
         style: Style,
-        markers: List<FriendMarker>
+        markers: List<NearbyGroup>
     ) {
         val featureCollection = FeatureCollection.fromFeatures(
-            markers.map(::createFriendFeature)
+            markers.map { createNearbyGroupFeature(it) }
         )
-        val existingSource = style.getSourceAs<GeoJsonSource>(doubleFriendLocationSourceId)
+        val existingSource = style.getSourceAs<GeoJsonSource>(nearbyGroupLocationSourceId)
 
         if (existingSource == null) {
             style.addSource(
                 GeoJsonSource(
-                    doubleFriendLocationSourceId,
+                    nearbyGroupLocationSourceId,
                     featureCollection
                 )
             )
@@ -424,11 +507,11 @@ class MapMarkerRenderer(
             existingSource.setGeoJson(featureCollection)
         }
 
-        if (style.getLayer(doubleFriendLocationLayerId) == null) {
+        if (style.getLayer(nearbyGroupLocationLayerId) == null) {
             style.addLayer(
                 SymbolLayer(
-                    doubleFriendLocationLayerId,
-                    doubleFriendLocationSourceId
+                    nearbyGroupLocationLayerId,
+                    nearbyGroupLocationSourceId
                 ).withProperties(
                     iconImage(get("iconId")),
                     iconSize(literal(FRIEND_MARKER_SIZE)),
@@ -439,40 +522,170 @@ class MapMarkerRenderer(
             )
         }
 
-        // Visibility is updated from the current camera so an isolated pair
-        // stays visible at every zoom, while a pair that touches another
+        val memberFeatureCollection = FeatureCollection.fromFeatures(emptyList())
+        val memberSource = style.getSourceAs<GeoJsonSource>(nearbyGroupMemberSourceId)
+        if (memberSource == null) {
+            style.addSource(GeoJsonSource(nearbyGroupMemberSourceId, memberFeatureCollection))
+        } else {
+            memberSource.setGeoJson(memberFeatureCollection)
+        }
+
+        if (style.getLayer(nearbyGroupMemberLayerId) == null) {
+            style.addLayer(
+                SymbolLayer(
+                    nearbyGroupMemberLayerId,
+                    nearbyGroupMemberSourceId
+                ).withProperties(
+                    iconImage(get("iconId")),
+                    iconSize(friendMarkerSizeExpression()),
+                    iconAnchor(ICON_ANCHOR_BOTTOM),
+                    iconAllowOverlap(true),
+                    iconIgnorePlacement(true)
+                )
+            )
+        }
+
+        val radiusFeatureCollection = FeatureCollection.fromFeatures(emptyList())
+        val radiusSource = style.getSourceAs<GeoJsonSource>(nearbyGroupRadiusSourceId)
+        if (radiusSource == null) {
+            style.addSource(GeoJsonSource(nearbyGroupRadiusSourceId, radiusFeatureCollection))
+        } else {
+            radiusSource.setGeoJson(radiusFeatureCollection)
+        }
+
+        if (style.getLayer(nearbyGroupRadiusLayerId) == null) {
+            val radiusLayer = FillLayer(
+                nearbyGroupRadiusLayerId,
+                nearbyGroupRadiusSourceId
+            ).withProperties(
+                fillColor("#3F8CFF"),
+                fillOpacity(0.08f),
+                fillOutlineColor("#3F8CFF")
+            )
+            val layerBelow = if (style.getLayer(currentLocationLayerId) != null) {
+                currentLocationLayerId
+            } else {
+                nearbyGroupLocationLayerId
+            }
+            style.addLayerBelow(radiusLayer, layerBelow)
+        }
+
+        // Visibility is updated from the current camera so an isolated group
+        // stays visible at close zoom, while a group that joins another
         // marker is hidden and represented by the clustered proxy count.
-        visibleDoubleMarkerIds = null
+        visibleNearbyGroupIds = null
+        visibleNearbyMemberIds = null
+        visibleNearbyRadiusIds = null
     }
 
-    fun updateDoubleMarkerVisibility(
+    fun updateNearbyGroupVisibility(
         map: MapLibreMap,
         style: Style
     ) {
-        val source = style.getSourceAs<GeoJsonSource>(doubleFriendLocationSourceId)
+        val groupSource = style.getSourceAs<GeoJsonSource>(nearbyGroupLocationSourceId)
+            ?: return
+        val memberSource = style.getSourceAs<GeoJsonSource>(nearbyGroupMemberSourceId)
+            ?: return
+        val radiusSource = style.getSourceAs<GeoJsonSource>(nearbyGroupRadiusSourceId)
             ?: return
 
-        val visibleMarkers = if (map.cameraPosition.zoom > FRIEND_CLUSTER_MAX_ZOOM) {
-            renderedDoubleMarkers
+        val isCloseZoom = map.cameraPosition.zoom > FRIEND_CLUSTER_MAX_ZOOM
+        val splitGroups = if (isCloseZoom) {
+            renderedNearbyGroups.filter { nearbyGroupShouldSplit(map, it) }
         } else {
-            renderedDoubleMarkers.filterNot { marker ->
+            emptyList()
+        }
+        val splitGroupIds = splitGroups.mapTo(mutableSetOf(), NearbyGroup::markerId)
+
+        val visibleMarkers = if (isCloseZoom) {
+            renderedNearbyGroups
+        } else {
+            renderedNearbyGroups.filterNot { marker ->
+                // Group size alone must never hide a nearby marker. It is
+                // hidden only when its screen footprint touches another
+                // logical marker and the proxy can take over as a cluster.
                 markerTouchesAnotherMarker(map, marker)
             }
         }
-        val visibleIds = visibleMarkers.mapTo(mutableSetOf(), FriendMarker::markerId)
-        if (visibleIds == visibleDoubleMarkerIds) return
 
-        visibleDoubleMarkerIds = visibleIds
-        source.setGeoJson(
+        val stackMarkers = visibleMarkers.filterNot { it.markerId in splitGroupIds }
+        val memberMarkers = splitGroups
+            .flatMap { group ->
+                group.people.filterNot(MarkerPerson::isCurrentUser).map { person ->
+                    group to person
+                }
+            }
+        val radiusMarkers = splitGroups
+
+        val visibleIds = stackMarkers.mapTo(mutableSetOf(), NearbyGroup::markerId)
+        val visibleMemberIds = memberMarkers.mapTo(mutableSetOf()) { (_, person) -> person.id }
+        val visibleRadiusIds = radiusMarkers.mapTo(mutableSetOf(), NearbyGroup::markerId)
+
+        val shouldHideCurrentMarker = if (isCloseZoom) {
+            stackMarkers.any(NearbyGroup::containsCurrentUser)
+        } else {
+            renderedNearbyGroups.any(NearbyGroup::containsCurrentUser)
+        }
+        setCurrentMarkerHidden(style, shouldHideCurrentMarker)
+
+        if (
+            visibleIds == visibleNearbyGroupIds &&
+            visibleMemberIds == visibleNearbyMemberIds &&
+            visibleRadiusIds == visibleNearbyRadiusIds
+        ) {
+            return
+        }
+
+        visibleNearbyGroupIds = visibleIds
+        visibleNearbyMemberIds = visibleMemberIds
+        visibleNearbyRadiusIds = visibleRadiusIds
+
+        groupSource.setGeoJson(
             FeatureCollection.fromFeatures(
-                visibleMarkers.map(::createFriendFeature)
+                stackMarkers.map(::createNearbyGroupFeature)
             )
+        )
+        memberSource.setGeoJson(
+            FeatureCollection.fromFeatures(
+                memberMarkers.map { (group, person) ->
+                    createNearbyGroupMemberFeature(group, person)
+                }
+            )
+        )
+        radiusSource.setGeoJson(
+            FeatureCollection.fromFeatures(
+                radiusMarkers.map(::createNearbyGroupRadiusFeature)
+            )
+        )
+    }
+
+    private fun nearbyGroupShouldSplit(
+        map: MapLibreMap,
+        marker: NearbyGroup
+    ): Boolean {
+        val screenPoints = marker.people.map { person ->
+            val point = map.projection.toScreenLocation(
+                LatLng(person.latitude, person.longitude)
+            )
+            MarkerScreenPoint(
+                id = person.id,
+                x = point.x,
+                y = point.y
+            )
+        }
+
+        return MapMarkerGrouping.shouldSplitNearbyGroup(
+            points = screenPoints,
+            thresholdPx = MapMarkerGrouping.NEARBY_SPLIT_THRESHOLD_DP
+                .toInt()
+                .dpToPx()
+                .toFloat()
         )
     }
 
     private fun markerTouchesAnotherMarker(
         map: MapLibreMap,
-        marker: FriendMarker
+        marker: NearbyGroup
     ): Boolean {
         val markerPoint = map.projection.toScreenLocation(
             LatLng(marker.latitude, marker.longitude)
@@ -482,14 +695,20 @@ class MapMarkerRenderer(
         // native round-trip that waits for the renderer and can block the UI
         // thread for several seconds while a style or tile is being rendered.
         // The source already contains every marker, so projected screen
-        // distances are enough to decide whether the pair visually touches a
+        // distances are enough to decide whether the group visually touches a
         // neighboring marker.
         val touchesSingleMarker = renderedSingleMarkers.any { otherMarker ->
             screenDistance(map, markerPoint, otherMarker) <= FRIEND_CLUSTER_RADIUS
         }
         if (touchesSingleMarker) return true
 
-        return renderedDoubleMarkers.any { otherMarker ->
+        renderedStandaloneCurrentMarker?.let { currentMarker ->
+            if (screenDistance(map, markerPoint, currentMarker) <= FRIEND_CLUSTER_RADIUS) {
+                return true
+            }
+        }
+
+        return renderedNearbyGroups.any { otherMarker ->
             otherMarker.markerId != marker.markerId &&
                 screenDistance(map, markerPoint, otherMarker) <= FRIEND_CLUSTER_RADIUS
         }
@@ -498,7 +717,7 @@ class MapMarkerRenderer(
     private fun screenDistance(
         map: MapLibreMap,
         markerPoint: PointF,
-        otherMarker: FriendMarker
+        otherMarker: NearbyGroup
     ): Float {
         val otherPoint = map.projection.toScreenLocation(
             LatLng(otherMarker.latitude, otherMarker.longitude)
@@ -509,148 +728,189 @@ class MapMarkerRenderer(
         ).toFloat()
     }
 
-    private fun createFriendFeature(
-        marker: FriendMarker,
-        markerType: String = if (marker.isDouble) "double" else "single",
-        id: String = marker.markerId
+    private fun createMarkerProxyFeature(proxy: MarkerProxy): Feature {
+        val marker = proxy.marker
+        return Feature.fromGeometry(
+            Point.fromLngLat(marker.longitude, marker.latitude)
+        ).apply {
+            addStringProperty("id", marker.markerId)
+            addStringProperty("name", marker.name)
+            addStringProperty("iconId", marker.iconId)
+            addStringProperty("markerType", proxy.markerType)
+            addNumberProperty(PERSON_COUNT_PROPERTY, proxy.personCount)
+        }
+    }
+
+    private fun createNearbyGroupFeature(
+        marker: NearbyGroup
     ): Feature {
         return Feature.fromGeometry(
             Point.fromLngLat(marker.longitude, marker.latitude)
         ).apply {
-            addStringProperty("id", id)
+            addStringProperty("id", marker.markerId)
             addStringProperty("name", marker.name)
             addStringProperty("iconId", marker.iconId)
-            addStringProperty("markerType", markerType)
+            addStringProperty("markerType", "nearbyGroup")
+            addNumberProperty(PERSON_COUNT_PROPERTY, marker.personCount)
         }
     }
 
-    private fun createDoubleProxyFeatures(marker: FriendMarker): List<Feature> {
-        return marker.people.mapIndexed { index, _ ->
-            createFriendFeature(
-                marker = marker,
-                markerType = "doubleProxy",
-                id = "${marker.markerId}:doubleProxy:$index"
+    private fun createNearbyGroupMemberFeature(
+        group: NearbyGroup,
+        person: MarkerPerson
+    ): Feature {
+        return Feature.fromGeometry(
+            Point.fromLngLat(person.longitude, person.latitude)
+        ).apply {
+            addStringProperty("id", person.id)
+            addStringProperty("name", person.name)
+            addStringProperty("iconId", "friend-avatar-${person.id}")
+            addStringProperty("groupId", group.markerId)
+            addStringProperty("markerType", "nearbyGroupMember")
+        }
+    }
+
+    private fun createNearbyGroupRadiusFeature(
+        marker: NearbyGroup
+    ): Feature {
+        val ring = MapMarkerGrouping.circlePoints(
+            latitude = marker.latitude,
+            longitude = marker.longitude,
+            radiusMeters = NEARBY_GROUP_RADIUS_METERS,
+            segments = NEARBY_GROUP_CIRCLE_SEGMENTS
+        ).map { point ->
+            Point.fromLngLat(point.longitude, point.latitude)
+        }
+
+        return Feature.fromGeometry(
+            Polygon.fromLngLats(listOf(ring))
+        ).apply {
+            addStringProperty("id", marker.markerId)
+            addNumberProperty(PERSON_COUNT_PROPERTY, marker.personCount)
+            addStringProperty("markerType", "nearbyGroupRadius")
+        }
+    }
+
+    fun resolveFollowLocation(personIds: Set<String>): MarkerFollowLocation? {
+        val people = renderedPeople.values.map { person ->
+            NearbyMarkerPerson(
+                id = person.id,
+                name = person.name,
+                avatarUrl = person.avatarUrl,
+                latitude = person.latitude,
+                longitude = person.longitude,
+                isCurrentUser = person.isCurrentUser
             )
         }
+        return MapMarkerGrouping.resolveFollowLocation(people, personIds)
+    }
+
+    fun personIdsForFeature(style: Style, feature: Feature): Set<String> {
+        if (feature.getNumberProperty("point_count") != null) {
+            val source = style.getSourceAs<GeoJsonSource>(friendLocationSourceId)
+                ?: return emptySet()
+            return clusterPersonIds(source, feature)
+        }
+
+        return MapMarkerGrouping.personIdsFromMarkerId(
+            feature.getStringProperty("id") ?: ""
+        )
+    }
+
+    private fun clusterPersonIds(
+        source: GeoJsonSource,
+        cluster: Feature
+    ): Set<String> {
+        val pointCount = cluster.getNumberProperty("point_count")?.toLong() ?: return emptySet()
+        val leaves = runCatching {
+            source.getClusterLeaves(cluster, pointCount, 0)
+        }.getOrNull()?.features() ?: return emptySet()
+
+        return leaves.flatMap { leaf ->
+            if (leaf.getNumberProperty("point_count") != null) {
+                clusterPersonIds(source, leaf)
+            } else {
+                MapMarkerGrouping.personIdsFromMarkerId(
+                    leaf.getStringProperty("id") ?: ""
+                )
+            }
+        }.toSet()
     }
 
     /**
-     * Groups only connected proximity sets of exactly two people (the current
-     * user can be one of them). A set of three or more remains as individual
-     * features so MapLibre can still cluster it normally at lower zoom levels.
+     * Groups people who are within the nearby radius. A group can contain the
+     * current user and any number of friends. A group is represented by one
+     * avatar marker at high zoom and one weighted proxy in the cluster source.
      */
-    private fun buildFriendMarkers(
+    private fun buildNearbyGroups(
         friends: List<FriendItemModel>,
         currentUser: CurrentUserMapMarker?
-    ): List<FriendMarker> {
-        val locatedFriends = friends
+    ): List<NearbyGroup> {
+        val people = friends
             .filter { friend -> friend.id.toString() != currentUser?.id?.toString() }
             .mapNotNull { friend ->
                 val latitude = friend.latitude ?: return@mapNotNull null
                 val longitude = friend.longitude ?: return@mapNotNull null
-                LocatedFriend(
-                    person = MarkerPerson(
-                        id = friend.id.toString(),
-                        name = friend.name,
-                        avatarUrl = friend.avatarUrl,
-                        latitude = latitude,
-                        longitude = longitude,
-                        isCurrentUser = false
-                    ),
+                NearbyMarkerPerson(
+                    id = friend.id.toString(),
+                    name = friend.name,
+                    avatarUrl = friend.avatarUrl,
                     latitude = latitude,
-                    longitude = longitude
+                    longitude = longitude,
+                    isCurrentUser = false
                 )
             }
             .toMutableList()
 
         if (currentUser != null) {
-            locatedFriends += LocatedFriend(
-                person = MarkerPerson(
-                    id = currentUser.id.toString(),
-                    name = currentUser.name,
-                    avatarUrl = currentUser.avatarUrl,
-                    latitude = currentUser.latitude,
-                    longitude = currentUser.longitude,
-                    isCurrentUser = true
-                ),
+            people += NearbyMarkerPerson(
+                id = currentUser.id.toString(),
+                name = currentUser.name,
+                avatarUrl = currentUser.avatarUrl,
                 latitude = currentUser.latitude,
-                longitude = currentUser.longitude
+                longitude = currentUser.longitude,
+                isCurrentUser = true
             )
         }
 
-        val visited = BooleanArray(locatedFriends.size)
-        val markers = mutableListOf<FriendMarker>()
-
-        locatedFriends.indices.forEach { startIndex ->
-            if (visited[startIndex]) return@forEach
-
-            val component = mutableListOf<Int>()
-            val pending = ArrayDeque<Int>().apply { add(startIndex) }
-            visited[startIndex] = true
-
-            while (pending.isNotEmpty()) {
-                val currentIndex = pending.removeFirst()
-                component += currentIndex
-
-                locatedFriends.indices.forEach { candidateIndex ->
-                    if (visited[candidateIndex]) return@forEach
-
-                    val distance = distanceMeters(
-                        locatedFriends[currentIndex],
-                        locatedFriends[candidateIndex]
+        return MapMarkerGrouping.group(people).map { group ->
+            NearbyGroup(
+                people = group.people.map { person ->
+                    MarkerPerson(
+                        id = person.id,
+                        name = person.name,
+                        avatarUrl = person.avatarUrl,
+                        latitude = person.latitude,
+                        longitude = person.longitude,
+                        isCurrentUser = person.isCurrentUser
                     )
-                    if (distance <= DOUBLE_FRIEND_DISTANCE_METERS) {
-                        visited[candidateIndex] = true
-                        pending.add(candidateIndex)
-                    }
-                }
-            }
-
-            if (component.size == 2) {
-                val first = locatedFriends[component[0]]
-                val second = locatedFriends[component[1]]
-                markers += FriendMarker(
-                    people = listOf(first.person, second.person),
-                    latitude = (first.latitude + second.latitude) / 2.0,
-                    longitude = (first.longitude + second.longitude) / 2.0
-                )
-            } else {
-                component.forEach { index ->
-                    val locatedFriend = locatedFriends[index]
-                    markers += FriendMarker(
-                        people = listOf(locatedFriend.person),
-                        latitude = locatedFriend.latitude,
-                        longitude = locatedFriend.longitude
-                    )
-                }
-            }
+                },
+                latitude = group.latitude,
+                longitude = group.longitude
+            )
         }
-
-        return markers
     }
 
-    private fun distanceMeters(first: LocatedFriend, second: LocatedFriend): Float {
-        val result = FloatArray(1)
-        Location.distanceBetween(
-            first.latitude,
-            first.longitude,
-            second.latitude,
-            second.longitude,
-            result
-        )
-        return result[0]
+    private fun List<NearbyGroup>.renderKey(): String = joinToString(";") { group ->
+        group.people.joinToString(",") { person ->
+            "${person.id}:${person.latitude}:${person.longitude}:" +
+                "${person.avatarUrl.orEmpty()}:${person.isCurrentUser}"
+        }
     }
 
-    private fun loadDoubleFriendAvatarImages(
+    private fun loadNearbyGroupAvatarImages(
         style: Style,
-        markers: List<FriendMarker>
+        markers: List<NearbyGroup>
     ) {
-        markers.filter(FriendMarker::isDouble).forEach { marker ->
+        markers.filter(NearbyGroup::isNearbyGroup).forEach { marker ->
             val iconId = marker.iconId
-            val avatarUrls = marker.people.map(MarkerPerson::avatarUrl)
-            val cachedMarker = doubleMarkerBitmapCache[iconId]
+            val displayedPeople = marker.people.take(MAX_VISIBLE_GROUP_AVATARS)
+            val avatarUrls = displayedPeople.map(MarkerPerson::avatarUrl)
+            val cachedMarker = nearbyGroupBitmapCache.get(iconId)
 
-            if (cachedMarker?.avatarUrls == avatarUrls) {
+            if (cachedMarker?.avatarUrls == avatarUrls &&
+                cachedMarker.totalAvatarCount == marker.people.size
+            ) {
                 if (style.getImage(iconId) == null) {
                     style.addImage(iconId, cachedMarker.bitmap)
                 }
@@ -661,39 +921,43 @@ class MapMarkerRenderer(
                 val defaultAvatar = defaultAvatarBitmap()
                 style.addImage(
                     iconId,
-                    createDoubleFriendMarkerBitmap(defaultAvatar, defaultAvatar)
+                    createGroupFriendMarkerBitmap(
+                        avatars = List(displayedPeople.size) { defaultAvatar },
+                        totalAvatarCount = marker.people.size
+                    )
                 )
             } else if (cachedMarker != null) {
                 style.removeImage(iconId)
             }
 
             val loadKey = "$iconId|${avatarUrls.joinToString("|")}"
-            if (!pendingDoubleMarkerLoads.add(loadKey)) return@forEach
+            if (!pendingNearbyGroupLoads.add(loadKey)) return@forEach
 
-            val loadedBitmaps = arrayOfNulls<Bitmap>(2)
-            marker.people.forEachIndexed { index, person ->
+            val loadedBitmaps = arrayOfNulls<Bitmap>(displayedPeople.size)
+            displayedPeople.forEachIndexed { index, person ->
                 loadFriendAvatarBitmap(
                     person = person,
                     onReady = { bitmap ->
                         loadedBitmaps[index] = bitmap
                         if (loadedBitmaps.any { it == null }) return@loadFriendAvatarBitmap
 
-                        pendingDoubleMarkerLoads.remove(loadKey)
+                        pendingNearbyGroupLoads.remove(loadKey)
                         val currentStyle = activeStyle ?: return@loadFriendAvatarBitmap
                         if (currentStyle !== style) return@loadFriendAvatarBitmap
 
-                        val markerBitmap = createDoubleFriendMarkerBitmap(
-                            loadedBitmaps[0]!!,
-                            loadedBitmaps[1]!!
+                        val markerBitmap = createGroupFriendMarkerBitmap(
+                            avatars = loadedBitmaps.map { it!! },
+                            totalAvatarCount = marker.people.size
                         )
-                        doubleMarkerBitmapCache[iconId] = CachedDoubleMarkerBitmap(
+                        nearbyGroupBitmapCache.put(iconId, CachedGroupMarkerBitmap(
                             avatarUrls = avatarUrls,
+                            totalAvatarCount = marker.people.size,
                             bitmap = markerBitmap
-                        )
+                        ))
                         currentStyle.addImage(iconId, markerBitmap)
                     },
                     onCleared = {
-                        pendingDoubleMarkerLoads.remove(loadKey)
+                        pendingNearbyGroupLoads.remove(loadKey)
                     }
                 )
             }
@@ -751,19 +1015,71 @@ class MapMarkerRenderer(
         ) ?: createBitmap(60.dpToPx(), 60.dpToPx())
     }
 
-    private fun createDoubleFriendMarkerBitmap(
-        firstAvatar: Bitmap,
-        secondAvatar: Bitmap
+    private fun createGroupFriendMarkerBitmap(
+        avatars: List<Bitmap>,
+        totalAvatarCount: Int = avatars.size
     ): Bitmap {
         val markerBinding = LayoutDoubleFriendMarkerBinding.inflate(
             LayoutInflater.from(fragment.requireContext())
         )
-        markerBinding.avatarLeft.setImageBitmap(firstAvatar)
-        markerBinding.avatarRight.setImageBitmap(secondAvatar)
 
         val markerView = markerBinding.root
-        val width = 144.dpToPx()
-        val height = 86.dpToPx()
+        val avatarSize = GROUP_AVATAR_SIZE_DP.dpToPx()
+        val overlap = GROUP_AVATAR_OVERLAP_DP.dpToPx()
+        val displayedAvatars = avatars.take(MAX_VISIBLE_GROUP_AVATARS)
+        val contentWidth = avatarSize +
+            (displayedAvatars.size - 1).coerceAtLeast(0) * (avatarSize - overlap)
+        val width = max(
+            GROUP_MARKER_BASE_WIDTH_DP.dpToPx(),
+            contentWidth + GROUP_AVATAR_HORIZONTAL_PADDING_DP.dpToPx()
+        )
+        val height = GROUP_MARKER_HEIGHT_DP.dpToPx()
+
+        markerBinding.avatarContainer.layoutParams = FrameLayout.LayoutParams(
+            contentWidth,
+            avatarSize
+        ).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            topMargin = 7.dpToPx()
+        }
+
+        displayedAvatars.forEachIndexed { index, avatar ->
+            val imageView = ImageView(fragment.requireContext()).apply {
+                setImageBitmap(avatar)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                contentDescription = null
+            }
+            markerBinding.avatarContainer.addView(
+                imageView,
+                FrameLayout.LayoutParams(avatarSize, avatarSize).apply {
+                    leftMargin = index * (avatarSize - overlap)
+                }
+            )
+        }
+
+        val hiddenAvatarCount = totalAvatarCount - displayedAvatars.size
+        if (hiddenAvatarCount > 0) {
+            val badgeSize = 30.dpToPx()
+            val badge = TextView(fragment.requireContext()).apply {
+                text = "+$hiddenAvatarCount"
+                setTextColor(Color.WHITE)
+                setTextSize(11f)
+                gravity = Gravity.CENTER
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.parseColor("#3F8CFF"))
+                    setStroke(2.dpToPx(), Color.WHITE)
+                }
+            }
+            markerView.addView(
+                badge,
+                FrameLayout.LayoutParams(badgeSize, badgeSize).apply {
+                    gravity = Gravity.TOP or Gravity.END
+                    topMargin = 2.dpToPx()
+                    marginEnd = 4.dpToPx()
+                }
+            )
+        }
 
         markerView.measure(
             android.view.View.MeasureSpec.makeMeasureSpec(
@@ -783,8 +1099,9 @@ class MapMarkerRenderer(
 
     fun setFocusedFriendMarker(style: Style?, friendId: String?) {
         focusedFriendId = friendId
-        style
-            ?.getLayerAs<SymbolLayer>(friendLocationLayerId)
+        style?.getLayerAs<SymbolLayer>(friendLocationLayerId)
+            ?.setProperties(iconSize(friendMarkerSizeExpression()))
+        style?.getLayerAs<SymbolLayer>(nearbyGroupMemberLayerId)
             ?.setProperties(iconSize(friendMarkerSizeExpression()))
     }
 
@@ -798,12 +1115,17 @@ class MapMarkerRenderer(
     fun clearStyle(style: Style?) {
         if (style == null || activeStyle === style) {
             activeStyle = null
-            pendingDoubleMarkerLoads.clear()
+            pendingNearbyGroupLoads.clear()
             currentMarkerHidden = false
             currentLocationFeature = null
             renderedSingleMarkers = emptyList()
-            renderedDoubleMarkers = emptyList()
-            visibleDoubleMarkerIds = null
+            renderedNearbyGroups = emptyList()
+            renderedStandaloneCurrentMarker = null
+            renderedPeople = emptyMap()
+            visibleNearbyGroupIds = null
+            visibleNearbyMemberIds = null
+            visibleNearbyRadiusIds = null
+            lastRenderKey = null
         }
     }
 
@@ -817,18 +1139,24 @@ class MapMarkerRenderer(
 
     private fun loadFriendAvatarImages(
         style: Style,
-        markers: List<FriendMarker>
+        markers: List<NearbyGroup>
     ) {
         markers
-            .filterNot(FriendMarker::isDouble)
-            .filterNot(FriendMarker::containsCurrentUser)
-            .forEach { marker ->
-            val person = marker.people.first()
+            .flatMap { marker ->
+                if (marker.isNearbyGroup) {
+                    marker.people.take(MAX_VISIBLE_GROUP_AVATARS)
+                } else {
+                    marker.people
+                }
+            }
+            .filterNot(MarkerPerson::isCurrentUser)
+            .distinctBy(MarkerPerson::id)
+            .forEach { person ->
             val iconId = "friend-avatar-${person.id}"
 
             if (style.getImage(iconId) != null) return@forEach
 
-            markerBitmapCache[person.id]
+            markerBitmapCache.get(person.id)
                 ?.takeIf { it.avatarUrl == person.avatarUrl }
                 ?.let { cachedMarker ->
                     style.addImage(iconId, cachedMarker.bitmap)
@@ -842,10 +1170,10 @@ class MapMarkerRenderer(
                     if (currentStyle !== style) return@loadFriendAvatarBitmap
 
                     val markerBitmap = createFriendMarkerBitmap(bitmap)
-                    markerBitmapCache[person.id] = CachedMarkerBitmap(
+                    markerBitmapCache.put(person.id, CachedMarkerBitmap(
                         avatarUrl = person.avatarUrl,
                         bitmap = markerBitmap
-                    )
+                    ))
                     currentStyle.addImage(iconId, markerBitmap)
                 },
                 onCleared = {}
