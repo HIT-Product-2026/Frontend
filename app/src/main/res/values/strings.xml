@@ -31,6 +31,10 @@
     <string name="stop_location_sharing">Dừng chia sẻ</string>
     <string name="coming_soon">Coming soon...</string>
     <string name="otp_sent_success">Đã gửi mã OTP!</string>
+    <string name="otp_resend">Gửi lại mã</string>
+    <string name="otp_resending">Đang gửi lại…</string>
+    <string name="otp_resend_countdown">Gửi lại mã (%1$ds)</string>
+    <string name="otp_resent_success">Đã gửi lại mã OTP!</string>
     <string name="register_success">Đăng ký thành công!</string>
     <string name="otp_verified_success">Xác thực OTP thành công!</string>
     <string name="password_changed_success">Thay đổi mật khẩu thành công!</string>

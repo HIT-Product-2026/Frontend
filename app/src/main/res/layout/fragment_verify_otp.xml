@@ -102,7 +102,7 @@
                     android:layout_alignParentEnd="true"
                     android:layout_marginRight="@dimen/_35sdp"
                     android:layout_marginBottom="@dimen/_10sdp"
-                    android:text="Gửi lại mã"
+                    android:text="@string/otp_resend"
                     android:textAlignment="center"
                     android:textColor="@color/accent5"
                     android:textSize="@dimen/_13sdp"
