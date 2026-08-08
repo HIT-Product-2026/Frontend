@@ -253,7 +253,6 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
 
         binding.root.setOnTouchListener(dismissOnTouch)
         binding.toolBar.setOnTouchListener(dismissOnTouch)
-        binding.sendBtn.setOnTouchListener(dismissOnTouch)
 
         binding.messageList.addOnItemTouchListener(
             object : RecyclerView.SimpleOnItemTouchListener() {
