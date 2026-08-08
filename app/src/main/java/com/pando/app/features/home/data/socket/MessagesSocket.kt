@@ -7,6 +7,7 @@ import com.pando.app.core.network.socket.SocketConnectionManager
 import com.pando.app.core.network.socket.SocketConstants
 import com.pando.app.core.network.socket.PendingSocketMessage
 import com.pando.app.core.network.socket.PendingSocketMessageQueue
+import com.pando.app.core.session.UserSession
 import com.pando.app.features.home.data.model.request.SendImageRequest
 import com.pando.app.features.home.data.model.request.SendMessageRequest
 import com.pando.app.features.home.data.model.response.ChatMessageResponse
@@ -28,7 +29,8 @@ import javax.inject.Singleton
 @Singleton
 class MessagesSocket @Inject constructor(
     private val connectionManager: SocketConnectionManager,
-    private val gson: Gson
+    private val gson: Gson,
+    private val userSession: UserSession
 ) {
     companion object {
         private const val TAG = "MessageSocket"
@@ -138,6 +140,10 @@ class MessagesSocket @Inject constructor(
             Log.e(TAG, "Nội dung tin nhắn đang trống")
             return
         }
+        val ownerUserId = userSession.getCurrentUserId() ?: run {
+            Log.e(TAG, "Không thể xếp tin nhắn khi chưa có phiên đăng nhập")
+            return
+        }
 
         val request = SendMessageRequest(
             conversationId = conversationId,
@@ -149,7 +155,8 @@ class MessagesSocket @Inject constructor(
         enqueueMessage(
             PendingSocketMessage(
                 destination = SocketConstants.Chat.SEND_TEXT_DESTINATION,
-                payload = payload
+                payload = payload,
+                ownerUserId = ownerUserId
             )
         )
     }
@@ -157,6 +164,10 @@ class MessagesSocket @Inject constructor(
     fun sendImageMessage(conversationId: UUID, postImageUrl: String) {
         if (postImageUrl.isBlank()) {
             Log.e(TAG, "Không có link ảnh")
+            return
+        }
+        val ownerUserId = userSession.getCurrentUserId() ?: run {
+            Log.e(TAG, "Không thể xếp ảnh khi chưa có phiên đăng nhập")
             return
         }
 
@@ -170,9 +181,22 @@ class MessagesSocket @Inject constructor(
         enqueueMessage(
             PendingSocketMessage(
                 destination = SocketConstants.Chat.SEND_IMAGE_DESTINATION,
-                payload = payload
+                payload = payload,
+                ownerUserId = ownerUserId
             )
         )
+    }
+
+    /** Drop all account-scoped work before disconnecting or switching user. */
+    fun clearSession() {
+        unsubscribeAllConversation()
+
+        val removedCount = synchronized(flushLock) {
+            pendingMessages.clear()
+        }
+        if (removedCount > 0) {
+            Log.d(TAG, "Đã xóa $removedCount tin nhắn đang chờ của phiên cũ")
+        }
     }
 
     private fun enqueueMessage(message: PendingSocketMessage) {
@@ -202,6 +226,11 @@ class MessagesSocket @Inject constructor(
             try {
                 while (true) {
                     val message = pendingMessages.pollFirst() ?: break
+                    val activeUserId = userSession.getCurrentUserId()
+                    if (activeUserId == null || message.ownerUserId != activeUserId) {
+                        Log.w(TAG, "Bỏ tin nhắn đang chờ không thuộc phiên hiện tại")
+                        continue
+                    }
                     val client = connectionManager.getConnectedClient()
                     if (client == null) {
                         pendingMessages.addFirst(message)

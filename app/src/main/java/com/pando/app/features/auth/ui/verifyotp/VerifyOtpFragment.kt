@@ -6,7 +6,9 @@ import android.view.inputmethod.InputMethodManager
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
 import com.pando.app.R
@@ -71,43 +73,46 @@ class VerifyOtpFragment :
             }
         }
 
-        lifecycleScope.launch {
-            viewModel.uiState.collect { state ->
-                when (state) {
-                    is UiState.Idle -> {
-                    }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    when (state) {
+                        is UiState.Idle -> {
+                        }
 
-                    is UiState.Loading -> {
-                        binding.verifyOtpButton.isEnabled = false
-                        binding.verifyOtpText.visibility = View.GONE
-                        binding.verifyOtpProgressBar.visibility = View.VISIBLE
-                    }
+                        is UiState.Loading -> {
+                            binding.verifyOtpButton.isEnabled = false
+                            binding.verifyOtpText.visibility = View.GONE
+                            binding.verifyOtpProgressBar.visibility = View.VISIBLE
+                        }
 
-                    is UiState.Success -> {
-                        binding.verifyOtpText.visibility = View.VISIBLE
-                        binding.verifyOtpProgressBar.visibility = View.GONE
+                        is UiState.Success -> {
+                            binding.verifyOtpText.visibility = View.VISIBLE
+                            binding.verifyOtpProgressBar.visibility = View.GONE
+                            viewModel.clearResult()
 
-                        when (val result = state.data) {
-                            is VerifyOtpResult.RegisterSuccess -> {
-                                requireContext().showShortToast(R.string.register_success)
-                                findNavController().popBackStack(R.id.startFragment, false)
-                            }
+                            when (val result = state.data) {
+                                is VerifyOtpResult.RegisterSuccess -> {
+                                    requireContext().showShortToast(R.string.register_success)
+                                    findNavController().popBackStack(R.id.startFragment, false)
+                                }
 
-                            is VerifyOtpResult.ForgotPasswordSuccess -> {
-                                requireContext().showShortToast(R.string.otp_verified_success)
-                                val action =
-                                    VerifyOtpFragmentDirections.actionVerifyOtpFragmentToResetPasswordFragment(
-                                        receiveEmail = email
-                                    )
-                                findNavController().navigate(action)
+                                is VerifyOtpResult.ForgotPasswordSuccess -> {
+                                    requireContext().showShortToast(R.string.otp_verified_success)
+                                    val action =
+                                        VerifyOtpFragmentDirections.actionVerifyOtpFragmentToResetPasswordFragment(
+                                            receiveEmail = email
+                                        )
+                                    findNavController().navigate(action)
+                                }
                             }
                         }
-                    }
 
-                    is UiState.Error -> {
-                        binding.verifyOtpButton.isEnabled = true
-                        binding.verifyOtpText.visibility = View.VISIBLE
-                        binding.verifyOtpProgressBar.visibility = View.GONE
+                        is UiState.Error -> {
+                            binding.verifyOtpButton.isEnabled = true
+                            binding.verifyOtpText.visibility = View.VISIBLE
+                            binding.verifyOtpProgressBar.visibility = View.GONE
+                        }
                     }
                 }
             }

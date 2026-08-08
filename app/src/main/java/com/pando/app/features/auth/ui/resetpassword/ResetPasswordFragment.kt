@@ -3,7 +3,9 @@ package com.pando.app.features.auth.ui.resetpassword
 import android.view.View
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
 import com.pando.app.R
@@ -49,47 +51,50 @@ class ResetPasswordFragment :
             viewModel.clearResult()
         }
 
-        lifecycleScope.launch {
-            viewModel.uiState.collect { state ->
-                when (state) {
-                    is UiState.Idle -> {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    when (state) {
+                        is UiState.Idle -> {
 
-                    }
-                    is UiState.Loading -> {
-                        binding.resetPasswordButton.isEnabled = false
-                        binding.resetPasswordText.visibility = View.GONE
-                        binding.resetPasswordProgressBar.visibility = View.VISIBLE
-                    }
-                    is UiState.Success -> {
-                        binding.resetPasswordText.visibility = View.VISIBLE
-                        binding.resetPasswordProgressBar.visibility = View.GONE
-                        requireContext().showShortToast(R.string.password_changed_success)
-
-                        findNavController().getBackStackEntry(R.id.startFragment)
-                            .savedStateHandle
-                            .set("is_verified", true)
-                        findNavController().popBackStack(R.id.startFragment, false)
-                    }
-                    is UiState.Error -> {
-                        binding.resetPasswordButton.isEnabled = true
-                        binding.resetPasswordText.visibility = View.VISIBLE
-                        binding.resetPasswordProgressBar.visibility = View.GONE
-
-                        binding.newPasswordLayout.error = null
-                        binding.confirmPasswordLayout.error = null
-
-                        val passwordText = binding.newPassword.text.toString()
-                        val confirmPasswordText = binding.confirmPassword.text.toString()
-
-                        if (passwordText.isEmpty()) {
-                            binding.newPasswordLayout.error = "Vui lòng nhập mật khẩu"
                         }
-                        if (confirmPasswordText.isEmpty()) {
-                            binding.confirmPasswordLayout.error = "Vui lòng nhập mật khẩu"
+                        is UiState.Loading -> {
+                            binding.resetPasswordButton.isEnabled = false
+                            binding.resetPasswordText.visibility = View.GONE
+                            binding.resetPasswordProgressBar.visibility = View.VISIBLE
                         }
-                        if (passwordText.isNotEmpty() && confirmPasswordText.isNotEmpty()) {
-                            binding.newPasswordLayout.error = ""
-                            binding.confirmPasswordLayout.error = state.message
+                        is UiState.Success -> {
+                            binding.resetPasswordText.visibility = View.VISIBLE
+                            binding.resetPasswordProgressBar.visibility = View.GONE
+                            requireContext().showShortToast(R.string.password_changed_success)
+
+                            viewModel.clearResult()
+                            findNavController().getBackStackEntry(R.id.startFragment)
+                                .savedStateHandle
+                                .set("is_verified", true)
+                            findNavController().popBackStack(R.id.startFragment, false)
+                        }
+                        is UiState.Error -> {
+                            binding.resetPasswordButton.isEnabled = true
+                            binding.resetPasswordText.visibility = View.VISIBLE
+                            binding.resetPasswordProgressBar.visibility = View.GONE
+
+                            binding.newPasswordLayout.error = null
+                            binding.confirmPasswordLayout.error = null
+
+                            val passwordText = binding.newPassword.text.toString()
+                            val confirmPasswordText = binding.confirmPassword.text.toString()
+
+                            if (passwordText.isEmpty()) {
+                                binding.newPasswordLayout.error = "Vui lòng nhập mật khẩu"
+                            }
+                            if (confirmPasswordText.isEmpty()) {
+                                binding.confirmPasswordLayout.error = "Vui lòng nhập mật khẩu"
+                            }
+                            if (passwordText.isNotEmpty() && confirmPasswordText.isNotEmpty()) {
+                                binding.newPasswordLayout.error = ""
+                                binding.confirmPasswordLayout.error = state.message
+                            }
                         }
                     }
                 }
