@@ -39,6 +39,10 @@
     <string name="otp_verified_success">Xác thực OTP thành công!</string>
     <string name="password_changed_success">Thay đổi mật khẩu thành công!</string>
     <string name="profile_updated_success">Cập nhật hồ sơ thành công!</string>
+    <string name="invalid_vietnam_phone">Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0</string>
+    <string name="birthday_required">Vui lòng chọn ngày sinh</string>
+    <string name="birthday_invalid">Ngày sinh không hợp lệ</string>
+    <string name="birthday_in_future">Ngày sinh không được ở tương lai</string>
     <string name="avatar_updated_success">Cập nhật ảnh đại diện thành công!</string>
     <string name="location_sharing_enabled">Đã bật chia sẻ vị trí!</string>
     <string name="location_sharing_disabled">Đã tắt chia sẻ vị trí!</string>
