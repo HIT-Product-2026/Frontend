@@ -43,6 +43,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     companion object {
         private const val FRIEND_FOCUS_ZOOM = 16.0
         private const val FRIEND_MARKER_HIT_RADIUS_DP = 48f
+        private const val FOLLOW_CAMERA_ANIMATION_MILLIS = 250
     }
 
     @Inject
@@ -76,6 +77,9 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     private var loadedStyle: Style? = null
     private var focusedFriendZoom: Double? = null
     private var isAnimatingToFriend = false
+    private data class FollowTarget(val personIds: Set<String>)
+    private var followTarget: FollowTarget? = null
+    private var lastFollowLocation: MarkerFollowLocation? = null
 
     private val multiplePermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -189,6 +193,8 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     }
 
     override fun onPause() {
+        clearFollowTarget()
+
         if (::locationController.isInitialized) {
             locationController.stopLocationUpdates()
             locationController.unregisterBearingUpdates()
@@ -209,6 +215,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     }
 
     override fun onDestroyView() {
+        clearFollowTarget()
         markerRenderer.clearStyle(loadedStyle)
         mapLibreMap = null
         loadedStyle = null
@@ -262,6 +269,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
                         ?: "Bạn"
                     currentUserAvatar = user?.avatar?.toString()
                     binding.profileIcon.loadAvatar(user?.avatar)
+                    updateCurrentLocationPoint()
                     renderFriendsState()
                 }
             }
@@ -292,10 +300,16 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
             if (feature == null) {
                 setFocusedFriendMarker(null)
+                clearFollowTarget()
                 return@addOnMapClickListener false
             }
 
             val markerType = feature.getStringProperty("markerType")
+
+            if (markerType == "current") {
+                focusCurrentMarker(map, feature)
+                return@addOnMapClickListener true
+            }
 
             if (
                 feature.getNumberProperty("point_count") != null ||
@@ -312,6 +326,14 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
 
             focusFriendMarker(map, feature)
             true
+        }
+
+        map.addOnCameraMoveStartedListener { reason ->
+            if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+                // Pan, pinch and rotate are explicit user intent. Stop only
+                // the automatic camera-follow; keep the visual marker focus.
+                clearFollowTarget()
+            }
         }
 
         map.addOnCameraIdleListener {
@@ -365,6 +387,10 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     }
 
     private fun zoomIntoCluster(map: MapLibreMap, feature: Feature) {
+        setFollowTarget(
+            loadedStyle?.let { style -> markerRenderer.personIdsForFeature(style, feature) }
+                .orEmpty()
+        )
         setFocusedFriendMarker(null)
 
         val clusterPoint = feature.geometry() as? Point ?: return
@@ -382,7 +408,11 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     private fun focusFriendMarker(map: MapLibreMap, feature: Feature) {
         val friendId = feature.getStringProperty("id")
         val friendName = feature.getStringProperty("name")
+        val personIds = loadedStyle?.let { style ->
+            markerRenderer.personIdsForFeature(style, feature)
+        }.orEmpty()
 
+        setFollowTarget(personIds)
         setFocusedFriendMarker(friendId)
 
         val friendPoint = feature.geometry() as? Point
@@ -407,6 +437,11 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
     }
 
     private fun focusNearbyGroupMarker(map: MapLibreMap, feature: Feature) {
+        val personIds = loadedStyle?.let { style ->
+            markerRenderer.personIdsForFeature(style, feature)
+        }.orEmpty()
+
+        setFollowTarget(personIds)
         setFocusedFriendMarker(null)
 
         val point = feature.geometry() as? Point
@@ -425,6 +460,35 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         Toast.makeText(
             requireContext(),
             "Bạn vừa chọn ${feature.getStringProperty("name")}",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun focusCurrentMarker(map: MapLibreMap, feature: Feature) {
+        val currentId = feature.getStringProperty("id")
+            .takeIf(String::isNotBlank)
+            ?: currentUserId?.toString()
+            ?: return
+
+        setFollowTarget(setOf(currentId))
+        setFocusedFriendMarker(null)
+
+        val point = feature.geometry() as? Point
+        if (point != null) {
+            focusedFriendZoom = FRIEND_FOCUS_ZOOM
+            isAnimatingToFriend = true
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(
+                    LatLng(point.latitude(), point.longitude()),
+                    zoom = FRIEND_FOCUS_ZOOM
+                ),
+                500
+            )
+        }
+
+        Toast.makeText(
+            requireContext(),
+            "Bạn vừa chọn ${feature.getStringProperty("name") ?: currentUserName}",
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -486,7 +550,9 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         currentLng = location.longitude
         updateCurrentLocationPoint()
         renderFriendsState()
-        moveCameraToCurrentLocation(animate = false)
+        if (followTarget == null) {
+            moveCameraToCurrentLocation(animate = false)
+        }
     }
 
     private fun updateCurrentLocationPoint() {
@@ -494,7 +560,13 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         val latitude = currentLat ?: return
         val longitude = currentLng ?: return
 
-        markerRenderer.renderCurrentLocation(style, latitude, longitude)
+        markerRenderer.renderCurrentLocation(
+            style = style,
+            latitude = latitude,
+            longitude = longitude,
+            currentUserId = currentUserId?.toString(),
+            currentUserName = currentUserName
+        )
     }
 
     private fun renderMapState() {
@@ -523,6 +595,7 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
         mapLibreMap?.let { map ->
             markerRenderer.updateNearbyGroupVisibility(map, style)
         }
+        updateCameraForFollowTarget()
     }
 
     private fun currentUserMapMarker(): CurrentUserMapMarker? {
@@ -545,6 +618,42 @@ class MapFragment : BaseFragment<FragmentMapBinding>(FragmentMapBinding::inflate
             isAnimatingToFriend = false
         }
         markerRenderer.setFocusedFriendMarker(loadedStyle, friendId)
+    }
+
+    private fun setFollowTarget(personIds: Set<String>) {
+        if (personIds.isEmpty()) {
+            clearFollowTarget()
+            return
+        }
+
+        followTarget = FollowTarget(personIds)
+        lastFollowLocation = null
+    }
+
+    private fun clearFollowTarget() {
+        followTarget = null
+        lastFollowLocation = null
+    }
+
+    private fun updateCameraForFollowTarget() {
+        val target = followTarget ?: return
+        val map = mapLibreMap ?: return
+        val location = markerRenderer.resolveFollowLocation(target.personIds)
+
+        if (location == null) {
+            clearFollowTarget()
+            return
+        }
+
+        if (location == lastFollowLocation) return
+        lastFollowLocation = location
+
+        map.animateCamera(
+            CameraUpdateFactory.newLatLng(
+                LatLng(location.latitude, location.longitude)
+            ),
+            FOLLOW_CAMERA_ANIMATION_MILLIS
+        )
     }
 
     private fun moveCameraToCurrentLocation(animate: Boolean = true) {

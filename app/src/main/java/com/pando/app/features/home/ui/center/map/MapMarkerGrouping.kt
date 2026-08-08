@@ -1,6 +1,7 @@
 package com.pando.app.features.home.ui.center.map
 
 import kotlin.math.atan2
+import kotlin.math.asin
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -36,6 +37,22 @@ data class NearbyMarkerGroup(
         get() = people.size
 }
 
+data class MarkerScreenPoint(
+    val id: String,
+    val x: Float,
+    val y: Float
+)
+
+data class MarkerFollowLocation(
+    val latitude: Double,
+    val longitude: Double
+)
+
+data class NearbyCirclePoint(
+    val latitude: Double,
+    val longitude: Double
+)
+
 /**
  * Builds connected components using a geographic radius.  Connected
  * components are intentional here: if A is within 30m of B and B is within
@@ -44,6 +61,7 @@ data class NearbyMarkerGroup(
  */
 object MapMarkerGrouping {
     const val NEARBY_RADIUS_METERS = 30.0
+    const val NEARBY_SPLIT_THRESHOLD_DP = 48.0
 
     /**
      * Returns the label used for a rendered cluster. A cluster is only
@@ -57,6 +75,87 @@ object MapMarkerGrouping {
 
     fun clusterLabelForPersonCount(personCount: Int): String {
         return "+${(personCount - 1).coerceAtLeast(1)}"
+    }
+
+    /**
+     * Returns true when at least two members no longer touch on screen. The
+     * geographic nearby group is intentionally kept intact; this only changes
+     * how it is rendered at the current zoom level.
+     */
+    fun shouldSplitNearbyGroup(
+        points: List<MarkerScreenPoint>,
+        thresholdPx: Float
+    ): Boolean {
+        if (points.size < 2) return false
+
+        points.indices.forEach { firstIndex ->
+            ((firstIndex + 1) until points.size).forEach { secondIndex ->
+                val first = points[firstIndex]
+                val second = points[secondIndex]
+                val dx = first.x - second.x
+                val dy = first.y - second.y
+                if (sqrt((dx * dx + dy * dy).toDouble()) > thresholdPx) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    fun resolveFollowLocation(
+        people: Collection<NearbyMarkerPerson>,
+        personIds: Set<String>
+    ): MarkerFollowLocation? {
+        if (personIds.isEmpty()) return null
+
+        val matchedPeople = people.filter { it.id in personIds }
+        if (matchedPeople.isEmpty()) return null
+
+        return MarkerFollowLocation(
+            latitude = matchedPeople.map(NearbyMarkerPerson::latitude).average(),
+            longitude = matchedPeople.map(NearbyMarkerPerson::longitude).average()
+        )
+    }
+
+    fun personIdsFromMarkerId(markerId: String): Set<String> {
+        return markerId
+            .split(',')
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .toSet()
+    }
+
+    /** Returns a closed ring representing a geodesic circle on the map. */
+    fun circlePoints(
+        latitude: Double,
+        longitude: Double,
+        radiusMeters: Double = NEARBY_RADIUS_METERS,
+        segments: Int = 48
+    ): List<NearbyCirclePoint> {
+        require(segments >= 8) { "A circle needs at least eight segments" }
+
+        val earthRadiusMeters = 6_371_000.0
+        val angularDistance = radiusMeters / earthRadiusMeters
+        val centerLatitude = Math.toRadians(latitude)
+        val centerLongitude = Math.toRadians(longitude)
+
+        return (0..segments).map { index ->
+            val bearing = 2.0 * Math.PI * index / segments
+            val pointLatitude = asin(
+                sin(centerLatitude) * cos(angularDistance) +
+                    cos(centerLatitude) * sin(angularDistance) * cos(bearing)
+            )
+            val pointLongitude = centerLongitude + atan2(
+                sin(bearing) * sin(angularDistance) * cos(centerLatitude),
+                cos(angularDistance) - sin(centerLatitude) * sin(pointLatitude)
+            )
+
+            NearbyCirclePoint(
+                latitude = Math.toDegrees(pointLatitude),
+                longitude = Math.toDegrees(pointLongitude)
+            )
+        }
     }
 
     fun group(

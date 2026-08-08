@@ -65,6 +65,84 @@ class MapMarkerGroupingTest {
         assertEquals(null, MapMarkerGrouping.clusterLabel(listOf(3)))
     }
 
+    @Test
+    fun nearbyGroupStaysStackedWhenMembersTouchOnScreen() {
+        val points = listOf(
+            MarkerScreenPoint("a", x = 100f, y = 100f),
+            MarkerScreenPoint("b", x = 140f, y = 100f),
+            MarkerScreenPoint("c", x = 120f, y = 135f)
+        )
+
+        assertFalse(MapMarkerGrouping.shouldSplitNearbyGroup(points, thresholdPx = 48f))
+    }
+
+    @Test
+    fun nearbyGroupSplitsWhenAnyMembersAreFartherThanThreshold() {
+        val points = listOf(
+            MarkerScreenPoint("a", x = 100f, y = 100f),
+            MarkerScreenPoint("b", x = 180f, y = 100f)
+        )
+
+        assertTrue(MapMarkerGrouping.shouldSplitNearbyGroup(points, thresholdPx = 48f))
+    }
+
+    @Test
+    fun followLocationUsesCurrentCenterOfSelectedPeople() {
+        val people = listOf(
+            person("a", 21.0, 105.0),
+            person("b", 21.0002, 105.0004),
+            person("other", 22.0, 106.0)
+        )
+
+        val location = MapMarkerGrouping.resolveFollowLocation(
+            people = people,
+            personIds = setOf("a", "b")
+        )
+
+        assertEquals(21.0001, location?.latitude ?: 0.0, 0.0000001)
+        assertEquals(105.0002, location?.longitude ?: 0.0, 0.0000001)
+    }
+
+    @Test
+    fun followLocationIsNullWhenSelectedPeopleDisappear() {
+        val location = MapMarkerGrouping.resolveFollowLocation(
+            people = listOf(person("a", 21.0, 105.0)),
+            personIds = setOf("missing")
+        )
+
+        assertEquals(null, location)
+    }
+
+    @Test
+    fun markerIdCanRepresentAGroupOfPeople() {
+        assertEquals(
+            setOf("a", "b", "c"),
+            MapMarkerGrouping.personIdsFromMarkerId("a,b,c")
+        )
+    }
+
+    @Test
+    fun nearbyCircleIsClosedAndHasThirtyMeterRadius() {
+        val centerLatitude = 21.0
+        val centerLongitude = 105.0
+        val circle = MapMarkerGrouping.circlePoints(
+            latitude = centerLatitude,
+            longitude = centerLongitude
+        )
+
+        assertEquals(circle.first(), circle.last())
+        assertEquals(
+            30.0,
+            MapMarkerGrouping.distanceMeters(
+                centerLatitude,
+                centerLongitude,
+                circle.first().latitude,
+                circle.first().longitude
+            ),
+            0.05
+        )
+    }
+
     private fun person(
         id: String,
         latitude: Double,
