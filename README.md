@@ -46,7 +46,7 @@
 ### 📍 Map — Bản Đồ Bạn Bè
 
 - Hiển thị vị trí hiện tại của người dùng và các bạn bè đã chia sẻ vị trí.
-- Sử dụng **MapLibre Android SDK** với style bản đồ từ **Amazon Location**.
+- Sử dụng **MapLibre Android SDK** để render bản đồ và **Amazon Location Service** để cung cấp style/map data.
 - Nhận vị trí bạn bè theo thời gian thực thông qua STOMP WebSocket.
 - Gom các marker gần nhau thành nhóm để bản đồ dễ quan sát.
 - Focus vào bạn bè, nhóm bạn bè hoặc vị trí hiện tại.
@@ -341,4 +341,4 @@ Chọn ảnh từ thư viện trong màn hình chỉnh sửa avatar đã đượ
 
 ## 📄 Giấy Phép
 
-Repository hiện chưa kèm file `LICENSE`. Hãy bổ sung giấy phép phù hợp trước khi phân phối mã nguồn công khai.
+Project được phát hành theo **MIT License**. Xem toàn bộ điều khoản tại file [`LICENSE`](LICENSE).
