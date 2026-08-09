@@ -33,4 +33,15 @@ class PendingSocketMessageQueueTest {
         assertEquals(image, queue.pollFirst())
         assertEquals(text, queue.pollFirst())
     }
+
+    @Test
+    fun clearDropsEveryPendingMessage() {
+        val queue = PendingSocketMessageQueue()
+        queue.addLast(PendingSocketMessage("image", "first"))
+        queue.addLast(PendingSocketMessage("text", "second"))
+
+        assertEquals(2, queue.clear())
+        assertEquals(0, queue.size())
+        assertNull(queue.pollFirst())
+    }
 }

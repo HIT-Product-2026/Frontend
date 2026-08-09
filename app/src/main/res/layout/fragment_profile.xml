@@ -160,7 +160,11 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:background="@drawable/stroke_accent5_r10"
+                        android:digits="0123456789"
                         android:hint="Số điện thoại"
+                        android:inputType="phone"
+                        android:maxLength="10"
+                        android:maxLines="1"
                         android:textColor="@color/white"
                         android:textColorHint="@color/white" />
 

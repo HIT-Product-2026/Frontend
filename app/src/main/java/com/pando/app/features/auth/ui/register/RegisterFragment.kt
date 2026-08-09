@@ -77,6 +77,7 @@ class RegisterFragment : BaseBottomSheet<FragmentRegisterBinding>(FragmentRegist
                             binding.registerText.visibility = View.VISIBLE
                             binding.registerProgressBar.visibility = View.GONE
                             requireContext().showShortToast(R.string.otp_sent_success)
+                            viewModel.clearResult()
 
                             val action = RegisterFragmentDirections.actionRegisterBottomSheetToVerifyOtpFragment(
                                 isRegister = "true",

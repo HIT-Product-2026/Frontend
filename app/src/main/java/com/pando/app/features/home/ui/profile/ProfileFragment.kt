@@ -8,6 +8,7 @@ import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -26,7 +27,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import javax.inject.Inject
 
@@ -99,6 +99,8 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
             val displayName = binding.displayNameET.text.toString().trim()
             val phoneNumber = binding.phoneET.text.toString().trim()
             val birthday = binding.birthDateTV.text.toString().trim()
+            val birthdayDate = validateProfileInput(phoneNumber, birthday)
+                ?: return@setOnClickListener
             val gender = when (binding.genderTV.text.toString()) {
                 "Nam" -> Gender.MALE
                 "Nữ" -> Gender.FEMALE
@@ -114,7 +116,7 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
 
             pendingDisplayName = displayName
             pendingProfile = CurrentUserProfile(
-                birthday = birthday,
+                birthday = birthdayDate.toString(),
                 gender = gender,
                 phoneNumber = phoneNumber
             )
@@ -125,6 +127,10 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
                 gender = gender,
                 phoneNumber = phoneNumber
             )
+        }
+
+        binding.phoneET.doOnTextChanged { _, _, _, _ ->
+            binding.phoneLayout.error = null
         }
 
         binding.btnEditAvatar.setOnClickListener {
@@ -218,18 +224,34 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
         }
     }
 
-    fun initDatePicker() {
+    private fun initDatePicker() {
         val dataSetListener = DatePickerDialog.OnDateSetListener { _, year, month, day ->
-            val formattedDay = "%02d".format(day)
-            val formattedMonth = "%02d".format(month + 1)
+            val selectedDate = LocalDate.of(year, month + 1, day)
+            if (ProfileInputValidator.isFutureBirthday(selectedDate)) {
+                binding.birthDateLayout.error = getString(R.string.birthday_in_future)
+                return@OnDateSetListener
+            }
 
-            val date: String = makeDateString(formattedDay, formattedMonth, year)
-
-            binding.birthDateTV.setText(date, false)
+            binding.birthDateLayout.error = null
+            binding.birthDateTV.setText(
+                ProfileInputValidator.formatDisplayBirthday(selectedDate),
+                false
+            )
         }
 
         binding.birthDateTV.setOnClickListener {
+            binding.birthDateLayout.error = null
+            val today = LocalDate.now()
+            val initialDate = ProfileInputValidator
+                .parseDisplayBirthday(binding.birthDateTV.text.toString())
+                ?.takeUnless { ProfileInputValidator.isFutureBirthday(it) }
+                ?: today
             val calendar = Calendar.getInstance()
+            calendar.set(
+                initialDate.year,
+                initialDate.monthValue - 1,
+                initialDate.dayOfMonth
+            )
 
             datePickerDialog = DatePickerDialog(
                 requireContext(),
@@ -239,12 +261,47 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
                 calendar.get(Calendar.DAY_OF_MONTH)
             )
 
+            datePickerDialog.datePicker.maxDate = System.currentTimeMillis()
             datePickerDialog.show()
         }
     }
 
-    private fun makeDateString(day: String, month: String, year: Int): String {
-        return "$day/$month/$year"
+    private fun validateProfileInput(phoneNumber: String, birthday: String): LocalDate? {
+        binding.phoneLayout.error = null
+        binding.birthDateLayout.error = null
+
+        var isValid = true
+        if (!ProfileInputValidator.isValidVietnamPhone(phoneNumber)) {
+            binding.phoneLayout.error = getString(R.string.invalid_vietnam_phone)
+            isValid = false
+        }
+
+        val birthdayDate = ProfileInputValidator.parseDisplayBirthday(birthday)
+        when {
+            birthday.isBlank() -> {
+                binding.birthDateLayout.error = getString(R.string.birthday_required)
+                isValid = false
+            }
+
+            birthdayDate == null -> {
+                binding.birthDateLayout.error = getString(R.string.birthday_invalid)
+                isValid = false
+            }
+
+            ProfileInputValidator.isFutureBirthday(birthdayDate) -> {
+                binding.birthDateLayout.error = getString(R.string.birthday_in_future)
+                isValid = false
+            }
+        }
+
+        if (!isValid) {
+            if (binding.phoneLayout.error != null) {
+                binding.phoneET.requestFocus()
+            }
+            return null
+        }
+
+        return birthdayDate
     }
 
     private fun loadCurrentUser() {
@@ -256,10 +313,11 @@ class ProfileFragment : BaseFragment<FragmentProfileBinding>(FragmentProfileBind
 
                     val profile = user?.profile
                     val birthday = profile?.birthday.orEmpty()
-                    val displayBirthday = runCatching {
-                        val birthdayParsed = LocalDate.parse(birthday)
-                        makeDateString(birthdayParsed.dayOfMonth.toString(), birthdayParsed.monthValue.toString(), birthdayParsed.year)
-                    }.getOrDefault(birthday)
+                    val birthdayParsed = runCatching { LocalDate.parse(birthday) }.getOrNull()
+                        ?: ProfileInputValidator.parseDisplayBirthday(birthday)
+                    val displayBirthday = birthdayParsed
+                        ?.let(ProfileInputValidator::formatDisplayBirthday)
+                        ?: birthday
 
                     binding.birthDateTV.setText(displayBirthday, false)
                     binding.phoneET.setText(profile?.phoneNumber.orEmpty())
