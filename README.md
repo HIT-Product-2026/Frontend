@@ -330,7 +330,6 @@ Vị trí chỉ được chia sẻ sau khi người dùng bật tính năng và 
 Một số mục giao diện hiện vẫn hiển thị `Coming soon`:
 
 - Chọn media từ gallery trực tiếp trong màn hình Camera.
-- Gửi lại OTP.
 - Chụp/xóa avatar trực tiếp bằng camera.
 - Chặn bạn bè.
 - Một số mục mở rộng trong Settings như chia sẻ profile, báo cáo sự cố, appearance và xóa tài khoản.
