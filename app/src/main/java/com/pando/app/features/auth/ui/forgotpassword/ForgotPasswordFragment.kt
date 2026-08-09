@@ -4,7 +4,9 @@ import android.text.InputType
 import android.view.View
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.pando.app.R
 import com.pando.app.core.base.BaseFragment
@@ -18,6 +20,7 @@ import kotlin.getValue
 @AndroidEntryPoint
 class ForgotPasswordFragment : BaseFragment<FragmentForgotPasswordBinding>(FragmentForgotPasswordBinding::inflate) {
     private val viewModel : FPViewModel by viewModels()
+    private var submittedEmail: String? = null
 
     override fun initData() {
     }
@@ -30,10 +33,9 @@ class ForgotPasswordFragment : BaseFragment<FragmentForgotPasswordBinding>(Fragm
             findNavController().popBackStack()
         }
 
-        lateinit var email : String
-
         binding.forgotPasswordButton.setOnClickListener {
-            email = binding.emailET.text.toString()
+            val email = binding.emailET.text.toString()
+            submittedEmail = email
             viewModel.forgotPassword(email)
         }
 
@@ -42,44 +44,56 @@ class ForgotPasswordFragment : BaseFragment<FragmentForgotPasswordBinding>(Fragm
             viewModel.clearResult()
         }
 
-        lifecycleScope.launch {
-            viewModel.uiState.collect { state ->
-                when (state) {
-                    is UiState.Idle -> {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    when (state) {
+                        is UiState.Idle -> {
 
-                    }
-                    is UiState.Loading -> {
-                        binding.forgotPasswordButton.isEnabled = false
-                        binding.forgotPasswordText.visibility = View.GONE
-                        binding.forgotPasswordProgressBar.visibility = View.VISIBLE
-                    }
-                    is UiState.Success -> {
-                        binding.forgotPasswordText.visibility = View.VISIBLE
-                        binding.forgotPasswordProgressBar.visibility = View.GONE
-                        requireContext().showShortToast(R.string.otp_sent_success)
-
-                        val action = ForgotPasswordFragmentDirections.actionForgotPasswordFragmentToVerifyOtpFragment(
-                            receiveEmail = email
-                        )
-                        findNavController().navigate(action)
-                    }
-                    is UiState.Error -> {
-                        binding.forgotPasswordButton.isEnabled = true
-                        binding.forgotPasswordText.visibility = View.VISIBLE
-                        binding.forgotPasswordProgressBar.visibility = View.GONE
-
-                        binding.emailLayout.error = null
-
-                        val emailText = binding.emailET.text.toString()
-
-                        if (emailText.isEmpty()) {
-                            binding.emailLayout.error = "Vui lòng nhập email"
                         }
-                        if (binding.emailET.inputType != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS && emailText.isNotEmpty()) {
-                            binding.emailLayout.error = "Vui lòng nhập đúng định dạng email"
+                        is UiState.Loading -> {
+                            binding.forgotPasswordButton.isEnabled = false
+                            binding.forgotPasswordText.visibility = View.GONE
+                            binding.forgotPasswordProgressBar.visibility = View.VISIBLE
                         }
-                        if (emailText.isNotEmpty()) {
-                            binding.emailLayout.error = state.message
+                        is UiState.Success -> {
+                            binding.forgotPasswordText.visibility = View.VISIBLE
+                            binding.forgotPasswordProgressBar.visibility = View.GONE
+                            requireContext().showShortToast(R.string.otp_sent_success)
+
+                            val email = submittedEmail
+                                ?.takeIf(String::isNotBlank)
+                                ?: binding.emailET.text?.toString().orEmpty()
+                            if (email.isBlank()) {
+                                viewModel.clearResult()
+                                return@collect
+                            }
+
+                            viewModel.clearResult()
+                            val action =
+                                ForgotPasswordFragmentDirections.actionForgotPasswordFragmentToVerifyOtpFragment(
+                                    receiveEmail = email
+                                )
+                            findNavController().navigate(action)
+                        }
+                        is UiState.Error -> {
+                            binding.forgotPasswordButton.isEnabled = true
+                            binding.forgotPasswordText.visibility = View.VISIBLE
+                            binding.forgotPasswordProgressBar.visibility = View.GONE
+
+                            binding.emailLayout.error = null
+
+                            val emailText = binding.emailET.text.toString()
+
+                            if (emailText.isEmpty()) {
+                                binding.emailLayout.error = "Vui lòng nhập email"
+                            }
+                            if (binding.emailET.inputType != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS && emailText.isNotEmpty()) {
+                                binding.emailLayout.error = "Vui lòng nhập đúng định dạng email"
+                            }
+                            if (emailText.isNotEmpty()) {
+                                binding.emailLayout.error = state.message
+                            }
                         }
                     }
                 }

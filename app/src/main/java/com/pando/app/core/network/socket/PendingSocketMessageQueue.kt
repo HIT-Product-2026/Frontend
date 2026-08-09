@@ -1,11 +1,13 @@
 package com.pando.app.core.network.socket
 
 import java.util.ArrayDeque
+import java.util.UUID
 
 /** A small in-memory FIFO used while the STOMP connection is unavailable. */
 internal data class PendingSocketMessage(
     val destination: String,
-    val payload: String
+    val payload: String,
+    val ownerUserId: UUID? = null
 )
 
 internal class PendingSocketMessageQueue {
@@ -40,4 +42,11 @@ internal class PendingSocketMessageQueue {
 
     @Synchronized
     fun size(): Int = messages.size
+
+    @Synchronized
+    fun clear(): Int {
+        val removedCount = messages.size
+        messages.clear()
+        return removedCount
+    }
 }

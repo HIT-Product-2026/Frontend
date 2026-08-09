@@ -148,7 +148,13 @@ class MainActivity : AppCompatActivity() {
 
         observeUiEvents()
 
-        if (savedInstanceState == null) {
+        // UserSession only lives in memory. After Android restores this Activity
+        // in a new process, savedInstanceState is non-null but the session is
+        // empty, so resolve it from the encrypted tokens before restoring UI.
+        val shouldResolveStartup =
+            savedInstanceState == null || userSession.getCurrentUser() == null
+
+        if (shouldResolveStartup) {
             lifecycleScope.launch {
                 val onboardingCompleted = OnboardingPreferences.isCompleted(this@MainActivity)
 

@@ -1,6 +1,9 @@
 package com.pando.app.core.service
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.util.Log
 import com.google.firebase.messaging.FirebaseMessaging
 import com.pando.app.core.network.api.TokenManager
@@ -39,6 +42,10 @@ class FcmTokenSyncManager @Inject constructor(
     )
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val syncLock = Any()
+    private val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+
+    @Volatile
+    private var isNetworkAvailable = checkInitialNetworkAvailable()
 
     @Volatile
     private var syncJob: Job? = null
@@ -48,6 +55,31 @@ class FcmTokenSyncManager @Inject constructor(
 
     @Volatile
     private var lastSyncedKey: String? = null
+
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onCapabilitiesChanged(
+            network: Network,
+            capabilities: NetworkCapabilities
+        ) {
+            val available =
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                    capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            val becameAvailable = available && !isNetworkAvailable
+            isNetworkAvailable = available
+
+            if (becameAvailable) {
+                requestSync()
+            }
+        }
+
+        override fun onLost(network: Network) {
+            isNetworkAvailable = false
+        }
+    }
+
+    init {
+        connectivityManager.registerDefaultNetworkCallback(networkCallback)
+    }
 
     /**
      * Call only after login/session restoration has saved a valid access token
@@ -95,6 +127,9 @@ class FcmTokenSyncManager @Inject constructor(
     private suspend fun syncWithRetry() {
         repeat(RETRY_DELAYS_MILLIS.size + 1) { attempt ->
             if (!hasAuthenticatedSession()) return
+            // Keep the pending token untouched. The network callback will
+            // restart synchronization as soon as Android validates a network.
+            if (!isNetworkAvailable) return
 
             try {
                 val userId = userSession.getCurrentUser()?.id ?: return
@@ -145,6 +180,14 @@ class FcmTokenSyncManager @Inject constructor(
     private fun hasAuthenticatedSession(): Boolean =
         userSession.getCurrentUser() != null &&
             !tokenManager.getAccessToken().isNullOrBlank()
+
+    private fun checkInitialNetworkAvailable(): Boolean {
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
 
     private fun pendingToken(): String? =
         preferences.getString(PENDING_TOKEN_KEY, null)
