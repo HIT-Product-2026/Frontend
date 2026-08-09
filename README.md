@@ -131,7 +131,7 @@
 | Realtime | STOMP over WebSocket, OkHttp SSE |
 | Camera/Media | CameraX, ExoPlayer, Media3 Transformer, Compressor |
 | Bản đồ/Vị trí | MapLibre Android SDK, Amazon Location, Fused Location Provider |
-| Hình ảnh | Coil, Glide |
+| Hình ảnh | Glide |
 | Firebase | Firebase Cloud Messaging, Firebase Analytics |
 | Bảo mật | EncryptedSharedPreferences, JWT Decode, refresh token |
 | Widget | Android AppWidget, RemoteViews, PendingIntent |
